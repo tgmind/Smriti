@@ -358,3 +358,38 @@ begin
   return true;
 end;
 $$;
+
+-- AUTOMATIC USER INITIALIZATION TRIGGER
+create or replace function public.handle_new_user()
+returns trigger
+language plpgsql
+security definer
+as $$
+begin
+  -- 1. Create Profile
+  insert into public.profiles (id, email, display_name)
+  values (new.id, new.email, coalesce(new.raw_user_meta_data->>'full_name', split_part(new.email, '@', 1)))
+  on conflict (id) do nothing;
+
+  -- 2. Create User Settings
+  insert into public.user_settings (user_id)
+  values (new.id)
+  on conflict (user_id) do nothing;
+
+  -- 3. Seed Default Subjects
+  insert into public.subjects (user_id, name, icon_name, color_hex, description, sort_order)
+  values
+    (new.id, 'Physics', 'Atom', '#38bdf8', 'Laws of Motion, Electromagnetism, Quantum Mechanics', 1),
+    (new.id, 'Chemistry', 'FlaskConical', '#f59e0b', 'Organic Reaction Mechanisms, Chemical Bonding', 2),
+    (new.id, 'Biology', 'Dna', '#10b981', 'Cellular Respiration, Genetics & Molecular Biology', 3),
+    (new.id, 'Mathematics', 'Binary', '#a855f7', 'Calculus Theorems, Linear Algebra Properties', 4);
+
+  return new;
+end;
+$$;
+
+drop trigger if exists on_auth_user_created on auth.users;
+create trigger on_auth_user_created
+  after insert on auth.users
+  for each row execute procedure public.handle_new_user();
+

@@ -1,185 +1,111 @@
-# MANUAL SETUP REQUIREMENTS & OWNER GUIDE
+# MANUAL SETUP REQUIREMENTS & OWNER GUIDE (UPDATED)
 
 **Product:** SMRITI — Audio Learning & Spaced Repetition Platform  
 **Target Audience:** Product Owner (No Coding Required)  
-**Cost:** $0.00 (Zero Cost — No Credit Card Needed)  
+**Backend Status:** **100% CONFIGURED & DEPLOYED AUTOMATICALLY**  
+**Cost:** $0.00 (Strictly Free-Tier — Zero Credit Card Required)  
 
 ---
 
-## Overview of External Actions
-As the product owner, you only need to create free accounts on four platforms and copy a few identification keys into the environment. You will never need to write or edit code.
+## 1. What Has Been Completed Automatically For You
 
-Every action below is marked with one of:
-- **[REQUIRED BEFORE FIRST BUILD]**
-- **[REQUIRED BEFORE FIRST INSTALLATION]**
-- **[REQUIRED BEFORE PUBLIC LAUNCH]**
-- **[OPTIONAL]**
-- **[REQUIRED ONLY FOR FUTURE UPDATES]**
+You do **NOT** need to create or configure a Supabase project or write any SQL. The entire backend has already been provisioned, connected, and verified:
 
----
-
-## Section A: Accounts You Must Create
-
-### 1. GitHub Account `[REQUIRED BEFORE FIRST BUILD]`
-- **Website:** https://github.com/signup
-- **Why it is needed:** Stores your SMRITI code securely and automatically sends updates to Cloudflare.
-- **Plan to choose:** **Free Plan** ($0/month).
-- **Credit card asked?** **No.**
-- **What to save:** Your GitHub username and repository link.
-
-### 2. Cloudflare Account `[REQUIRED BEFORE FIRST BUILD]`
-- **Website:** https://dash.cloudflare.com/sign-up
-- **Why it is needed:** Hosts the SMRITI web application globally with lightning-fast speeds and zero hosting bills.
-- **Plan to choose:** **Free Plan**.
-- **Credit card asked?** **No.** (Skip any billing page).
-- **What to save:** Your Cloudflare account login.
-
-### 3. Supabase Account `[REQUIRED BEFORE FIRST BUILD]`
-- **Website:** https://supabase.com
-- **Why it is needed:** Stores user accounts, learning progress, revision schedules, and audio metadata.
-- **Plan to choose:** **Free Tier** (Select "Start your project" -> Choose Free Plan).
-- **Credit card asked?** **No.**
-- **What to save:** Your Project URL and `anon` public key (found in Project Settings -> API).
-
-### 4. Google Cloud Console (For Google Drive Integration) `[REQUIRED BEFORE FIRST INSTALLATION]`
-- **Website:** https://console.cloud.google.com
-- **Why it is needed:** Allows students to store their audio notes directly in their personal Google Drive without central storage fees.
-- **Plan to choose:** Free Developer Console (Default).
-- **Credit card asked?** **No.** (Do not enable billing; standard Google Drive API access operates entirely on the free tier).
-- **What to save:** Your Google OAuth Client ID.
+- [x] **Supabase Credentials Loaded & Saved:**
+  - Project URL: `https://wppnfezoqpcgmowdkofp.supabase.co`
+  - Public Anon Key: `sb_publishable_Jv7t8irT0s7wTNheRXMUpQ_SrNOB-0n`
+  - Direct PostgreSQL Pooler: `db.wppnfezoqpcgmowdkofp.supabase.co:6543/postgres`
+- [x] **Full Production Database Migrations Applied:**
+  - All 15 relational tables created (`profiles`, `user_settings`, `subjects`, `collections`, `audio_items`, `playlists`, `playlist_items`, `playback_events`, `audio_statistics`, `daily_statistics`, `recall_assessments`, `revision_schedule`, `listening_sessions`, `user_devices`, `sync_state`).
+- [x] **PostgreSQL Row-Level Security (RLS) Active:** Every table is secured with tenant isolation policies (`auth.uid() = user_id`).
+- [x] **Automatic Student Provisioning Trigger:** New user registrations automatically initialize student profiles, default preferences, and 4 starter academic subjects (Physics, Chemistry, Biology, Mathematics).
+- [x] **Frontend Production Build Configured:** The web bundle has been recompiled with live Supabase credentials.
+- [x] **Android APK Built & Bundled:** `smriti-debug.apk` has been re-assembled with the live credentials and bundled assets.
 
 ---
 
-## Section B: Google Drive & OAuth 2.0 Setup (Step-by-Step)
-`[REQUIRED BEFORE FIRST INSTALLATION]`
+## 2. What Remains: Step-by-Step Manual Setup Checklist
 
-Google Drive integration is developer-configured and centrally managed. Your users will **never** need to configure API keys or Google Cloud projects—they simply tap "Connect Google Drive" and sign in with their personal Google account.
+Below are the **only 3 remaining manual steps** required to test on your phone and launch the web app.
 
-1. **Create a Google Cloud Project:**
-   - Go to [Google Cloud Console](https://console.cloud.google.com).
-   - In the top dropdown, click **New Project**.
-   - Name it **Smriti Learning** and click **Create**.
+---
 
-2. **Enable the Google Drive API:**
-   - In the search bar at the top, type `Google Drive API` and press Enter.
-   - Click on **Google Drive API** and click **Enable**.
+### Step 1: Google Cloud & Drive OAuth 2.0 Setup
+**Timing:** `[REQUIRED FOR GOOGLE DRIVE AUDIO STORAGE]`  
+**Estimated Time:** ~3 minutes  
+**Cost:** $0.00 (Free Developer Console — No billing required)  
 
-3. **Configure the OAuth Consent Screen:**
+Because audio files are saved directly in each student's personal Google Drive (saving you central storage bills), Google requires an OAuth Client ID so users can securely sign in with their Google accounts.
+
+1. **Open Google Cloud Console:**
+   - Go to [console.cloud.google.com](https://console.cloud.google.com) and log in with your Google account.
+2. **Create a Project:**
+   - In the top dropdown bar, click **New Project**.
+   - Project Name: `Smriti Audio Learning`.
+   - Click **Create**.
+3. **Enable Google Drive API:**
+   - In the top search bar, type `Google Drive API` and press Enter.
+   - Click on **Google Drive API** in the results, then click the blue **Enable** button.
+4. **Configure OAuth Consent Screen:**
    - In the left sidebar, click **APIs & Services** > **OAuth consent screen**.
    - Select **External** and click **Create**.
-   - App Name: `SMRITI Audio Learning`.
-   - User Support Email: Select your email.
-   - Developer Contact Email: Enter your email.
+   - **App name:** `SMRITI`.
+   - **User support email:** (Select your email address).
+   - **Developer contact information:** (Enter your email address).
    - Click **Save and Continue**.
-   - Under **Scopes**, click **Add or Remove Scopes**. Select:
-     `.../auth/drive.file` (Per-file access: only files created or opened by SMRITI).
+   - Under **Scopes**, click **Add or Remove Scopes**. Search for and check:
+     `.../auth/drive.file` (This grants access ONLY to audio files created or opened by SMRITI).
    - Click **Save and Continue**.
-   - Under **Test Users**, add your personal Google email address (so you can test the app immediately). Click **Save and Continue**.
-
-4. **Create Credentials:**
-   - In the left sidebar, click **Credentials** > **Create Credentials** > **OAuth client ID**.
-   - Application Type:
-     - For Web: Select **Web Application**. Add Authorized JavaScript origin (your Cloudflare Pages URL) and redirect URI.
-     - For Android: Select **Android**. Enter package name `com.smriti.app` and your SHA-1 signing certificate fingerprint.
+   - Under **Test Users**, click **Add Users** and enter your personal email address so you can test it immediately. Click **Save and Continue**.
+5. **Create Credentials:**
+   - In the left menu, click **Credentials** > **Create Credentials** > **OAuth client ID**.
+   - **Application type:** Select **Web application**.
+   - **Name:** `SMRITI Web Client`.
+   - Under **Authorized JavaScript origins**, click **Add URI** and enter:
+     - `http://localhost:3000` (for local testing)
+     - `https://smriti.pages.dev` (or your future Cloudflare domain)
    - Click **Create**.
-   - Copy the generated **Client ID**.
+   - Copy the generated **Client ID** (it looks like `123456789-abcdefg.apps.googleusercontent.com`).
+   - Paste it into `frontend/.env` as `VITE_GOOGLE_CLIENT_ID=your-client-id`.
 
 ---
 
-## Section C: Supabase Setup (Step-by-Step)
-`[REQUIRED BEFORE FIRST BUILD]`
+### Step 2: Install SMRITI on Your Android Phone
+**Timing:** `[READY TO TEST NOW]`  
+**Estimated Time:** ~1 minute  
 
-1. **Create a New Project:**
-   - Log in to [Supabase](https://supabase.com).
-   - Click **New Project**.
-   - Project Name: `Smriti-Production`.
-   - Database Password: Create a secure password (save it safely).
-   - Region: Choose the region closest to you or your students (e.g. `ap-south-1` for India or `us-east-1` for US).
-   - Pricing Plan: Choose **Free**. Click **Create new project**.
+The Android application is completely built and ready in your workspace.
 
-2. **Apply Database Migrations (Zero Coding):**
-   - In your Supabase dashboard, click the **SQL Editor** tab on the left sidebar (looks like `>_`).
-   - Click **New Query**.
-   - Open the file `supabase/migrations/20261111000001_initial_smriti_schema.sql` provided in this project.
-   - Copy the entire contents of that file and paste it into the Supabase SQL Editor.
-   - Click **Run** (green button). You will see "Success. No rows returned".
-   - Your complete database schema, security policies, and performance indexes are now active!
-
-3. **Copy Your API Keys:**
-   - In the left sidebar, click **Project Settings** (gear icon) > **API**.
-   - Find:
-     - `Project URL` (e.g. `https://xyzcompany.supabase.co`)
-     - `Project API Keys` > `anon` `public` key.
-   - These are safe to use in frontend configuration.
-
----
-
-## Section D: Cloudflare Pages Deployment (Step-by-Step)
-`[REQUIRED BEFORE FIRST BUILD]`
-
-1. **Push your code to GitHub:**
-   - Push this workspace to your GitHub account repository.
-
-2. **Connect to Cloudflare Pages:**
-   - Log in to [Cloudflare Dashboard](https://dash.cloudflare.com).
-   - In the left navigation, click **Workers & Pages**.
-   - Click **Create application** > **Pages** > **Connect to Git**.
-   - Select your GitHub repository (`smriti`).
-   - Click **Begin setup**.
-
-3. **Configure Build Settings:**
-   - Project Name: `smriti`
-   - Production branch: `master` or `main`
-   - Framework preset: `Vite`
-   - Build command: `npm run build`
-   - Build output directory: `dist`
-   - Root directory: `frontend`
-
-4. **Add Environment Variables:**
-   - Under **Environment variables (advanced)**, click **Add variable**:
-     - `VITE_SUPABASE_URL`: (Paste your Supabase Project URL)
-     - `VITE_SUPABASE_ANON_KEY`: (Paste your Supabase anon key)
-     - `VITE_GOOGLE_CLIENT_ID`: (Paste your Google OAuth Web Client ID)
-   - Click **Save and Deploy**.
-   - In 1 to 2 minutes, Cloudflare will display your live web address (e.g. `https://smriti.pages.dev`).
-
----
-
-## Section E: Android Installation & Permissions
-`[REQUIRED BEFORE FIRST INSTALLATION]`
-
-1. **Obtain the APK:**
-   - Download the built APK file `smriti-debug.apk` directly from your build directory:
-     `android/app/build/outputs/apk/debug/app-debug.apk`.
-
-2. **Transfer to Your Android Phone:**
+1. **Locate the APK:**
+   - File path: [`./smriti-debug.apk`](file:///home/thoughtful/Documents/antigravity/brave-mendeleev/smriti-debug.apk) (15 MB).
+2. **Transfer to Your Phone:**
    - Send the file to your phone via USB cable, Google Drive, or messaging.
-
-3. **Install on Phone:**
-   - On your Android phone, open the downloaded APK.
-   - If prompted "Install unknown apps", tap **Settings** and toggle **Allow from this source**.
+3. **Install:**
+   - Tap `smriti-debug.apk` on your phone.
+   - If prompted *"Install unknown apps"*, tap **Settings** and toggle **Allow from this source**.
    - Tap **Install**.
-
-4. **Grant App Permissions:**
-   - **Microphone:** Required for recording study notes and lectures.
-   - **Notifications:** Required for lock-screen audio playback controls and spaced-repetition revision reminders.
-   - **Battery Optimization:** When prompted, select **Don't optimize / Unrestricted** so your audio lessons continue playing smoothly when your phone screen turns off.
+4. **Permissions:**
+   - When opened, allow **Microphone** (for recording study audio notes) and **Notifications** (for lock-screen audio controls and revision reminders).
+   - You can test audio playback, background operation, voice recording with noise reduction, and spaced repetition immediately!
 
 ---
 
-## Section F: Future Updates & Maintenance
+### Step 3: Deploy Frontend to Cloudflare Pages (Optional Web Launch)
+**Timing:** `[WHEN YOU WANT THE WEB VERSION LIVE GLOBALLY]`  
+**Estimated Time:** ~2 minutes  
+**Cost:** $0.00 (Cloudflare Pages Free Tier — Unlimited bandwidth)  
 
-### Updates that require ONLY Cloudflare Deployment (Zero App Reinstallation):
-- UI updates, new study themes, design polish, button tweaks, or text updates.
-- Simply push changes to GitHub; Cloudflare automatically updates the web app within 60 seconds. Every student opening the app instantly sees the new version!
-
-### Updates that require a New Android APK:
-- Changes to native audio playback algorithms (ExoPlayer), hardware microphone DSP, local Room database migrations, or Android system permissions.
-
----
-
-## Section G: Cost & Quota Monitoring
-
-- **Cloudflare Pages:** 100% Free with unlimited bandwidth. No charges can occur.
-- **Supabase:** Free tier provides 500 MB database and 50,000 active users. If you approach 500 MB, the database soft-limits write operations—it **never** bills you automatically.
-- **Google Drive:** Audio storage uses the student's own Google account (15 GB free per student). Your platform incurs zero storage costs.
+1. Push your SMRITI workspace to your free GitHub account repository.
+2. Log in to [Cloudflare Dashboard](https://dash.cloudflare.com).
+3. Click **Workers & Pages** > **Create application** > **Pages** > **Connect to Git**.
+4. Select your GitHub repository (`smriti`).
+5. Configure Build Settings:
+   - **Framework preset:** `Vite`
+   - **Build command:** `npm run build`
+   - **Build output directory:** `dist`
+   - **Root directory:** `frontend`
+6. Under **Environment variables (advanced)**, add:
+   - `VITE_SUPABASE_URL`: `https://wppnfezoqpcgmowdkofp.supabase.co`
+   - `VITE_SUPABASE_ANON_KEY`: `sb_publishable_Jv7t8irT0s7wTNheRXMUpQ_SrNOB-0n`
+   - `VITE_GOOGLE_CLIENT_ID`: (Your Google Client ID from Step 1)
+7. Click **Save and Deploy**. Your web platform will be live at `https://smriti.pages.dev`!
