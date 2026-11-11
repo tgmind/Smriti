@@ -1,8 +1,10 @@
-# Environment files
+# Environment files & Secrets
 .env
 *.env
 frontend/.env
 *.env.local
+client_secret*.json
+*.secret.json
 
 # Node / Web dependencies
 frontend/node_modules/
