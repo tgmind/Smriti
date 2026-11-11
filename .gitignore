@@ -23,6 +23,8 @@ local.properties
 *.apk
 *.ap_
 *.aab
+.kotlin/
+android/.kotlin/
 
 # IDE & Editor files
 .idea/
