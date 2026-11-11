@@ -29,15 +29,15 @@ class RootErrorBoundary extends Component<Props, State> {
   public render() {
     if (this.state.hasError) {
       return (
-        <div style={{ padding: '24px', color: '#f8fafc', backgroundColor: '#0d121c', minHeight: '100vh', fontFamily: 'system-ui, sans-serif' }}>
-          <h2 style={{ color: '#f59e0b', fontSize: '20px', fontWeight: 'bold' }}>SMRITI Startup Alert</h2>
-          <p style={{ marginTop: '8px', color: '#94a3b8' }}>An unexpected error occurred while initializing the application:</p>
-          <pre style={{ marginTop: '12px', padding: '12px', background: '#1a2233', borderRadius: '8px', color: '#f43f5e', overflowX: 'auto', fontSize: '13px' }}>
+        <div style={{ padding: '24px', color: '#0f172a', backgroundColor: '#f8fafc', minHeight: '100vh', fontFamily: 'system-ui, sans-serif' }}>
+          <h2 style={{ color: '#d97706', fontSize: '18px', fontWeight: 'bold' }}>SMRITI Startup Notice</h2>
+          <p style={{ marginTop: '8px', color: '#64748b', fontSize: '14px' }}>An error occurred while initializing the view:</p>
+          <pre style={{ marginTop: '12px', padding: '12px', background: '#f1f5f9', borderRadius: '8px', color: '#e11d48', overflowX: 'auto', fontSize: '12px' }}>
             {this.state.error?.message || 'Unknown error'}
           </pre>
           <button
             onClick={() => window.location.reload()}
-            style={{ marginTop: '16px', padding: '10px 16px', backgroundColor: '#f59e0b', color: '#0d121c', fontWeight: 'bold', borderRadius: '6px', border: 'none', cursor: 'pointer' }}
+            style={{ marginTop: '16px', padding: '10px 18px', backgroundColor: '#0f172a', color: '#ffffff', fontWeight: '600', borderRadius: '8px', border: 'none', cursor: 'pointer' }}
           >
             Reload Application
           </button>

@@ -72,7 +72,7 @@ export const RecordTab: React.FC<RecordTabProps> = ({
       audio.ontimeupdate = () => setPreviewCurrentTime(audio.currentTime);
       audio.onended = () => setIsPreviewPlaying(false);
       setPreviewAudio(audio);
-      setTitle(`Lecture Note ${new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`);
+      setTitle(`Study Note ${new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`);
 
       return () => {
         audio.pause();
@@ -91,7 +91,6 @@ export const RecordTab: React.FC<RecordTabProps> = ({
 
   const handleStopRecording = () => {
     bridge.stopRecording();
-    // In web fallback, onstop will trigger review state
     if (!bridge.isNativeApp()) {
       setTimeout(() => {
         if (recordingState !== 'review') {
@@ -168,37 +167,37 @@ export const RecordTab: React.FC<RecordTabProps> = ({
   };
 
   return (
-    <div className="space-y-6 pb-28 pt-4 px-4 max-w-md mx-auto">
+    <div className="space-y-4 pb-28 pt-4 px-4 max-w-md mx-auto">
       {/* Header */}
       <div>
-        <span className="text-[11px] font-mono tracking-widest uppercase font-bold text-amber-400">
+        <span className="text-[11px] font-mono tracking-widest uppercase font-bold text-amber-700">
           STUDIO RECORDER
         </span>
-        <h1 className="text-xl font-extrabold text-surface-50 tracking-tight">
-          Audio Note Capture
+        <h1 className="text-xl font-extrabold text-slate-950 tracking-tight">
+          Record Audio Note
         </h1>
-        <p className="text-xs text-surface-400 mt-0.5">
-          Clean voice recording with on-device DSP noise suppression.
+        <p className="text-xs text-slate-500 mt-0.5">
+          Clean voice capture with on-device DSP noise suppression.
         </p>
       </div>
 
       {/* RECORDING / IDLE STATE */}
       {recordingState !== 'review' ? (
-        <div className="bg-surface-850 border border-surface-750 rounded-3xl p-6 shadow-xl flex flex-col items-center justify-center space-y-6 min-h-[380px]">
-          {/* Status Indicator */}
-          <div className="flex items-center gap-2">
+        <div className="bg-white border border-slate-200/90 rounded-3xl p-6 shadow-[0_2px_12px_rgba(0,0,0,0.03)] flex flex-col items-center justify-center space-y-5 min-h-[360px]">
+          {/* Status Indicator Pill */}
+          <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-100 border border-slate-200 text-slate-700">
             <span
-              className={`w-2.5 h-2.5 rounded-full ${
+              className={`w-2 h-2 rounded-full ${
                 recordingState === 'recording'
                   ? 'bg-rose-500 animate-ping'
                   : recordingState === 'paused'
-                  ? 'bg-amber-400'
-                  : 'bg-surface-600'
+                  ? 'bg-amber-500'
+                  : 'bg-slate-400'
               }`}
             />
-            <span className="text-xs font-mono font-bold uppercase tracking-wider text-surface-300">
+            <span className="text-[11px] font-mono font-bold uppercase tracking-wider">
               {recordingState === 'recording'
-                ? 'Recording Live...'
+                ? 'Recording Live'
                 : recordingState === 'paused'
                 ? 'Recording Paused'
                 : 'Ready to Record'}
@@ -206,19 +205,19 @@ export const RecordTab: React.FC<RecordTabProps> = ({
           </div>
 
           {/* Large Digital Timer */}
-          <div className="text-4xl font-extrabold font-mono text-surface-50 tracking-tight">
+          <div className="text-4xl font-extrabold font-mono text-slate-950 tracking-tight">
             {formatDuration(recordedDuration)}
           </div>
 
           {/* Live Waveform Visualizer */}
-          <div className="w-full flex items-center justify-center gap-1.5 h-24 px-4">
+          <div className="w-full flex items-center justify-center gap-1.5 h-20 px-4">
             {liveAmplitudes.map((amp, idx) => (
               <div
                 key={idx}
                 className={`w-1.5 rounded-full transition-all duration-100 ${
                   recordingState === 'recording'
-                    ? 'bg-gradient-to-t from-amber-500 to-amber-300'
-                    : 'bg-surface-700/60'
+                    ? 'bg-amber-500'
+                    : 'bg-slate-200'
                 }`}
                 style={{
                   height: recordingState === 'recording' ? `${Math.max(12, amp)}%` : '15%'
@@ -228,134 +227,134 @@ export const RecordTab: React.FC<RecordTabProps> = ({
           </div>
 
           {/* Main Action Buttons */}
-          <div className="flex items-center gap-4 pt-4">
+          <div className="flex items-center gap-4 pt-2">
             {recordingState === 'idle' ? (
               <button
                 onClick={handleStartRecording}
-                className="w-20 h-20 rounded-full bg-gradient-to-tr from-amber-500 to-amber-400 text-surface-950 flex items-center justify-center shadow-2xl hover:scale-105 active:scale-95 transition-transform"
+                className="w-18 h-18 rounded-full bg-slate-900 text-white flex items-center justify-center shadow-lg shadow-slate-900/20 hover:scale-105 active:scale-95 transition-transform"
                 aria-label="Start recording"
               >
-                <Mic size={32} />
+                <Mic size={28} />
               </button>
             ) : (
-              <>
-                <button
-                  onClick={handleStopRecording}
-                  className="w-16 h-16 rounded-full bg-rose-500 hover:bg-rose-600 text-white flex items-center justify-center shadow-xl active:scale-95 transition-transform"
-                  aria-label="Stop and save recording"
-                >
-                  <Square size={24} fill="currentColor" />
-                </button>
-              </>
+              <button
+                onClick={handleStopRecording}
+                className="w-16 h-16 rounded-full bg-rose-600 hover:bg-rose-700 text-white flex items-center justify-center shadow-md shadow-rose-600/25 active:scale-95 transition-transform"
+                aria-label="Stop and save recording"
+              >
+                <Square size={22} fill="currentColor" />
+              </button>
             )}
           </div>
 
-          <p className="text-[11px] text-surface-400 text-center max-w-xs">
+          <p className="text-[11px] text-slate-500 text-center max-w-xs leading-relaxed">
             {recordingState === 'idle'
-              ? 'Tap microphone to begin. Audio stays on your device and uploads securely to your personal Google Drive.'
-              : 'Speak clearly. Hardware noise suppression will remove ambient room noise.'}
+              ? 'Tap microphone to start recording. Saved to your sovereign Google Drive.'
+              : 'Speak clearly into the microphone. Noise filtering is applied automatically.'}
           </p>
         </div>
       ) : (
         /* POST-RECORDING REVIEW & TRIM STATE */
-        <div className="bg-surface-850 border border-surface-750 rounded-3xl p-5 shadow-xl space-y-4">
-          <div className="flex items-center justify-between border-b border-surface-800 pb-3">
-            <h3 className="text-sm font-bold text-surface-100">Review & Save Recording</h3>
-            <span className="text-xs font-mono text-amber-400">
+        <div className="bg-white border border-slate-200/90 rounded-3xl p-5 shadow-[0_2px_12px_rgba(0,0,0,0.03)] space-y-3.5">
+          <div className="flex items-center justify-between border-b border-slate-100 pb-2.5">
+            <h3 className="text-xs font-bold uppercase tracking-wider text-slate-900">
+              Review & Save Recording
+            </h3>
+            <span className="text-xs font-mono font-semibold text-slate-500">
               {formatDuration(recordedDuration)} recorded
             </span>
           </div>
 
           {/* Audio Preview Bar */}
-          <div className="bg-surface-900 border border-surface-800 p-3.5 rounded-2xl flex items-center justify-between gap-3">
+          <div className="bg-slate-50 border border-slate-200/80 p-3 rounded-xl flex items-center justify-between gap-3">
             <button
               onClick={handleTogglePreview}
-              className="p-3 rounded-xl bg-amber-500 text-surface-950 hover:bg-amber-400 active:scale-95 transition-transform flex-shrink-0"
+              className="p-2.5 rounded-lg bg-slate-900 text-white hover:bg-slate-800 active:scale-95 transition-transform flex-shrink-0 shadow-2xs"
               aria-label={isPreviewPlaying ? 'Pause preview' : 'Play preview'}
             >
-              {isPreviewPlaying ? <Pause size={18} fill="currentColor" /> : <Play size={18} fill="currentColor" />}
+              {isPreviewPlaying ? <Pause size={16} fill="currentColor" /> : <Play size={16} fill="currentColor" />}
             </button>
 
             <div className="flex-1 min-w-0">
-              <span className="text-xs font-bold text-surface-100 block truncate">
+              <span className="text-xs font-bold text-slate-900 block truncate">
                 Preview Audio
               </span>
-              <span className="text-[11px] text-surface-400 font-mono">
+              <span className="text-[11px] text-slate-500 font-mono">
                 {formatDuration(previewCurrentTime)} / {formatDuration(recordedDuration)}
               </span>
             </div>
           </div>
 
           {/* On-Device Audio Enhancement Toggle */}
-          <div className="bg-surface-900/80 border border-surface-800 p-3.5 rounded-2xl flex items-center justify-between gap-3">
+          <div className="bg-slate-50 border border-slate-200/80 p-3 rounded-xl flex items-center justify-between gap-3">
             <div className="flex items-center gap-2.5">
-              <div className="w-8 h-8 rounded-lg bg-teal-500/20 text-teal-400 flex items-center justify-center">
-                <Sparkles size={16} />
+              <div className="w-7 h-7 rounded-lg bg-sky-50 text-sky-700 border border-sky-200 flex items-center justify-center">
+                <Sparkles size={14} />
               </div>
               <div>
-                <span className="text-xs font-bold text-surface-100 block">
+                <span className="text-xs font-bold text-slate-900 block">
                   Hardware Noise Suppression
                 </span>
-                <span className="text-[10px] text-surface-400">
-                  On-device voice normalization & background noise reduction
+                <span className="text-[10px] text-slate-500">
+                  On-device background noise reduction
                 </span>
               </div>
             </div>
 
             <button
               onClick={() => setEnhancementEnabled(!enhancementEnabled)}
-              className={`w-11 h-6 rounded-full transition-colors relative flex items-center px-0.5 ${
-                enhancementEnabled ? 'bg-teal-500' : 'bg-surface-700'
+              className={`w-10 h-5.5 rounded-full transition-colors relative flex items-center px-0.5 ${
+                enhancementEnabled ? 'bg-slate-900' : 'bg-slate-200'
               }`}
             >
               <div
-                className={`w-5 h-5 rounded-full bg-white transition-transform ${
-                  enhancementEnabled ? 'translate-x-5' : 'translate-x-0'
+                className={`w-4.5 h-4.5 rounded-full bg-white transition-transform ${
+                  enhancementEnabled ? 'translate-x-4.5' : 'translate-x-0'
                 }`}
               />
             </button>
           </div>
 
           {/* Trim Range Slider */}
-          <div className="space-y-1.5 bg-surface-900/60 p-3 rounded-2xl border border-surface-800">
+          <div className="space-y-1 bg-slate-50 p-3 rounded-xl border border-slate-200/80">
             <div className="flex items-center justify-between text-xs">
-              <span className="font-semibold text-surface-300 flex items-center gap-1">
-                <Sliders size={12} /> Trim Audio Boundaries
+              <span className="font-semibold text-slate-700 flex items-center gap-1">
+                <Sliders size={12} /> Trim Audio
               </span>
-              <span className="text-[11px] font-mono text-surface-400">
+              <span className="text-[11px] font-mono text-slate-500">
                 {formatDuration(trimStartSeconds)} → {formatDuration(trimEndSeconds || recordedDuration)}
               </span>
             </div>
             <div className="grid grid-cols-2 gap-2 pt-1">
               <div>
-                <label className="text-[10px] text-surface-400 block mb-1">Start Trim (s)</label>
+                <label className="text-[10px] text-slate-500 block mb-0.5">Start (seconds)</label>
                 <input
                   type="number"
                   min="0"
                   max={recordedDuration - 1}
                   value={trimStartSeconds}
                   onChange={(e) => setTrimStartSeconds(Math.max(0, parseFloat(e.target.value) || 0))}
-                  className="w-full bg-surface-800 border border-surface-700 rounded-lg p-1.5 text-xs text-surface-100 font-mono"
+                  className="w-full bg-white border border-slate-200 rounded-lg p-1.5 text-xs text-slate-900 font-mono focus:outline-none"
                 />
               </div>
               <div>
-                <label className="text-[10px] text-surface-400 block mb-1">End Trim (s)</label>
+                <label className="text-[10px] text-slate-500 block mb-0.5">End (seconds)</label>
                 <input
                   type="number"
                   min={trimStartSeconds + 1}
                   max={recordedDuration}
                   value={trimEndSeconds || recordedDuration}
                   onChange={(e) => setTrimEndSeconds(Math.min(recordedDuration, parseFloat(e.target.value) || recordedDuration))}
-                  className="w-full bg-surface-800 border border-surface-700 rounded-lg p-1.5 text-xs text-surface-100 font-mono"
+                  className="w-full bg-white border border-slate-200 rounded-lg p-1.5 text-xs text-slate-900 font-mono focus:outline-none"
                 />
               </div>
             </div>
           </div>
 
           {/* Meta Inputs: Title & Subject */}
-          <div className="space-y-3 pt-1">
+          <div className="space-y-2.5 pt-0.5">
             <div>
-              <label className="text-xs font-semibold text-surface-300 block mb-1">
+              <label className="text-[11px] font-bold text-slate-700 block mb-1">
                 Lesson / Note Title
               </label>
               <input
@@ -363,18 +362,18 @@ export const RecordTab: React.FC<RecordTabProps> = ({
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
                 placeholder="e.g. Thermodynamics First Law Derivation"
-                className="w-full bg-surface-900 border border-surface-750 focus:border-amber-400 rounded-xl px-3 py-2 text-xs text-surface-100 placeholder:text-surface-500 focus:outline-none"
+                className="w-full bg-white border border-slate-200 focus:border-slate-400 rounded-xl px-3 py-2 text-xs text-slate-900 placeholder:text-slate-400 focus:outline-none shadow-2xs"
               />
             </div>
 
             <div>
-              <label className="text-xs font-semibold text-surface-300 block mb-1">
+              <label className="text-[11px] font-bold text-slate-700 block mb-1">
                 Subject
               </label>
               <select
                 value={selectedSubjectId}
                 onChange={(e) => setSelectedSubjectId(e.target.value)}
-                className="w-full bg-surface-900 border border-surface-750 focus:border-amber-400 rounded-xl px-3 py-2 text-xs text-surface-100 focus:outline-none"
+                className="w-full bg-white border border-slate-200 focus:border-slate-400 rounded-xl px-3 py-2 text-xs text-slate-900 focus:outline-none shadow-2xs"
               >
                 {subjects.map((s) => (
                   <option key={s.id} value={s.id}>
@@ -385,42 +384,42 @@ export const RecordTab: React.FC<RecordTabProps> = ({
             </div>
 
             <div>
-              <label className="text-xs font-semibold text-surface-300 block mb-1">
+              <label className="text-[11px] font-bold text-slate-700 block mb-1">
                 Key Terms & Formulas (comma-separated)
               </label>
               <input
                 type="text"
                 value={keyTermsInput}
                 onChange={(e) => setKeyTermsInput(e.target.value)}
-                placeholder="e.g. Internal Energy, dQ = dU + dW, Isochoric"
-                className="w-full bg-surface-900 border border-surface-750 focus:border-amber-400 rounded-xl px-3 py-2 text-xs text-surface-100 placeholder:text-surface-500 focus:outline-none"
+                placeholder="e.g. Internal Energy, dQ = dU + dW"
+                className="w-full bg-white border border-slate-200 focus:border-slate-400 rounded-xl px-3 py-2 text-xs text-slate-900 placeholder:text-slate-400 focus:outline-none shadow-2xs"
               />
             </div>
           </div>
 
           {/* Save & Discard Buttons */}
-          <div className="flex items-center gap-3 pt-3">
+          <div className="flex items-center gap-2 pt-2">
             <button
               onClick={handleDiscard}
-              className="flex-1 py-3 rounded-xl bg-surface-800 border border-surface-700 text-surface-300 hover:text-rose-400 font-semibold text-xs flex items-center justify-center gap-1.5 active:scale-95 transition-all"
+              className="flex-1 py-2.5 rounded-xl bg-slate-100 border border-slate-200 text-slate-700 hover:text-rose-600 hover:bg-slate-200 font-semibold text-xs flex items-center justify-center gap-1.5 active:scale-95 transition-all"
             >
-              <Trash2 size={15} />
+              <Trash2 size={14} />
               <span>Discard</span>
             </button>
 
             <button
               onClick={handleSave}
               disabled={isSaving || !title.trim()}
-              className="flex-[2] py-3 rounded-xl bg-amber-500 text-surface-950 font-bold text-xs hover:bg-amber-400 active:scale-95 transition-all flex items-center justify-center gap-1.5 shadow-md disabled:opacity-50"
+              className="flex-[2] py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-semibold text-xs active:scale-95 transition-all flex items-center justify-center gap-1.5 shadow-xs disabled:opacity-50"
             >
               {isSaving ? (
                 <>
-                  <RefreshCw size={15} className="animate-spin" />
+                  <RefreshCw size={14} className="animate-spin text-amber-400" />
                   <span>Saving to Drive...</span>
                 </>
               ) : (
                 <>
-                  <HardDrive size={15} />
+                  <HardDrive size={14} className="text-amber-400" />
                   <span>Save to Google Drive</span>
                 </>
               )}

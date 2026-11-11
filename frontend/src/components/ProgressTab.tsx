@@ -28,96 +28,96 @@ export const ProgressTab: React.FC<ProgressTabProps> = ({
   const masteredCount = revisionItems.filter(r => r.status === 'mastered').length;
 
   return (
-    <div className="space-y-6 pb-28 pt-4 px-4 max-w-md mx-auto">
+    <div className="space-y-4 pb-28 pt-4 px-4 max-w-md mx-auto">
       {/* Header */}
       <div>
-        <span className="text-[11px] font-mono tracking-widest uppercase font-bold text-amber-400">
+        <span className="text-[11px] font-mono tracking-widest uppercase font-bold text-amber-700">
           STUDY ANALYTICS
         </span>
-        <h1 className="text-xl font-extrabold text-surface-50 tracking-tight">
+        <h1 className="text-xl font-extrabold text-slate-950 tracking-tight">
           Learning & Memory Progress
         </h1>
-        <p className="text-xs text-surface-400 mt-0.5">
-          Transparent metrics. No fabricated retention scores.
+        <p className="text-xs text-slate-500 mt-0.5">
+          Objective cognitive metrics. No fabricated retention scores.
         </p>
       </div>
 
       {/* Tripartite Philosophy Notice */}
       <div className="grid grid-cols-3 gap-2">
-        <div className="bg-surface-850 border border-surface-750 p-3 rounded-2xl text-center space-y-1">
-          <Headphones size={18} className="mx-auto text-amber-400" />
-          <span className="text-[10px] uppercase font-bold text-surface-400 block font-mono">1. Exposure</span>
-          <span className="text-xs font-semibold text-surface-100">Audio Listening</span>
+        <div className="bg-amber-50/70 border border-amber-200/80 p-2.5 rounded-xl text-center space-y-0.5 shadow-2xs">
+          <Headphones size={16} className="mx-auto text-amber-700" />
+          <span className="text-[10px] uppercase font-bold text-amber-900 block font-mono">1. Exposure</span>
+          <span className="text-[11px] font-semibold text-slate-800">Listening</span>
         </div>
-        <div className="bg-surface-850 border border-surface-750 p-3 rounded-2xl text-center space-y-1">
-          <Zap size={18} className="mx-auto text-teal-400" />
-          <span className="text-[10px] uppercase font-bold text-surface-400 block font-mono">2. Recall</span>
-          <span className="text-xs font-semibold text-surface-100">Active Testing</span>
+        <div className="bg-sky-50/70 border border-sky-200/80 p-2.5 rounded-xl text-center space-y-0.5 shadow-2xs">
+          <Zap size={16} className="mx-auto text-sky-700" />
+          <span className="text-[10px] uppercase font-bold text-sky-900 block font-mono">2. Recall</span>
+          <span className="text-[11px] font-semibold text-slate-800">Active Test</span>
         </div>
-        <div className="bg-surface-850 border border-surface-750 p-3 rounded-2xl text-center space-y-1">
-          <Brain size={18} className="mx-auto text-emerald-400" />
-          <span className="text-[10px] uppercase font-bold text-surface-400 block font-mono">3. Retention</span>
-          <span className="text-xs font-semibold text-surface-100">Spaced Review</span>
+        <div className="bg-emerald-50/70 border border-emerald-200/80 p-2.5 rounded-xl text-center space-y-0.5 shadow-2xs">
+          <Brain size={16} className="mx-auto text-emerald-700" />
+          <span className="text-[10px] uppercase font-bold text-emerald-900 block font-mono">3. Retention</span>
+          <span className="text-[11px] font-semibold text-slate-800">Spaced SM-2</span>
         </div>
       </div>
 
       {/* SECTION 1: EXPOSURE ANALYTICS */}
-      <div className="bg-surface-850 border border-surface-750 rounded-3xl p-5 shadow-lg space-y-4">
-        <div className="flex items-center justify-between border-b border-surface-800 pb-3">
-          <div className="flex items-center gap-2">
-            <Headphones size={18} className="text-amber-400" />
-            <h2 className="text-sm font-bold text-surface-100">
-              Exposure (Listening Exposure)
+      <div className="bg-white border border-slate-200/80 rounded-2xl p-4 shadow-[0_1px_3px_rgba(0,0,0,0.03)] space-y-3.5">
+        <div className="flex items-center justify-between border-b border-slate-100 pb-2.5">
+          <div className="flex items-center gap-1.5">
+            <Headphones size={16} className="text-amber-600" />
+            <h2 className="text-xs font-bold text-slate-900 uppercase tracking-wider">
+              Exposure (Listening Time)
             </h2>
           </div>
-          <span className="text-[11px] font-mono text-surface-400">Actual Duration</span>
+          <span className="text-[11px] font-mono text-slate-400">Actual Duration</span>
         </div>
 
-        <div className="grid grid-cols-2 gap-3">
-          <div className="bg-surface-900 border border-surface-800 p-3.5 rounded-2xl">
-            <span className="text-[10px] font-mono uppercase text-surface-400 font-semibold block">
-              Lifetime Listening
+        <div className="grid grid-cols-2 gap-2.5">
+          <div className="bg-slate-50 border border-slate-100 p-3 rounded-xl">
+            <span className="text-[10px] font-mono uppercase text-slate-500 font-semibold block">
+              Total Listening
             </span>
-            <span className="text-2xl font-black font-mono text-amber-400 mt-1 block">
-              {totalHours} <span className="text-xs font-normal text-surface-400">hrs</span>
+            <span className="text-xl font-extrabold font-mono text-slate-950 mt-0.5 block">
+              {totalHours} <span className="text-xs font-normal text-slate-500">hrs</span>
             </span>
-            <span className="text-[10px] text-surface-500 mt-0.5 block">
+            <span className="text-[10px] text-slate-400 mt-0.5 block">
               {formatDuration(totalLifetimeSeconds)} total
             </span>
           </div>
 
-          <div className="bg-surface-900 border border-surface-800 p-3.5 rounded-2xl">
-            <span className="text-[10px] font-mono uppercase text-surface-400 font-semibold block">
+          <div className="bg-slate-50 border border-slate-100 p-3 rounded-xl">
+            <span className="text-[10px] font-mono uppercase text-slate-500 font-semibold block">
               Completed Plays
             </span>
-            <span className="text-2xl font-black font-mono text-surface-100 mt-1 block">
-              {totalCompletedPlays} <span className="text-xs font-normal text-surface-400">sessions</span>
+            <span className="text-xl font-extrabold font-mono text-slate-950 mt-0.5 block">
+              {totalCompletedPlays} <span className="text-xs font-normal text-slate-500">plays</span>
             </span>
-            <span className="text-[10px] text-emerald-400/90 mt-0.5 block flex items-center gap-1">
-              <CheckCircle2 size={11} /> ≥75% duration met
+            <span className="text-[10px] text-emerald-700 mt-0.5 block flex items-center gap-0.5 font-medium">
+              <CheckCircle2 size={11} /> ≥75% listened
             </span>
           </div>
         </div>
 
-        {/* 7-Day Listening Trend Visual */}
-        <div className="pt-2">
-          <span className="text-xs font-semibold text-surface-300 block mb-2">
-            Recent 6-Day Study Exposure
+        {/* 6-Day Trend Visual */}
+        <div className="pt-1">
+          <span className="text-xs font-semibold text-slate-700 block mb-2">
+            6-Day Study Exposure
           </span>
-          <div className="flex items-end justify-between gap-2 h-24 pt-4 border-b border-surface-800 pb-2">
+          <div className="flex items-end justify-between gap-2 h-20 pt-2 border-b border-slate-100 pb-1.5">
             {dailyStats.map((stat, idx) => {
               const maxSecs = Math.max(...dailyStats.map(s => s.total_listening_seconds), 3600);
               const heightPct = Math.max(12, (stat.total_listening_seconds / maxSecs) * 100);
               const dayLabel = stat.study_date.split('-').slice(1).join('/');
 
               return (
-                <div key={idx} className="flex-1 flex flex-col items-center gap-1.5 h-full justify-end">
+                <div key={idx} className="flex-1 flex flex-col items-center gap-1 h-full justify-end">
                   <div
-                    className="w-full max-w-[28px] rounded-lg bg-gradient-to-t from-amber-600 to-amber-400 transition-all"
+                    className="w-full max-w-[24px] rounded-md bg-amber-500 hover:bg-amber-600 transition-all shadow-2xs"
                     style={{ height: `${heightPct}%` }}
                     title={`${Math.round(stat.total_listening_seconds / 60)} minutes`}
                   />
-                  <span className="text-[9px] font-mono text-surface-400">
+                  <span className="text-[9px] font-mono text-slate-400">
                     {dayLabel}
                   </span>
                 </div>
@@ -128,38 +128,40 @@ export const ProgressTab: React.FC<ProgressTabProps> = ({
       </div>
 
       {/* SECTION 2: RECALL ANALYTICS */}
-      <div className="bg-surface-850 border border-surface-750 rounded-3xl p-5 shadow-lg space-y-4">
-        <div className="flex items-center justify-between border-b border-surface-800 pb-3">
-          <div className="flex items-center gap-2">
-            <Zap size={18} className="text-teal-400" />
-            <h2 className="text-sm font-bold text-surface-100">
-              Recall (Assessment Performance)
+      <div className="bg-white border border-slate-200/80 rounded-2xl p-4 shadow-[0_1px_3px_rgba(0,0,0,0.03)] space-y-3">
+        <div className="flex items-center justify-between border-b border-slate-100 pb-2.5">
+          <div className="flex items-center gap-1.5">
+            <Zap size={16} className="text-sky-600" />
+            <h2 className="text-xs font-bold text-slate-900 uppercase tracking-wider">
+              Recall Performance
             </h2>
           </div>
-          <span className="text-[11px] font-mono text-teal-400">{recallSuccessRate}% Success</span>
+          <span className="text-[11px] font-mono font-bold text-sky-700 bg-sky-50 border border-sky-200 px-2 py-0.5 rounded-full">
+            {recallSuccessRate}% Success
+          </span>
         </div>
 
-        <div className="grid grid-cols-2 gap-3">
-          <div className="bg-surface-900 border border-surface-800 p-3.5 rounded-2xl">
-            <span className="text-[10px] font-mono uppercase text-surface-400 font-semibold block">
-              Assessments Taken
+        <div className="grid grid-cols-2 gap-2.5">
+          <div className="bg-slate-50 border border-slate-100 p-3 rounded-xl">
+            <span className="text-[10px] font-mono uppercase text-slate-500 font-semibold block">
+              Assessments
             </span>
-            <span className="text-2xl font-black font-mono text-surface-100 mt-1 block">
-              {totalAssessments} <span className="text-xs font-normal text-surface-400">checks</span>
+            <span className="text-xl font-extrabold font-mono text-slate-950 mt-0.5 block">
+              {totalAssessments} <span className="text-xs font-normal text-slate-500">checks</span>
             </span>
-            <span className="text-[10px] text-surface-500 mt-0.5 block">
+            <span className="text-[10px] text-slate-400 mt-0.5 block">
               Active memory tests
             </span>
           </div>
 
-          <div className="bg-surface-900 border border-surface-800 p-3.5 rounded-2xl">
-            <span className="text-[10px] font-mono uppercase text-surface-400 font-semibold block">
+          <div className="bg-slate-50 border border-slate-100 p-3 rounded-xl">
+            <span className="text-[10px] font-mono uppercase text-slate-500 font-semibold block">
               Accurate Recalls
             </span>
-            <span className="text-2xl font-black font-mono text-teal-400 mt-1 block">
-              {totalSuccessfulRecalls} <span className="text-xs font-normal text-surface-400">correct</span>
+            <span className="text-xl font-extrabold font-mono text-sky-700 mt-0.5 block">
+              {totalSuccessfulRecalls} <span className="text-xs font-normal text-slate-500">correct</span>
             </span>
-            <span className="text-[10px] text-surface-500 mt-0.5 block">
+            <span className="text-[10px] text-slate-400 mt-0.5 block">
               Rated Good or Easy
             </span>
           </div>
@@ -167,54 +169,54 @@ export const ProgressTab: React.FC<ProgressTabProps> = ({
       </div>
 
       {/* SECTION 3: RETENTION & SPACED REPETITION ENGINE */}
-      <div className="bg-surface-850 border border-surface-750 rounded-3xl p-5 shadow-lg space-y-4">
-        <div className="flex items-center justify-between border-b border-surface-800 pb-3">
-          <div className="flex items-center gap-2">
-            <Brain size={18} className="text-emerald-400" />
-            <h2 className="text-sm font-bold text-surface-100">
-              Retention Stability (SM-2 State)
+      <div className="bg-white border border-slate-200/80 rounded-2xl p-4 shadow-[0_1px_3px_rgba(0,0,0,0.03)] space-y-3">
+        <div className="flex items-center justify-between border-b border-slate-100 pb-2.5">
+          <div className="flex items-center gap-1.5">
+            <Brain size={16} className="text-emerald-600" />
+            <h2 className="text-xs font-bold text-slate-900 uppercase tracking-wider">
+              Retention Stability (SM-2)
             </h2>
           </div>
-          <span className="text-[11px] font-mono text-emerald-400 font-semibold">
-            {revisionItems.length} concepts tracked
+          <span className="text-[11px] font-mono font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full">
+            {revisionItems.length} concepts
           </span>
         </div>
 
         {/* 3 Stages */}
         <div className="grid grid-cols-3 gap-2">
-          <div className="bg-surface-900 border border-surface-800 p-3 rounded-xl text-center">
-            <span className="text-xs font-bold text-amber-400 block font-mono">
+          <div className="bg-amber-50/50 border border-amber-200/70 p-2.5 rounded-xl text-center">
+            <span className="text-sm font-bold text-amber-800 block font-mono">
               {learningCount}
             </span>
-            <span className="text-[10px] text-surface-400 uppercase font-semibold mt-0.5 block">
+            <span className="text-[10px] text-amber-900 uppercase font-semibold mt-0.5 block">
               Learning
             </span>
-            <span className="text-[9px] text-surface-500 font-mono">1–3d gap</span>
+            <span className="text-[9px] text-slate-500 font-mono">1–3d gap</span>
           </div>
 
-          <div className="bg-surface-900 border border-surface-800 p-3 rounded-xl text-center">
-            <span className="text-xs font-bold text-teal-400 block font-mono">
+          <div className="bg-sky-50/50 border border-sky-200/70 p-2.5 rounded-xl text-center">
+            <span className="text-sm font-bold text-sky-800 block font-mono">
               {reviewCount}
             </span>
-            <span className="text-[10px] text-surface-400 uppercase font-semibold mt-0.5 block">
+            <span className="text-[10px] text-sky-900 uppercase font-semibold mt-0.5 block">
               Review
             </span>
-            <span className="text-[9px] text-surface-500 font-mono">4–20d gap</span>
+            <span className="text-[9px] text-slate-500 font-mono">4–20d gap</span>
           </div>
 
-          <div className="bg-surface-900 border border-surface-800 p-3 rounded-xl text-center">
-            <span className="text-xs font-bold text-emerald-400 block font-mono">
+          <div className="bg-emerald-50/50 border border-emerald-200/70 p-2.5 rounded-xl text-center">
+            <span className="text-sm font-bold text-emerald-800 block font-mono">
               {masteredCount}
             </span>
-            <span className="text-[10px] text-surface-400 uppercase font-semibold mt-0.5 block">
+            <span className="text-[10px] text-emerald-900 uppercase font-semibold mt-0.5 block">
               Mastered
             </span>
-            <span className="text-[9px] text-surface-500 font-mono">≥21d gap</span>
+            <span className="text-[9px] text-slate-500 font-mono">≥21d gap</span>
           </div>
         </div>
 
-        <p className="text-[11px] text-surface-400 leading-relaxed">
-          Memory retention intervals are dynamically scheduled using SuperMemo SM-2. When you rate items as "Easy" or "Good", review gaps expand exponentially to reinforce long-term consolidation.
+        <p className="text-[11px] text-slate-500 leading-relaxed pt-1">
+          Review intervals expand dynamically via SuperMemo SM-2. When you rate items as "Easy" or "Good", intervals scale geometrically to build durable long-term retention.
         </p>
       </div>
     </div>

@@ -79,7 +79,7 @@ class MainActivity : ComponentActivity() {
                                 ViewGroup.LayoutParams.MATCH_PARENT,
                                 ViewGroup.LayoutParams.MATCH_PARENT
                             )
-                            setBackgroundColor(Color.parseColor("#0d121c"))
+                            setBackgroundColor(Color.parseColor("#f8fafc"))
 
                             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT) {
                                 WebView.setWebContentsDebuggingEnabled(true)

@@ -25,18 +25,18 @@ export const AssessmentModal: React.FC<AssessmentModalProps> = ({
 
   if (items.length === 0) {
     return (
-      <div className="fixed inset-0 z-50 bg-surface-950/95 backdrop-blur-xl flex items-center justify-center p-4">
-        <div className="bg-surface-850 border border-surface-700 p-6 rounded-3xl max-w-sm w-full text-center space-y-4">
-          <div className="w-14 h-14 rounded-full bg-emerald-500/20 text-emerald-400 mx-auto flex items-center justify-center">
-            <CheckCircle2 size={32} />
+      <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-md flex items-center justify-center p-4">
+        <div className="bg-white border border-slate-200 p-6 rounded-3xl max-w-sm w-full text-center space-y-4 shadow-xl">
+          <div className="w-12 h-12 rounded-full bg-emerald-50 text-emerald-600 border border-emerald-200 mx-auto flex items-center justify-center">
+            <CheckCircle2 size={28} />
           </div>
-          <h3 className="text-lg font-bold text-surface-50">All Caught Up!</h3>
-          <p className="text-xs text-surface-400 leading-relaxed">
-            No recall assessments are due right now. You can continue listening to your lessons to strengthen exposure.
+          <h3 className="text-base font-bold text-slate-900">All Caught Up!</h3>
+          <p className="text-xs text-slate-500 leading-relaxed">
+            No recall assessments are due right now. Continue listening to your audio notes to strengthen retrieval cues.
           </p>
           <button
             onClick={onClose}
-            className="w-full py-3 rounded-xl bg-amber-500 text-surface-950 font-bold hover:bg-amber-400 active:scale-95 transition-all"
+            className="w-full py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-semibold text-xs transition-all active:scale-[0.98]"
           >
             Back to Lessons
           </button>
@@ -69,51 +69,50 @@ export const AssessmentModal: React.FC<AssessmentModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-surface-950/95 backdrop-blur-xl flex flex-col justify-between p-5 overflow-y-auto safe-top safe-bottom text-surface-50">
-      {/* Header */}
-      <div className="flex items-center justify-between border-b border-surface-800 pb-3">
-        <div className="flex items-center gap-2">
-          <span className="w-2 h-2 rounded-full bg-amber-400 animate-ping" />
-          <span className="text-xs font-bold uppercase tracking-wider text-amber-400">
-            Active Recall Assessment
-          </span>
+    <div className="fixed inset-0 z-50 bg-slate-900/35 backdrop-blur-md flex flex-col justify-between p-4 overflow-y-auto safe-top safe-bottom text-slate-900 animate-in fade-in duration-150">
+      <div className="bg-white border border-slate-200/90 rounded-3xl p-5 shadow-2xl max-w-md mx-auto w-full my-auto space-y-5">
+        {/* Header */}
+        <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+          <div className="flex items-center gap-2">
+            <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
+            <span className="text-[11px] font-bold uppercase tracking-wider text-amber-800 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-full">
+              Active Recall Check
+            </span>
+          </div>
+
+          <div className="flex items-center gap-3">
+            <span className="text-xs font-mono font-semibold text-slate-500">
+              {currentIndex + 1} of {items.length}
+            </span>
+            <button
+              onClick={onClose}
+              className="p-1.5 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-500 hover:text-slate-800"
+              aria-label="Close assessment"
+            >
+              <X size={16} />
+            </button>
+          </div>
         </div>
 
-        <div className="flex items-center gap-3">
-          <span className="text-xs font-mono text-surface-400">
-            {currentIndex + 1} of {items.length}
-          </span>
-          <button
-            onClick={onClose}
-            className="p-2 rounded-full bg-surface-900 border border-surface-800 text-surface-400 hover:text-surface-200"
-            aria-label="Close assessment"
-          >
-            <X size={18} />
-          </button>
-        </div>
-      </div>
-
-      {/* Main Flashcard / Question Area */}
-      <div className="max-w-md mx-auto w-full my-auto py-6 space-y-5">
         {/* Source Lesson Badge */}
         <div className="text-center">
-          <span className="inline-block px-2.5 py-1 rounded-full bg-surface-800 border border-surface-700 text-[11px] font-semibold text-amber-300">
+          <span className="inline-block px-2.5 py-0.5 rounded-full bg-slate-100 border border-slate-200 text-[11px] font-semibold text-slate-700">
             {currentItem.subject_name || 'Lesson'}: {currentItem.audio_title}
           </span>
         </div>
 
         {/* Question Card */}
-        <div className="bg-surface-850 border border-surface-700/80 rounded-3xl p-6 shadow-xl space-y-4">
+        <div className="bg-slate-50 border border-slate-200/80 rounded-2xl p-4.5 space-y-3.5 shadow-2xs">
           <div className="flex items-start gap-2.5">
-            <HelpCircle size={20} className="text-teal-400 flex-shrink-0 mt-0.5" />
-            <h3 className="text-base font-bold text-surface-100 leading-snug">
+            <HelpCircle size={18} className="text-amber-600 flex-shrink-0 mt-0.5" />
+            <h3 className="text-sm font-bold text-slate-900 leading-snug">
               {currentItem.prompt}
             </h3>
           </div>
 
-          {/* Multiple Choice Options (if present) */}
+          {/* Multiple Choice Options */}
           {currentItem.options && currentItem.options.length > 0 && !isAnswerRevealed && (
-            <div className="space-y-2 pt-2">
+            <div className="space-y-2 pt-1">
               {currentItem.options.map((opt, i) => (
                 <button
                   key={i}
@@ -121,10 +120,10 @@ export const AssessmentModal: React.FC<AssessmentModalProps> = ({
                     setSelectedMCQ(opt);
                     setIsAnswerRevealed(true);
                   }}
-                  className={`w-full text-left p-3.5 rounded-xl border text-xs font-medium transition-all ${
+                  className={`w-full text-left p-3 rounded-xl border text-xs font-medium transition-all ${
                     selectedMCQ === opt
-                      ? 'bg-amber-500/20 border-amber-500 text-amber-200'
-                      : 'bg-surface-800/80 border-surface-700 text-surface-300 hover:bg-surface-700'
+                      ? 'bg-amber-50 border-amber-400 text-amber-900 font-semibold shadow-2xs'
+                      : 'bg-white border-slate-200 text-slate-700 hover:border-slate-300 hover:bg-slate-50'
                   }`}
                 >
                   {opt}
@@ -133,29 +132,29 @@ export const AssessmentModal: React.FC<AssessmentModalProps> = ({
             </div>
           )}
 
-          {/* Flip / Reveal Button for Flashcards */}
+          {/* Reveal Button for Flashcards */}
           {(!currentItem.options || currentItem.options.length === 0) && !isAnswerRevealed && (
             <button
               onClick={() => setIsAnswerRevealed(true)}
-              className="w-full mt-4 py-3 rounded-2xl bg-surface-800 border border-surface-700 text-amber-400 font-bold text-xs hover:bg-surface-750 active:scale-98 transition-all flex items-center justify-center gap-1.5"
+              className="w-full mt-2 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-semibold text-xs active:scale-[0.98] transition-all flex items-center justify-center gap-1.5 shadow-xs"
             >
-              <Sparkles size={14} />
+              <Sparkles size={13} className="text-amber-400" />
               <span>Reveal Correct Answer</span>
             </button>
           )}
 
           {/* Answer Section */}
           {isAnswerRevealed && (
-            <div className="pt-4 border-t border-surface-750 space-y-3 animate-in fade-in duration-200">
-              <div className="bg-surface-900/90 border border-surface-700 p-4 rounded-2xl">
-                <span className="text-[10px] uppercase tracking-wider font-bold text-teal-400 block mb-1">
+            <div className="pt-3 border-t border-slate-200/80 space-y-2.5 animate-in fade-in duration-150">
+              <div className="bg-emerald-50/70 border border-emerald-200 p-3.5 rounded-xl">
+                <span className="text-[10px] uppercase tracking-wider font-bold text-emerald-800 block mb-0.5">
                   Correct Answer & Explanation
                 </span>
-                <p className="text-sm font-semibold text-surface-50 leading-relaxed">
+                <p className="text-xs font-bold text-slate-900 leading-relaxed">
                   {currentItem.correct_answer}
                 </p>
                 {currentItem.explanation && (
-                  <p className="text-xs text-surface-400 mt-2 leading-relaxed">
+                  <p className="text-[11px] text-slate-600 mt-1.5 leading-relaxed">
                     {currentItem.explanation}
                   </p>
                 )}
@@ -166,14 +165,14 @@ export const AssessmentModal: React.FC<AssessmentModalProps> = ({
 
         {/* Spaced Repetition Rating Buttons */}
         {isAnswerRevealed && !lastCalculatedResult && (
-          <div className="space-y-2 animate-in fade-in slide-in-from-bottom-2 duration-150">
-            <p className="text-center text-xs font-semibold text-surface-300">
+          <div className="space-y-2 animate-in fade-in slide-in-from-bottom-1 duration-150">
+            <p className="text-center text-xs font-semibold text-slate-600">
               How easily did you recall this?
             </p>
             <div className="grid grid-cols-4 gap-2">
               <button
                 onClick={() => handleRatingSelect(0)}
-                className="py-3 px-1 rounded-2xl bg-rose-500/15 border border-rose-500/40 text-rose-300 hover:bg-rose-500/25 active:scale-95 flex flex-col items-center justify-center"
+                className="py-2.5 px-1 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 hover:bg-rose-100 active:scale-95 flex flex-col items-center justify-center transition-all shadow-2xs"
               >
                 <span className="text-xs font-bold">Again</span>
                 <span className="text-[10px] opacity-75 font-mono">1d</span>
@@ -181,7 +180,7 @@ export const AssessmentModal: React.FC<AssessmentModalProps> = ({
 
               <button
                 onClick={() => handleRatingSelect(1)}
-                className="py-3 px-1 rounded-2xl bg-amber-500/15 border border-amber-500/40 text-amber-300 hover:bg-amber-500/25 active:scale-95 flex flex-col items-center justify-center"
+                className="py-2.5 px-1 rounded-xl bg-amber-50 border border-amber-200 text-amber-800 hover:bg-amber-100 active:scale-95 flex flex-col items-center justify-center transition-all shadow-2xs"
               >
                 <span className="text-xs font-bold">Hard</span>
                 <span className="text-[10px] opacity-75 font-mono">1d</span>
@@ -189,7 +188,7 @@ export const AssessmentModal: React.FC<AssessmentModalProps> = ({
 
               <button
                 onClick={() => handleRatingSelect(2)}
-                className="py-3 px-1 rounded-2xl bg-teal-500/15 border border-teal-500/40 text-teal-300 hover:bg-teal-500/25 active:scale-95 flex flex-col items-center justify-center"
+                className="py-2.5 px-1 rounded-xl bg-sky-50 border border-sky-200 text-sky-800 hover:bg-sky-100 active:scale-95 flex flex-col items-center justify-center transition-all shadow-2xs"
               >
                 <span className="text-xs font-bold">Good</span>
                 <span className="text-[10px] opacity-75 font-mono">{Math.max(1, currentItem.interval_days * 2)}d</span>
@@ -197,7 +196,7 @@ export const AssessmentModal: React.FC<AssessmentModalProps> = ({
 
               <button
                 onClick={() => handleRatingSelect(3)}
-                className="py-3 px-1 rounded-2xl bg-emerald-500/15 border border-emerald-500/40 text-emerald-300 hover:bg-emerald-500/25 active:scale-95 flex flex-col items-center justify-center"
+                className="py-2.5 px-1 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 hover:bg-emerald-100 active:scale-95 flex flex-col items-center justify-center transition-all shadow-2xs"
               >
                 <span className="text-xs font-bold">Easy</span>
                 <span className="text-[10px] opacity-75 font-mono">{Math.max(2, currentItem.interval_days * 3)}d</span>
@@ -208,28 +207,28 @@ export const AssessmentModal: React.FC<AssessmentModalProps> = ({
 
         {/* Next Review Feedback Banner */}
         {lastCalculatedResult && (
-          <div className="bg-surface-850 border border-emerald-500/40 p-4 rounded-2xl text-center space-y-3 animate-in fade-in duration-150">
-            <div className="flex items-center justify-center gap-1.5 text-emerald-400 font-bold text-xs">
-              <CheckCircle2 size={16} />
+          <div className="bg-emerald-50 border border-emerald-200 p-4 rounded-2xl text-center space-y-2.5 animate-in fade-in duration-150">
+            <div className="flex items-center justify-center gap-1.5 text-emerald-800 font-bold text-xs">
+              <CheckCircle2 size={16} className="text-emerald-600" />
               <span>Recall Saved to Spaced Repetition Schedule</span>
             </div>
-            <p className="text-xs text-surface-300">
-              Next scheduled review in <span className="font-bold text-amber-400">{lastCalculatedResult.interval_days} day(s)</span> on{' '}
-              <span className="font-mono font-bold text-surface-100">{lastCalculatedResult.next_review_due}</span>.
+            <p className="text-xs text-slate-700">
+              Next scheduled review in <span className="font-bold text-slate-900">{lastCalculatedResult.interval_days} day(s)</span> on{' '}
+              <span className="font-mono font-bold text-slate-900">{lastCalculatedResult.next_review_due}</span>.
             </p>
             <button
               onClick={handleNext}
-              className="w-full py-2.5 rounded-xl bg-amber-500 text-surface-950 font-bold hover:bg-amber-400 active:scale-95 transition-all flex items-center justify-center gap-1.5 text-xs"
+              className="w-full py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-semibold active:scale-95 transition-all flex items-center justify-center gap-1.5 text-xs shadow-xs"
             >
               <span>{currentIndex + 1 < items.length ? 'Next Question' : 'Complete Session'}</span>
               <ArrowRight size={14} />
             </button>
           </div>
         )}
-      </div>
 
-      <div className="text-center text-[11px] text-surface-500 pb-2">
-        Spaced Repetition Algorithm: SuperMemo SM-2 (Deterministic & Transparent)
+        <div className="text-center text-[10px] text-slate-400 font-medium">
+          Deterministic SuperMemo SM-2 Spaced Repetition Engine
+        </div>
       </div>
     </div>
   );

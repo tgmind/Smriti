@@ -83,33 +83,33 @@ export const FullScreenPlayer: React.FC<FullScreenPlayerProps> = ({
     : [20, 40, 60, 80, 50, 70, 90, 60, 40, 65, 85, 75, 55, 45, 60, 80, 70, 50, 30, 40];
 
   return (
-    <div className="fixed inset-0 z-50 bg-surface-950/98 backdrop-blur-2xl flex flex-col justify-between overflow-y-auto safe-top safe-bottom p-5 text-surface-50">
+    <div className="fixed inset-0 z-50 bg-white flex flex-col justify-between overflow-y-auto safe-top safe-bottom p-5 text-slate-900 animate-in fade-in duration-150">
       {/* Top Header */}
-      <div className="flex items-center justify-between mb-4">
+      <div className="flex items-center justify-between mb-2">
         <button
           onClick={onClose}
-          className="p-2.5 rounded-full bg-surface-900 border border-surface-800 text-surface-300 hover:text-surface-100 active:scale-95"
+          className="p-2 rounded-full bg-slate-100 hover:bg-slate-200 border border-slate-200 text-slate-700 active:scale-95 transition-transform"
           aria-label="Collapse player"
         >
-          <ChevronDown size={22} />
+          <ChevronDown size={20} />
         </button>
 
         <div className="text-center">
-          <span className="text-xs uppercase tracking-widest font-bold text-amber-400">
+          <span className="px-3 py-0.5 rounded-full bg-slate-100 border border-slate-200/80 text-[11px] font-bold uppercase tracking-wider text-slate-800">
             Study Mode
           </span>
-          <p className="text-xs text-surface-400 font-medium">
+          <p className="text-[11px] text-slate-500 font-medium mt-0.5">
             {currentAudio.subject_name || 'Academic Audio'}
           </p>
         </div>
 
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-1.5">
           <button
             onClick={() => onToggleFavorite(currentAudio.id)}
-            className={`p-2.5 rounded-full border active:scale-95 transition-colors ${
+            className={`p-2 rounded-full border active:scale-95 transition-colors ${
               currentAudio.is_favorite
-                ? 'bg-amber-500/10 border-amber-500/40 text-amber-400'
-                : 'bg-surface-900 border-surface-800 text-surface-400 hover:text-surface-200'
+                ? 'bg-amber-50 border-amber-300 text-amber-600'
+                : 'bg-slate-100 border-slate-200 text-slate-400 hover:text-slate-700'
             }`}
             aria-label="Favorite audio"
           >
@@ -118,10 +118,10 @@ export const FullScreenPlayer: React.FC<FullScreenPlayerProps> = ({
 
           <button
             onClick={() => onToggleOffline(currentAudio)}
-            className={`p-2.5 rounded-full border active:scale-95 transition-colors ${
+            className={`p-2 rounded-full border active:scale-95 transition-colors ${
               currentAudio.is_downloaded_offline
-                ? 'bg-emerald-500/10 border-emerald-500/40 text-emerald-400'
-                : 'bg-surface-900 border-surface-800 text-surface-400 hover:text-surface-200'
+                ? 'bg-emerald-50 border-emerald-300 text-emerald-600'
+                : 'bg-slate-100 border-slate-200 text-slate-400 hover:text-slate-700'
             }`}
             title={currentAudio.is_downloaded_offline ? 'Saved Offline' : 'Save for Offline Study'}
             aria-label="Toggle offline download"
@@ -132,16 +132,10 @@ export const FullScreenPlayer: React.FC<FullScreenPlayerProps> = ({
       </div>
 
       {/* Visual Identity / Waveform Area */}
-      <div className="flex-1 flex flex-col items-center justify-center my-4 max-w-sm mx-auto w-full">
-        <div className="relative w-full aspect-square max-h-64 rounded-3xl bg-gradient-to-b from-surface-850 to-surface-900 border border-surface-800 shadow-2xl p-6 flex flex-col items-center justify-center overflow-hidden">
-          {/* Subtle concentric rings */}
-          <div className="absolute inset-0 flex items-center justify-center pointer-events-none opacity-20">
-            <div className="w-48 h-48 rounded-full border border-amber-400/40 animate-pulse" />
-            <div className="absolute w-32 h-32 rounded-full border border-teal-400/30" />
-          </div>
-
-          {/* Dynamic Waveform Bars */}
-          <div className="relative z-10 w-full flex items-center justify-center gap-1.5 h-28 px-2">
+      <div className="flex-1 flex flex-col items-center justify-center my-3 max-w-sm mx-auto w-full">
+        <div className="relative w-full aspect-square max-h-60 rounded-3xl bg-slate-50 border border-slate-200/80 shadow-[0_2px_12px_rgba(0,0,0,0.03)] p-5 flex flex-col items-center justify-center overflow-hidden">
+          {/* Waveform Bars */}
+          <div className="relative z-10 w-full flex items-center justify-center gap-1.5 h-24 px-2">
             {peaks.map((height, idx) => {
               const barProgress = (idx / peaks.length) * 100;
               const isPast = barProgress <= progressPercent;
@@ -151,8 +145,8 @@ export const FullScreenPlayer: React.FC<FullScreenPlayerProps> = ({
                   key={idx}
                   className={`w-1.5 rounded-full transition-all duration-150 ${
                     isPast
-                      ? 'bg-gradient-to-t from-amber-500 to-amber-300'
-                      : 'bg-surface-700/60'
+                      ? 'bg-amber-500'
+                      : 'bg-slate-200'
                   }`}
                   style={{
                     height: `${Math.max(14, (height / 100) * 100)}%`,
@@ -165,11 +159,11 @@ export const FullScreenPlayer: React.FC<FullScreenPlayerProps> = ({
 
           {/* Key terms pills */}
           {currentAudio.key_terms && currentAudio.key_terms.length > 0 && (
-            <div className="relative z-10 flex flex-wrap gap-1.5 justify-center mt-3 max-h-14 overflow-hidden">
+            <div className="relative z-10 flex flex-wrap gap-1.5 justify-center mt-3 max-h-12 overflow-hidden">
               {currentAudio.key_terms.slice(0, 3).map((term, i) => (
                 <span
                   key={i}
-                  className="px-2 py-0.5 rounded-md bg-surface-800/80 border border-surface-700 text-[10px] text-surface-300 font-mono"
+                  className="px-2.5 py-0.5 rounded-full bg-white border border-slate-200 text-[10px] text-slate-700 font-mono shadow-2xs"
                 >
                   {term}
                 </span>
@@ -179,12 +173,12 @@ export const FullScreenPlayer: React.FC<FullScreenPlayerProps> = ({
         </div>
 
         {/* Audio Titles */}
-        <div className="text-center mt-5 px-4 w-full">
-          <h2 className="text-xl font-bold text-surface-50 tracking-tight leading-snug line-clamp-2">
+        <div className="text-center mt-4 px-3 w-full">
+          <h2 className="text-base font-extrabold text-slate-950 tracking-tight leading-snug line-clamp-2">
             {currentAudio.title}
           </h2>
           {currentAudio.description && (
-            <p className="text-xs text-surface-400 mt-1 line-clamp-2 leading-relaxed">
+            <p className="text-xs text-slate-500 mt-1 line-clamp-2 leading-relaxed">
               {currentAudio.description}
             </p>
           )}
@@ -192,9 +186,9 @@ export const FullScreenPlayer: React.FC<FullScreenPlayerProps> = ({
       </div>
 
       {/* Player Controls & Scrubber */}
-      <div className="max-w-md mx-auto w-full space-y-4">
+      <div className="max-w-md mx-auto w-full space-y-3.5">
         {/* Scrubber Slider */}
-        <div className="space-y-1.5">
+        <div className="space-y-1">
           <input
             type="range"
             min="0"
@@ -202,86 +196,86 @@ export const FullScreenPlayer: React.FC<FullScreenPlayerProps> = ({
             step="0.5"
             value={positionSeconds}
             onChange={(e) => onSeek(parseFloat(e.target.value))}
-            className="w-full h-1.5 bg-surface-800 rounded-lg appearance-none cursor-pointer accent-amber-400 focus:outline-none"
+            className="w-full h-1.5 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-amber-500 focus:outline-none"
             aria-label="Audio scrubber"
           />
-          <div className="flex justify-between text-xs font-mono text-surface-400 px-0.5">
+          <div className="flex justify-between text-[11px] font-mono text-slate-500 px-0.5">
             <span>{formatDuration(positionSeconds)}</span>
             <span>-{formatDuration(Math.max(0, totalDuration - positionSeconds))}</span>
           </div>
         </div>
 
         {/* Primary Controls Row */}
-        <div className="flex items-center justify-between px-2">
+        <div className="flex items-center justify-between px-3">
           {/* Rewind 10s */}
           <button
             onClick={() => onSeekRelative(-10)}
-            className="p-3 text-surface-300 hover:text-surface-100 active:scale-95 transition-transform"
+            className="p-2.5 text-slate-500 hover:text-slate-900 active:scale-95 transition-transform"
             aria-label="Rewind 10 seconds"
           >
-            <RotateCcw size={22} />
+            <RotateCcw size={20} />
           </button>
 
           {/* Previous Track */}
           <button
             onClick={() => onSeek(0)}
-            className="p-3 text-surface-300 hover:text-surface-100 active:scale-95 transition-transform"
-            aria-label="Restart or previous track"
+            className="p-2.5 text-slate-500 hover:text-slate-900 active:scale-95 transition-transform"
+            aria-label="Restart track"
           >
-            <SkipBack size={24} />
+            <SkipBack size={22} />
           </button>
 
           {/* Main Play/Pause Button */}
           <button
             onClick={onTogglePlay}
-            className="p-5 rounded-full bg-gradient-to-tr from-amber-500 to-amber-400 text-surface-950 shadow-xl hover:brightness-110 active:scale-95 transition-transform"
+            className="p-4.5 rounded-full bg-slate-900 text-white hover:bg-slate-800 shadow-md shadow-slate-900/15 active:scale-95 transition-transform"
             aria-label={isPlaying ? 'Pause' : 'Play'}
           >
             {isPlaying ? (
-              <Pause size={28} fill="currentColor" />
+              <Pause size={24} fill="currentColor" />
             ) : (
-              <Play size={28} fill="currentColor" className="translate-x-0.5" />
+              <Play size={24} fill="currentColor" className="translate-x-0.5" />
             )}
           </button>
 
-          {/* Next / Fast Forward */}
+          {/* Next / Fast Forward 30s */}
           <button
             onClick={() => onSeekRelative(30)}
-            className="p-3 text-surface-300 hover:text-surface-100 active:scale-95 transition-transform"
+            className="p-2.5 text-slate-500 hover:text-slate-900 active:scale-95 transition-transform"
             aria-label="Forward 30 seconds"
           >
-            <RotateCw size={22} />
+            <RotateCw size={20} />
           </button>
 
           {/* Repeat Mode */}
           <button
             onClick={onToggleRepeat}
-            className={`p-3 active:scale-95 transition-colors ${
+            className={`p-2.5 active:scale-95 transition-colors ${
               isRepeatTrack
-                ? 'text-amber-400'
+                ? 'text-amber-600 font-bold'
                 : isRepeatQueue
-                ? 'text-teal-400'
-                : 'text-surface-400 hover:text-surface-200'
+                ? 'text-sky-600 font-bold'
+                : 'text-slate-400 hover:text-slate-700'
             }`}
             aria-label="Toggle repeat mode"
             title={isRepeatTrack ? 'Repeat Track' : isRepeatQueue ? 'Repeat All' : 'Repeat Off'}
           >
-            {isRepeatTrack ? <Repeat1 size={22} /> : <Repeat size={22} />}
+            {isRepeatTrack ? <Repeat1 size={20} /> : <Repeat size={20} />}
           </button>
         </div>
 
         {/* Secondary Toolstrip: Speed, A-B Loop, Sleep Timer, Active Recall */}
-        <div className="pt-2 border-t border-surface-800/80 grid grid-cols-4 gap-2">
+        <div className="pt-2 border-t border-slate-200 grid grid-cols-4 gap-2">
           {/* Speed Selector */}
           <button
             onClick={() => setShowSpeedMenu(!showSpeedMenu)}
             className={`py-2 px-2 rounded-xl text-xs font-mono font-semibold border flex items-center justify-center gap-1 transition-all ${
               playbackSpeed !== 1.0
-                ? 'bg-amber-500/10 border-amber-500/30 text-amber-400'
-                : 'bg-surface-900 border-surface-800 text-surface-300'
+                ? 'bg-amber-50 border-amber-300 text-amber-800'
+                : 'bg-slate-100 border-slate-200 text-slate-700 hover:bg-slate-200'
             }`}
           >
-            <Sliders size={13} />
+            <Sliders size={12} />
             <span>{playbackSpeed}x</span>
           </button>
 
@@ -290,12 +284,12 @@ export const FullScreenPlayer: React.FC<FullScreenPlayerProps> = ({
             onClick={() => setShowABPanel(!showABPanel)}
             className={`py-2 px-2 rounded-xl text-xs font-semibold border flex items-center justify-center gap-1 transition-all ${
               abLoop?.enabled
-                ? 'bg-teal-500/20 border-teal-500/40 text-teal-300'
-                : 'bg-surface-900 border-surface-800 text-surface-300'
+                ? 'bg-sky-50 border-sky-300 text-sky-800'
+                : 'bg-slate-100 border-slate-200 text-slate-700 hover:bg-slate-200'
             }`}
           >
             <span className="font-mono text-[11px]">A⇄B</span>
-            {abLoop?.enabled && <span className="w-1.5 h-1.5 rounded-full bg-teal-400" />}
+            {abLoop?.enabled && <span className="w-1.5 h-1.5 rounded-full bg-sky-500" />}
           </button>
 
           {/* Sleep Timer */}
@@ -303,11 +297,11 @@ export const FullScreenPlayer: React.FC<FullScreenPlayerProps> = ({
             onClick={() => setShowTimerMenu(!showTimerMenu)}
             className={`py-2 px-2 rounded-xl text-xs font-semibold border flex items-center justify-center gap-1 transition-all ${
               sleepTimerRemainingSeconds
-                ? 'bg-amber-500/10 border-amber-500/30 text-amber-400'
-                : 'bg-surface-900 border-surface-800 text-surface-300'
+                ? 'bg-amber-50 border-amber-300 text-amber-800'
+                : 'bg-slate-100 border-slate-200 text-slate-700 hover:bg-slate-200'
             }`}
           >
-            <Timer size={13} />
+            <Timer size={12} />
             <span className="font-mono text-[11px]">
               {sleepTimerRemainingSeconds ? `${Math.ceil(sleepTimerRemainingSeconds / 60)}m` : 'Sleep'}
             </span>
@@ -316,16 +310,16 @@ export const FullScreenPlayer: React.FC<FullScreenPlayerProps> = ({
           {/* Active Recall Action */}
           <button
             onClick={onOpenAssessment}
-            className="py-2 px-2 rounded-xl text-xs font-semibold bg-gradient-to-r from-amber-500/20 to-teal-500/20 border border-amber-500/30 text-amber-300 hover:brightness-110 flex items-center justify-center gap-1"
+            className="py-2 px-2 rounded-xl text-xs font-semibold bg-amber-500 hover:bg-amber-600 text-slate-950 flex items-center justify-center gap-1 shadow-2xs active:scale-95 transition-all"
           >
-            <Zap size={13} className="text-amber-400" />
+            <Zap size={12} fill="currentColor" />
             <span>Recall</span>
           </button>
         </div>
 
         {/* Speed Selection Flyout */}
         {showSpeedMenu && (
-          <div className="bg-surface-850 border border-surface-700 p-2.5 rounded-2xl flex flex-wrap justify-between gap-1 animate-in fade-in zoom-in-95 duration-100">
+          <div className="bg-white border border-slate-200 p-2.5 rounded-2xl shadow-lg flex flex-wrap justify-between gap-1 animate-in fade-in zoom-in-95 duration-100">
             {speedOptions.map((spd) => (
               <button
                 key={spd}
@@ -335,8 +329,8 @@ export const FullScreenPlayer: React.FC<FullScreenPlayerProps> = ({
                 }}
                 className={`py-1.5 px-2.5 rounded-lg text-xs font-mono font-bold transition-colors ${
                   playbackSpeed === spd
-                    ? 'bg-amber-500 text-surface-950'
-                    : 'bg-surface-800 text-surface-300 hover:bg-surface-700'
+                    ? 'bg-slate-900 text-white'
+                    : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
                 }`}
               >
                 {spd}x
@@ -347,7 +341,7 @@ export const FullScreenPlayer: React.FC<FullScreenPlayerProps> = ({
 
         {/* Sleep Timer Selection Flyout */}
         {showTimerMenu && (
-          <div className="bg-surface-850 border border-surface-700 p-2.5 rounded-2xl flex flex-wrap justify-between gap-1 animate-in fade-in zoom-in-95 duration-100">
+          <div className="bg-white border border-slate-200 p-2.5 rounded-2xl shadow-lg flex flex-wrap justify-between gap-1 animate-in fade-in zoom-in-95 duration-100">
             {timerOptions.map((opt, i) => (
               <button
                 key={i}
@@ -355,7 +349,7 @@ export const FullScreenPlayer: React.FC<FullScreenPlayerProps> = ({
                   onSetSleepTimer(opt.minutes);
                   setShowTimerMenu(false);
                 }}
-                className="py-1.5 px-2.5 rounded-lg text-xs font-semibold bg-surface-800 text-surface-300 hover:bg-surface-700 transition-colors"
+                className="py-1.5 px-2.5 rounded-lg text-xs font-semibold bg-slate-100 text-slate-700 hover:bg-slate-200 transition-colors"
               >
                 {opt.label}
               </button>
@@ -365,10 +359,10 @@ export const FullScreenPlayer: React.FC<FullScreenPlayerProps> = ({
 
         {/* A-B Loop Controls Panel */}
         {showABPanel && (
-          <div className="bg-surface-850 border border-teal-500/30 p-3 rounded-2xl space-y-2 animate-in fade-in duration-100">
+          <div className="bg-white border border-sky-200 p-3 rounded-2xl shadow-md space-y-2 animate-in fade-in duration-100">
             <div className="flex items-center justify-between text-xs">
-              <span className="font-semibold text-teal-400">A–B Repeat Segment</span>
-              <span className="text-[11px] text-surface-400 font-mono">
+              <span className="font-semibold text-sky-800">A–B Repeat Segment</span>
+              <span className="text-[11px] text-slate-500 font-mono">
                 {abLoop?.enabled
                   ? `${formatDuration(abLoop.startSeconds)} → ${formatDuration(abLoop.endSeconds)}`
                   : 'Loop Disabled'}
@@ -377,19 +371,19 @@ export const FullScreenPlayer: React.FC<FullScreenPlayerProps> = ({
             <div className="grid grid-cols-3 gap-2">
               <button
                 onClick={() => onToggleABLoop(positionSeconds, abLoop?.endSeconds || totalDuration)}
-                className="py-1.5 rounded-lg bg-surface-800 border border-surface-700 text-xs font-mono text-surface-200 active:scale-95"
+                className="py-1.5 rounded-lg bg-slate-100 border border-slate-200 text-xs font-mono text-slate-700 hover:bg-slate-200 active:scale-95"
               >
                 Set A ({formatDuration(positionSeconds)})
               </button>
               <button
                 onClick={() => onToggleABLoop(abLoop?.startSeconds || 0, positionSeconds)}
-                className="py-1.5 rounded-lg bg-surface-800 border border-surface-700 text-xs font-mono text-surface-200 active:scale-95"
+                className="py-1.5 rounded-lg bg-slate-100 border border-slate-200 text-xs font-mono text-slate-700 hover:bg-slate-200 active:scale-95"
               >
                 Set B ({formatDuration(positionSeconds)})
               </button>
               <button
                 onClick={() => onToggleABLoop(undefined, undefined)}
-                className="py-1.5 rounded-lg bg-rose-500/20 border border-rose-500/30 text-rose-300 text-xs font-semibold active:scale-95"
+                className="py-1.5 rounded-lg bg-rose-50 border border-rose-200 text-rose-700 text-xs font-semibold hover:bg-rose-100 active:scale-95"
               >
                 Clear Loop
               </button>

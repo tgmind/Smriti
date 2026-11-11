@@ -4,48 +4,61 @@
   --font-sans: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
   --font-mono: 'JetBrains Mono', monospace;
 
-  --color-surface-950: #06090e;
-  --color-surface-900: #0d121c;
-  --color-surface-850: #121824;
-  --color-surface-800: #1a2233;
-  --color-surface-700: #26334a;
-  --color-surface-600: #3b4d6b;
-  --color-surface-500: #64748b;
-  --color-surface-400: #94a3b8;
-  --color-surface-300: #cbd5e1;
-  --color-surface-200: #e2e8f0;
-  --color-surface-100: #f1f5f9;
-  --color-surface-50: #f8fafc;
+  /* SMRITI Clean Light Palette (shadcn/ui & daisyUI inspired) */
+  --color-canvas: #f8fafc;
+  --color-card-bg: #ffffff;
+  --color-card-subtle: #f8fafc;
+  --color-border-subtle: #e2e8f0;
+  --color-border-active: #cbd5e1;
 
-  --color-accent-amber-500: #f59e0b;
-  --color-accent-amber-400: #fbbf24;
-  --color-accent-amber-600: #d97706;
+  --color-primary-950: #09090b;
+  --color-primary-900: #0f172a;
+  --color-primary-800: #1e293b;
+  --color-primary-600: #475569;
+  --color-primary-500: #64748b;
+  --color-primary-400: #94a3b8;
 
-  --color-accent-teal-500: #0ea5e9;
-  --color-accent-teal-400: #38bdf8;
-  --color-accent-teal-600: #0284c7;
+  --color-amber-gold: #f59e0b;
+  --color-amber-deep: #d97706;
+  --color-amber-light: #fef3c7;
+  --color-amber-pill: #fffbeb;
 
-  --color-accent-emerald-500: #10b981;
-  --color-accent-rose-500: #f43f5e;
+  --color-emerald-deep: #059669;
+  --color-emerald-pill: #ecfdf5;
+
+  --color-rose-deep: #e11d48;
+  --color-rose-pill: #fff1f2;
+
+  --color-sky-deep: #0284c7;
+  --color-sky-pill: #f0f9ff;
 }
 
-/* Custom scrollbar */
+/* Base Light Theme Setup */
+html, body {
+  background-color: #f8fafc;
+  color: #0f172a;
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Sleek minimalist scrollbar */
 ::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+  width: 5px;
+  height: 5px;
 }
 
 ::-webkit-scrollbar-track {
-  background: var(--color-surface-900);
+  background: transparent;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: var(--color-surface-700);
+  background: #cbd5e1;
   border-radius: 9999px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: var(--color-surface-600);
+  background: #94a3b8;
 }
 
 /* Touch-optimized active states */
@@ -61,4 +74,9 @@ button, a, input, select {
 
 .safe-bottom {
   padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+/* Smooth micro-animations */
+.transition-micro {
+  transition: all 0.18s cubic-bezier(0.16, 1, 0.3, 1);
 }
