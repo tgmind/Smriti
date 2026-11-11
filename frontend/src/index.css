@@ -1,0 +1,64 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
+
+  --color-surface-950: #06090e;
+  --color-surface-900: #0d121c;
+  --color-surface-850: #121824;
+  --color-surface-800: #1a2233;
+  --color-surface-700: #26334a;
+  --color-surface-600: #3b4d6b;
+  --color-surface-500: #64748b;
+  --color-surface-400: #94a3b8;
+  --color-surface-300: #cbd5e1;
+  --color-surface-200: #e2e8f0;
+  --color-surface-100: #f1f5f9;
+  --color-surface-50: #f8fafc;
+
+  --color-accent-amber-500: #f59e0b;
+  --color-accent-amber-400: #fbbf24;
+  --color-accent-amber-600: #d97706;
+
+  --color-accent-teal-500: #0ea5e9;
+  --color-accent-teal-400: #38bdf8;
+  --color-accent-teal-600: #0284c7;
+
+  --color-accent-emerald-500: #10b981;
+  --color-accent-rose-500: #f43f5e;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--color-surface-900);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--color-surface-700);
+  border-radius: 9999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-surface-600);
+}
+
+/* Touch-optimized active states */
+button, a, input, select {
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+
+/* Safe areas for Android edge-to-edge / notches */
+.safe-top {
+  padding-top: env(safe-area-inset-top, 0px);
+}
+
+.safe-bottom {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
