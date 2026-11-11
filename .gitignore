@@ -1,3 +1,9 @@
+# Environment files
+.env
+*.env
+frontend/.env
+*.env.local
+
 # Node / Web dependencies
 frontend/node_modules/
 node_modules/
