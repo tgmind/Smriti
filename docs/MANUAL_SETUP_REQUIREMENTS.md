@@ -11,6 +11,10 @@
 
 You do **NOT** need to create or configure a Supabase project or write any SQL. The entire backend has already been provisioned, connected, and verified:
 
+- [x] **Google OAuth Client ID Configured:**
+  - Client ID: `964954219665-jf8pdaq8n3aejm2hf45p68nmcmc710mb.apps.googleusercontent.com`
+  - Client secrets safely ignored from Git tracking.
+  - Linked in `frontend/.env` and compiled into web & Android bundles.
 - [x] **Supabase Credentials Loaded & Saved:**
   - Project URL: `https://wppnfezoqpcgmowdkofp.supabase.co`
   - Public Anon Key: `sb_publishable_Jv7t8irT0s7wTNheRXMUpQ_SrNOB-0n`
