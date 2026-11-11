@@ -71,18 +71,36 @@ export const AssessmentModal: React.FC<AssessmentModalProps> = ({
   return (
     <div className="fixed inset-0 z-50 bg-slate-900/35 backdrop-blur-md flex flex-col justify-between p-4 overflow-y-auto safe-top safe-bottom text-slate-900 animate-in fade-in duration-150">
       <div className="bg-white border border-slate-200/90 rounded-3xl p-5 shadow-2xl max-w-md mx-auto w-full my-auto space-y-5">
-        {/* Header */}
+        {/* Question Step Pills */}
         <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-          <div className="flex items-center gap-2">
-            <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
-            <span className="text-[11px] font-bold uppercase tracking-wider text-amber-800 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-full">
-              Active Recall Check
-            </span>
+          <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar">
+            {items.map((_, idx) => {
+              const isCurrent = idx === currentIndex;
+              return (
+                <button
+                  key={idx}
+                  onClick={() => {
+                    setCurrentIndex(idx);
+                    setIsAnswerRevealed(false);
+                    setSelectedMCQ(null);
+                    setLastCalculatedResult(null);
+                  }}
+                  className={`w-6 h-6 rounded-full text-[11px] font-mono font-bold flex items-center justify-center transition-all ${
+                    isCurrent
+                      ? 'bg-slate-900 text-white shadow-2xs scale-105'
+                      : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                  }`}
+                  aria-label={`Jump to question ${idx + 1}`}
+                >
+                  {idx + 1}
+                </button>
+              );
+            })}
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2">
             <span className="text-xs font-mono font-semibold text-slate-500">
-              {currentIndex + 1} of {items.length}
+              {currentIndex + 1}/{items.length}
             </span>
             <button
               onClick={onClose}
@@ -132,15 +150,54 @@ export const AssessmentModal: React.FC<AssessmentModalProps> = ({
             </div>
           )}
 
-          {/* Reveal Button for Flashcards */}
+          {/* 1-Tap Recall Confidence & Reveal for Flashcards */}
           {(!currentItem.options || currentItem.options.length === 0) && !isAnswerRevealed && (
-            <button
-              onClick={() => setIsAnswerRevealed(true)}
-              className="w-full mt-2 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-semibold text-xs active:scale-[0.98] transition-all flex items-center justify-center gap-1.5 shadow-xs"
-            >
-              <Sparkles size={13} className="text-amber-400" />
-              <span>Reveal Correct Answer</span>
-            </button>
+            <div className="space-y-2 pt-2">
+              <span className="text-[11px] font-semibold text-slate-600 block text-center">
+                Test your memory before revealing:
+              </span>
+              <div className="grid grid-cols-3 gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsAnswerRevealed(true);
+                    handleRatingSelect(3); // Easy/Confident
+                  }}
+                  className="py-2 px-1 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-200 text-[10px] font-bold active:scale-95 transition-all text-center shadow-2xs"
+                >
+                  ⚡ Confident
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsAnswerRevealed(true);
+                    handleRatingSelect(1); // Hard/Unsure
+                  }}
+                  className="py-2 px-1 rounded-xl bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 text-[10px] font-bold active:scale-95 transition-all text-center shadow-2xs"
+                >
+                  🤔 Vague
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsAnswerRevealed(true);
+                    handleRatingSelect(0); // Blank/Forgot
+                  }}
+                  className="py-2 px-1 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-800 border border-rose-200 text-[10px] font-bold active:scale-95 transition-all text-center shadow-2xs"
+                >
+                  🤷 Forgot
+                </button>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setIsAnswerRevealed(true)}
+                className="w-full mt-1 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-xs active:scale-[0.98] transition-all flex items-center justify-center gap-1.5"
+              >
+                <Sparkles size={13} className="text-amber-500" />
+                <span>Just Show Answer</span>
+              </button>
+            </div>
           )}
 
           {/* Answer Section */}

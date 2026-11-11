@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Headphones, CheckCircle2, Brain, Zap } from 'lucide-react';
 import { DailyStudyStats, RevisionItem } from '../types';
 import { formatDuration } from '../services/learningEngine';
@@ -6,12 +6,16 @@ import { formatDuration } from '../services/learningEngine';
 interface ProgressTabProps {
   dailyStats: DailyStudyStats[];
   revisionItems: RevisionItem[];
+  onOpenAssessment?: () => void;
 }
 
 export const ProgressTab: React.FC<ProgressTabProps> = ({
   dailyStats,
-  revisionItems
+  revisionItems,
+  onOpenAssessment
 }) => {
+  const [selectedStage, setSelectedStage] = useState<'learning' | 'review' | 'mastered' | null>('review');
+
   // 1. Exposure Metrics
   const totalLifetimeSeconds = dailyStats.reduce((acc, curr) => acc + curr.total_listening_seconds, 0);
   const totalCompletedPlays = dailyStats.reduce((acc, curr) => acc + curr.completed_plays, 0);
@@ -26,6 +30,8 @@ export const ProgressTab: React.FC<ProgressTabProps> = ({
   const learningCount = revisionItems.filter(r => r.status === 'learning').length;
   const reviewCount = revisionItems.filter(r => r.status === 'review').length;
   const masteredCount = revisionItems.filter(r => r.status === 'mastered').length;
+
+  const stageItems = selectedStage ? revisionItems.filter(r => r.status === selectedStage) : [];
 
   return (
     <div className="space-y-4 pb-28 pt-4 px-4 max-w-md mx-auto">
@@ -182,38 +188,110 @@ export const ProgressTab: React.FC<ProgressTabProps> = ({
           </span>
         </div>
 
-        {/* 3 Stages */}
+        {/* 3 Interactive Clickable Stages */}
         <div className="grid grid-cols-3 gap-2">
-          <div className="bg-amber-50/50 border border-amber-200/70 p-2.5 rounded-xl text-center">
+          <button
+            type="button"
+            onClick={() => setSelectedStage(selectedStage === 'learning' ? null : 'learning')}
+            className={`p-2.5 rounded-xl text-center transition-all border ${
+              selectedStage === 'learning'
+                ? 'bg-amber-100 border-amber-400 ring-2 ring-amber-400/20 shadow-xs'
+                : 'bg-amber-50/50 border-amber-200/70 hover:bg-amber-50'
+            }`}
+          >
             <span className="text-sm font-bold text-amber-800 block font-mono">
               {learningCount}
             </span>
-            <span className="text-[10px] text-amber-900 uppercase font-semibold mt-0.5 block">
+            <span className="text-[10px] text-amber-900 uppercase font-bold mt-0.5 block">
               Learning
             </span>
             <span className="text-[9px] text-slate-500 font-mono">1–3d gap</span>
-          </div>
+          </button>
 
-          <div className="bg-sky-50/50 border border-sky-200/70 p-2.5 rounded-xl text-center">
+          <button
+            type="button"
+            onClick={() => setSelectedStage(selectedStage === 'review' ? null : 'review')}
+            className={`p-2.5 rounded-xl text-center transition-all border ${
+              selectedStage === 'review'
+                ? 'bg-sky-100 border-sky-400 ring-2 ring-sky-400/20 shadow-xs'
+                : 'bg-sky-50/50 border-sky-200/70 hover:bg-sky-50'
+            }`}
+          >
             <span className="text-sm font-bold text-sky-800 block font-mono">
               {reviewCount}
             </span>
-            <span className="text-[10px] text-sky-900 uppercase font-semibold mt-0.5 block">
+            <span className="text-[10px] text-sky-900 uppercase font-bold mt-0.5 block">
               Review
             </span>
             <span className="text-[9px] text-slate-500 font-mono">4–20d gap</span>
-          </div>
+          </button>
 
-          <div className="bg-emerald-50/50 border border-emerald-200/70 p-2.5 rounded-xl text-center">
+          <button
+            type="button"
+            onClick={() => setSelectedStage(selectedStage === 'mastered' ? null : 'mastered')}
+            className={`p-2.5 rounded-xl text-center transition-all border ${
+              selectedStage === 'mastered'
+                ? 'bg-emerald-100 border-emerald-400 ring-2 ring-emerald-400/20 shadow-xs'
+                : 'bg-emerald-50/50 border-emerald-200/70 hover:bg-emerald-50'
+            }`}
+          >
             <span className="text-sm font-bold text-emerald-800 block font-mono">
               {masteredCount}
             </span>
-            <span className="text-[10px] text-emerald-900 uppercase font-semibold mt-0.5 block">
+            <span className="text-[10px] text-emerald-900 uppercase font-bold mt-0.5 block">
               Mastered
             </span>
             <span className="text-[9px] text-slate-500 font-mono">≥21d gap</span>
-          </div>
+          </button>
         </div>
+
+        {/* Selected Stage Concepts Breakdown */}
+        {selectedStage && (
+          <div className="pt-2 border-t border-slate-100 space-y-2 animate-in fade-in duration-100">
+            <div className="flex items-center justify-between text-[11px] text-slate-600 font-semibold px-0.5">
+              <span className="capitalize">{selectedStage} Concepts ({stageItems.length}):</span>
+              <span className="text-[10px] font-mono text-slate-400">SM-2 Spaced Interval</span>
+            </div>
+
+            <div className="space-y-1.5 max-h-48 overflow-y-auto pr-0.5">
+              {stageItems.length === 0 ? (
+                <p className="text-xs text-slate-400 italic text-center py-2">
+                  No concepts currently in this retention stage.
+                </p>
+              ) : (
+                stageItems.map((item) => (
+                  <div
+                    key={item.id}
+                    className="p-2.5 rounded-xl bg-slate-50 border border-slate-200/70 flex items-center justify-between gap-2 shadow-2xs"
+                  >
+                    <div className="flex-1 min-w-0">
+                      <span className="text-[10px] font-mono font-bold text-slate-600 block uppercase">
+                        {item.subject_name || 'Subject'}
+                      </span>
+                      <p className="text-xs font-semibold text-slate-900 truncate">
+                        {item.prompt}
+                      </p>
+                      <span className="text-[10px] text-slate-400 font-mono">
+                        Due: {item.next_review_due} (Interval: {item.interval_days}d)
+                      </span>
+                    </div>
+
+                    {onOpenAssessment && (
+                      <button
+                        type="button"
+                        onClick={onOpenAssessment}
+                        className="px-2 py-1 rounded-lg bg-white border border-slate-200 hover:bg-amber-50 hover:border-amber-300 text-slate-700 hover:text-amber-800 text-[10px] font-mono font-bold flex items-center gap-0.5 active:scale-95 transition-all shadow-2xs flex-shrink-0"
+                      >
+                        <Zap size={10} fill="currentColor" />
+                        <span>Test</span>
+                      </button>
+                    )}
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        )}
 
         <p className="text-[11px] text-slate-500 leading-relaxed pt-1">
           Review intervals expand dynamically via SuperMemo SM-2. When you rate items as "Easy" or "Good", intervals scale geometrically to build durable long-term retention.

@@ -8,13 +8,15 @@ interface MiniPlayerProps {
   onTogglePlay: () => void;
   onSeekRelative: (seconds: number) => void;
   onOpenFullScreen: () => void;
+  onCycleSpeed?: () => void;
 }
 
 export const MiniPlayer: React.FC<MiniPlayerProps> = ({
   playbackState,
   onTogglePlay,
   onSeekRelative,
-  onOpenFullScreen
+  onOpenFullScreen,
+  onCycleSpeed
 }) => {
   const { currentAudio, isPlaying, positionSeconds, durationSeconds } = playbackState;
 
@@ -60,12 +62,26 @@ export const MiniPlayer: React.FC<MiniPlayerProps> = ({
           </div>
 
           {/* Player Controls */}
-          <div className="flex items-center gap-1 flex-shrink-0">
+          <div className="flex items-center gap-1.5 flex-shrink-0">
+            {onCycleSpeed && (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onCycleSpeed();
+                }}
+                className="px-2 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 border border-slate-200 text-[10px] font-mono font-bold text-slate-700 active:scale-90 transition-all shadow-2xs"
+                title="Cycle playback speed"
+                aria-label={`Playback speed ${playbackState.playbackSpeed}x`}
+              >
+                {playbackState.playbackSpeed}x
+              </button>
+            )}
+
             <button
-              onClick={() => onSeekRelative(30)}
-              className="p-2 text-slate-400 hover:text-slate-800 active:scale-95 transition-transform"
-              title="Forward 30s"
-              aria-label="Fast forward 30 seconds"
+              onClick={() => onSeekRelative(15)}
+              className="p-1.5 text-slate-400 hover:text-slate-800 active:scale-95 transition-transform"
+              title="Forward 15s"
+              aria-label="Fast forward 15 seconds"
             >
               <FastForward size={16} />
             </button>

@@ -72,7 +72,74 @@ export const RecordTab: React.FC<RecordTabProps> = ({
     return () => clearInterval(timer);
   }, [recordingState]);
 
-  // Audio Preview initialization
+  // Meta Inputs: Smart Click-Oriented Presets
+  const titlePresets = [
+    'Formula Derivation',
+    'Concept Summary',
+    'Rapid Revision',
+    'Exam Notes',
+    'Core Law',
+    'Lecture Recap',
+    'Problem Solving'
+  ];
+
+  const subjectTermPresets: Record<string, string[]> = {
+    'Physics': ['Derivation', 'Formulas', 'SI Units', 'Conservation Laws', 'Numericals', 'Definitions'],
+    'Chemistry': ['Reaction Mechanism', 'Equilibrium', 'Periodic Trends', 'Enthalpy', 'Nomenclature'],
+    'Biology': ['Metabolic Pathway', 'Diagram Notes', 'Physiology', 'Key Terms', 'Taxonomy'],
+    'Mathematics': ['Theorem Proof', 'Identities', 'Matrix Rules', 'Shortcuts', 'Calculus Steps'],
+    'General': ['Key Points', 'Exam Cues', 'Mnemonic', 'Quick Summary']
+  };
+
+  const currentSubjectObj = subjects.find(s => s.id === selectedSubjectId);
+  const currentSubjectName = currentSubjectObj?.name || 'General';
+  const availableTerms = subjectTermPresets[currentSubjectName] || subjectTermPresets['General'];
+
+  const selectedTerms = keyTermsInput
+    .split(',')
+    .map(t => t.trim())
+    .filter(Boolean);
+
+  const toggleTerm = (term: string) => {
+    if (selectedTerms.includes(term)) {
+      const next = selectedTerms.filter(t => t !== term);
+      setKeyTermsInput(next.join(', '));
+    } else {
+      const next = [...selectedTerms, term];
+      setKeyTermsInput(next.join(', '));
+    }
+  };
+
+  const applyTitlePreset = (preset: string) => {
+    const dateStr = new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    setTitle(`${currentSubjectName}: ${preset} (${dateStr})`);
+  };
+
+  const adjustTrimStart = (delta: number) => {
+    const maxVal = Math.max(0, (trimEndSeconds || recordedDuration) - 1);
+    setTrimStartSeconds(prev => Math.max(0, Math.min(maxVal, prev + delta)));
+  };
+
+  const adjustTrimEnd = (delta: number) => {
+    const minVal = trimStartSeconds + 1;
+    setTrimEndSeconds(prev => Math.min(recordedDuration, Math.max(minVal, (prev || recordedDuration) + delta)));
+  };
+
+  const handleApplyPresetTrim = (type: 'full' | 'intro3' | 'outro3' | 'playhead') => {
+    if (type === 'full') {
+      setTrimStartSeconds(0);
+      setTrimEndSeconds(recordedDuration);
+    } else if (type === 'intro3') {
+      setTrimStartSeconds(Math.min(3, Math.max(0, recordedDuration - 1)));
+    } else if (type === 'outro3') {
+      setTrimEndSeconds(Math.max(trimStartSeconds + 1, recordedDuration - 3));
+    } else if (type === 'playhead' && previewAudio) {
+      const cur = Math.floor(previewAudio.currentTime);
+      if (cur < (trimEndSeconds || recordedDuration)) {
+        setTrimStartSeconds(cur);
+      }
+    }
+  };
   useEffect(() => {
     if (recordedUrl && recordingState === 'review') {
       const audio = new Audio(recordedUrl);
@@ -324,48 +391,182 @@ export const RecordTab: React.FC<RecordTabProps> = ({
             </button>
           </div>
 
-          {/* Trim Range Slider */}
-          <div className="space-y-1 bg-slate-50 p-3 rounded-xl border border-slate-200/80">
+          {/* Trim Range with Steppers & Quick 1-Tap Presets */}
+          <div className="space-y-2.5 bg-slate-50 p-3.5 rounded-2xl border border-slate-200/80">
             <div className="flex items-center justify-between text-xs">
-              <span className="font-semibold text-slate-700 flex items-center gap-1">
-                <Sliders size={12} /> Trim Audio
+              <span className="font-bold text-slate-800 flex items-center gap-1.5">
+                <Sliders size={13} className="text-amber-600" />
+                <span>Trim Boundaries</span>
               </span>
-              <span className="text-[11px] font-mono text-slate-500">
-                {formatDuration(trimStartSeconds)} → {formatDuration(trimEndSeconds || recordedDuration)}
+              <span className="text-[11px] font-mono font-bold text-amber-800 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-full">
+                {formatDuration(trimStartSeconds)} → {formatDuration(trimEndSeconds || recordedDuration)} ({Math.max(1, (trimEndSeconds || recordedDuration) - trimStartSeconds)}s)
               </span>
             </div>
-            <div className="grid grid-cols-2 gap-2 pt-1">
-              <div>
-                <label className="text-[10px] text-slate-500 block mb-0.5">Start (seconds)</label>
-                <input
-                  type="number"
-                  min="0"
-                  max={recordedDuration - 1}
-                  value={trimStartSeconds}
-                  onChange={(e) => setTrimStartSeconds(Math.max(0, parseFloat(e.target.value) || 0))}
-                  className="w-full bg-white border border-slate-200 rounded-lg p-1.5 text-xs text-slate-900 font-mono focus:outline-none"
-                />
+
+            {/* 1-Tap Presets */}
+            <div className="flex items-center gap-1.5 overflow-x-auto pb-0.5 no-scrollbar">
+              <button
+                type="button"
+                onClick={() => handleApplyPresetTrim('full')}
+                className="px-2.5 py-1 rounded-lg bg-white border border-slate-200 hover:border-slate-300 text-[11px] font-medium text-slate-700 whitespace-nowrap active:scale-95 shadow-2xs"
+              >
+                Keep Full
+              </button>
+              <button
+                type="button"
+                onClick={() => handleApplyPresetTrim('intro3')}
+                className="px-2.5 py-1 rounded-lg bg-white border border-slate-200 hover:border-slate-300 text-[11px] font-medium text-slate-700 whitespace-nowrap active:scale-95 shadow-2xs"
+              >
+                Trim 3s Intro
+              </button>
+              <button
+                type="button"
+                onClick={() => handleApplyPresetTrim('outro3')}
+                className="px-2.5 py-1 rounded-lg bg-white border border-slate-200 hover:border-slate-300 text-[11px] font-medium text-slate-700 whitespace-nowrap active:scale-95 shadow-2xs"
+              >
+                Trim 3s Outro
+              </button>
+              {previewAudio && (
+                <button
+                  type="button"
+                  onClick={() => handleApplyPresetTrim('playhead')}
+                  className="px-2.5 py-1 rounded-lg bg-amber-50 border border-amber-200 text-amber-800 text-[11px] font-semibold whitespace-nowrap active:scale-95 shadow-2xs"
+                >
+                  Start at {formatDuration(Math.floor(previewCurrentTime))}
+                </button>
+              )}
+            </div>
+
+            {/* Steppers for Start & End */}
+            <div className="grid grid-cols-2 gap-2.5 pt-1">
+              {/* Start Steppers */}
+              <div className="bg-white border border-slate-200 rounded-xl p-2 space-y-1 shadow-2xs">
+                <div className="flex justify-between items-center text-[10px] text-slate-500 font-mono">
+                  <span>START</span>
+                  <span className="font-bold text-slate-900">{formatDuration(trimStartSeconds)}</span>
+                </div>
+                <div className="flex items-center justify-between gap-1">
+                  <button
+                    type="button"
+                    onClick={() => adjustTrimStart(-5)}
+                    className="flex-1 py-1 rounded bg-slate-100 hover:bg-slate-200 text-slate-700 font-mono text-[10px] font-bold active:scale-90"
+                  >
+                    -5s
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => adjustTrimStart(-1)}
+                    className="flex-1 py-1 rounded bg-slate-100 hover:bg-slate-200 text-slate-700 font-mono text-[10px] font-bold active:scale-90"
+                  >
+                    -1s
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => adjustTrimStart(1)}
+                    className="flex-1 py-1 rounded bg-slate-100 hover:bg-slate-200 text-slate-700 font-mono text-[10px] font-bold active:scale-90"
+                  >
+                    +1s
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => adjustTrimStart(5)}
+                    className="flex-1 py-1 rounded bg-slate-100 hover:bg-slate-200 text-slate-700 font-mono text-[10px] font-bold active:scale-90"
+                  >
+                    +5s
+                  </button>
+                </div>
               </div>
-              <div>
-                <label className="text-[10px] text-slate-500 block mb-0.5">End (seconds)</label>
-                <input
-                  type="number"
-                  min={trimStartSeconds + 1}
-                  max={recordedDuration}
-                  value={trimEndSeconds || recordedDuration}
-                  onChange={(e) => setTrimEndSeconds(Math.min(recordedDuration, parseFloat(e.target.value) || recordedDuration))}
-                  className="w-full bg-white border border-slate-200 rounded-lg p-1.5 text-xs text-slate-900 font-mono focus:outline-none"
-                />
+
+              {/* End Steppers */}
+              <div className="bg-white border border-slate-200 rounded-xl p-2 space-y-1 shadow-2xs">
+                <div className="flex justify-between items-center text-[10px] text-slate-500 font-mono">
+                  <span>END</span>
+                  <span className="font-bold text-slate-900">{formatDuration(trimEndSeconds || recordedDuration)}</span>
+                </div>
+                <div className="flex items-center justify-between gap-1">
+                  <button
+                    type="button"
+                    onClick={() => adjustTrimEnd(-5)}
+                    className="flex-1 py-1 rounded bg-slate-100 hover:bg-slate-200 text-slate-700 font-mono text-[10px] font-bold active:scale-90"
+                  >
+                    -5s
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => adjustTrimEnd(-1)}
+                    className="flex-1 py-1 rounded bg-slate-100 hover:bg-slate-200 text-slate-700 font-mono text-[10px] font-bold active:scale-90"
+                  >
+                    -1s
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => adjustTrimEnd(1)}
+                    className="flex-1 py-1 rounded bg-slate-100 hover:bg-slate-200 text-slate-700 font-mono text-[10px] font-bold active:scale-90"
+                  >
+                    +1s
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => adjustTrimEnd(5)}
+                    className="flex-1 py-1 rounded bg-slate-100 hover:bg-slate-200 text-slate-700 font-mono text-[10px] font-bold active:scale-90"
+                  >
+                    +5s
+                  </button>
+                </div>
               </div>
             </div>
           </div>
 
-          {/* Meta Inputs: Title & Subject */}
-          <div className="space-y-2.5 pt-0.5">
-            <div>
-              <label className="text-[11px] font-bold text-slate-700 block mb-1">
-                Lesson / Note Title
-              </label>
+          {/* Subject 1-Tap Horizontal Pill Bar */}
+          <div className="space-y-1.5">
+            <label className="text-[11px] font-bold uppercase tracking-wider text-slate-500 block">
+              Select Subject
+            </label>
+            <div className="flex gap-1.5 overflow-x-auto pb-1 no-scrollbar">
+              {subjects.map((s) => {
+                const isSelected = selectedSubjectId === s.id;
+                return (
+                  <button
+                    key={s.id}
+                    type="button"
+                    onClick={() => setSelectedSubjectId(s.id)}
+                    className={`px-3 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap transition-all border ${
+                      isSelected
+                        ? 'bg-slate-900 border-slate-900 text-white shadow-2xs scale-[1.02]'
+                        : 'bg-white border-slate-200 text-slate-700 hover:border-slate-300'
+                    }`}
+                  >
+                    {s.name}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Meta Inputs: Title with 1-Tap Style Presets */}
+          <div className="space-y-2 pt-0.5">
+            <div className="space-y-1">
+              <div className="flex items-center justify-between">
+                <label className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                  Lesson Title
+                </label>
+                <span className="text-[10px] text-slate-400 font-mono">Tap preset or edit</span>
+              </div>
+
+              {/* Title One-Tap Quick Style Chips */}
+              <div className="flex flex-wrap gap-1 pb-1">
+                {titlePresets.map((preset) => (
+                  <button
+                    key={preset}
+                    type="button"
+                    onClick={() => applyTitlePreset(preset)}
+                    className="px-2 py-0.5 rounded-md bg-slate-100 hover:bg-amber-100 hover:text-amber-900 text-slate-700 text-[10px] font-medium transition-colors border border-slate-200/80 active:scale-95"
+                  >
+                    + {preset}
+                  </button>
+                ))}
+              </div>
+
               <input
                 type="text"
                 value={title}
@@ -375,33 +576,60 @@ export const RecordTab: React.FC<RecordTabProps> = ({
               />
             </div>
 
-            <div>
-              <label className="text-[11px] font-bold text-slate-700 block mb-1">
-                Subject
-              </label>
-              <select
-                value={selectedSubjectId}
-                onChange={(e) => setSelectedSubjectId(e.target.value)}
-                className="w-full bg-white border border-slate-200 focus:border-slate-400 rounded-xl px-3 py-2 text-xs text-slate-900 focus:outline-none shadow-2xs"
-              >
-                {subjects.map((s) => (
-                  <option key={s.id} value={s.id}>
-                    {s.name}
-                  </option>
-                ))}
-              </select>
-            </div>
+            {/* Key Terms: One-Tap Topic Chips */}
+            <div className="space-y-1.5 pt-1">
+              <div className="flex items-center justify-between">
+                <label className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                  Key Terms & Concepts
+                </label>
+                <span className="text-[10px] text-slate-400 font-mono">Tap to toggle</span>
+              </div>
 
-            <div>
-              <label className="text-[11px] font-bold text-slate-700 block mb-1">
-                Key Terms & Formulas (comma-separated)
-              </label>
+              {/* Suggested Terms for Chosen Subject */}
+              <div className="flex flex-wrap gap-1">
+                {availableTerms.map((term) => {
+                  const isChecked = selectedTerms.includes(term);
+                  return (
+                    <button
+                      key={term}
+                      type="button"
+                      onClick={() => toggleTerm(term)}
+                      className={`px-2.5 py-1 rounded-full text-[11px] font-medium transition-all border ${
+                        isChecked
+                          ? 'bg-amber-500 border-amber-500 text-slate-950 font-bold shadow-2xs'
+                          : 'bg-white border-slate-200 text-slate-600 hover:border-slate-300'
+                      }`}
+                    >
+                      {isChecked ? `✓ ${term}` : `+ ${term}`}
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* Active Terms Pills Display */}
+              {selectedTerms.length > 0 && (
+                <div className="flex flex-wrap gap-1 p-2 rounded-xl bg-slate-50 border border-slate-200/80">
+                  {selectedTerms.map((term) => (
+                    <span
+                      key={term}
+                      onClick={() => toggleTerm(term)}
+                      className="px-2 py-0.5 rounded-md bg-white border border-slate-200 text-[10px] font-mono text-slate-800 flex items-center gap-1 cursor-pointer hover:bg-rose-50 hover:text-rose-700 hover:border-rose-200 transition-colors"
+                      title="Tap to remove"
+                    >
+                      <span>{term}</span>
+                      <span className="text-slate-400 hover:text-rose-600">✕</span>
+                    </span>
+                  ))}
+                </div>
+              )}
+
+              {/* Optional Custom Input */}
               <input
                 type="text"
                 value={keyTermsInput}
                 onChange={(e) => setKeyTermsInput(e.target.value)}
-                placeholder="e.g. Internal Energy, dQ = dU + dW"
-                className="w-full bg-white border border-slate-200 focus:border-slate-400 rounded-xl px-3 py-2 text-xs text-slate-900 placeholder:text-slate-400 focus:outline-none shadow-2xs"
+                placeholder="Or type custom terms (comma separated)..."
+                className="w-full bg-white border border-slate-200 focus:border-slate-400 rounded-xl px-3 py-1.5 text-xs text-slate-900 placeholder:text-slate-400 focus:outline-none shadow-2xs text-[11px]"
               />
             </div>
           </div>

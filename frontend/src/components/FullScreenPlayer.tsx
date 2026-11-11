@@ -12,8 +12,7 @@ import {
   Zap,
   Star,
   Download,
-  CheckCircle2,
-  Sliders
+  CheckCircle2
 } from 'lucide-react';
 import { AudioItem, PlaybackState } from '../types';
 import { formatDuration } from '../services/learningEngine';
@@ -59,7 +58,6 @@ export const FullScreenPlayer: React.FC<FullScreenPlayerProps> = ({
     sleepTimerRemainingSeconds
   } = playbackState;
 
-  const [showSpeedMenu, setShowSpeedMenu] = useState(false);
   const [showTimerMenu, setShowTimerMenu] = useState(false);
   const [showABPanel, setShowABPanel] = useState(false);
 
@@ -68,7 +66,6 @@ export const FullScreenPlayer: React.FC<FullScreenPlayerProps> = ({
   const totalDuration = durationSeconds || currentAudio.duration_seconds || 1;
   const progressPercent = Math.min(100, (positionSeconds / totalDuration) * 100);
 
-  const speedOptions = [0.5, 0.75, 1.0, 1.25, 1.5, 1.75, 2.0, 2.5];
   const timerOptions = [
     { label: 'Off', minutes: null },
     { label: '5 min', minutes: 5 },
@@ -216,7 +213,7 @@ export const FullScreenPlayer: React.FC<FullScreenPlayerProps> = ({
             <RotateCcw size={20} />
           </button>
 
-          {/* Previous Track */}
+          {/* Previous Track / Restart */}
           <button
             onClick={() => onSeek(0)}
             className="p-2.5 text-slate-500 hover:text-slate-900 active:scale-95 transition-transform"
@@ -238,7 +235,7 @@ export const FullScreenPlayer: React.FC<FullScreenPlayerProps> = ({
             )}
           </button>
 
-          {/* Next / Fast Forward 30s */}
+          {/* Fast Forward 30s */}
           <button
             onClick={() => onSeekRelative(30)}
             className="p-2.5 text-slate-500 hover:text-slate-900 active:scale-95 transition-transform"
@@ -264,20 +261,41 @@ export const FullScreenPlayer: React.FC<FullScreenPlayerProps> = ({
           </button>
         </div>
 
-        {/* Secondary Toolstrip: Speed, A-B Loop, Sleep Timer, Active Recall */}
-        <div className="pt-2 border-t border-slate-200 grid grid-cols-4 gap-2">
-          {/* Speed Selector */}
-          <button
-            onClick={() => setShowSpeedMenu(!showSpeedMenu)}
-            className={`py-2 px-2 rounded-xl text-xs font-mono font-semibold border flex items-center justify-center gap-1 transition-all ${
-              playbackSpeed !== 1.0
-                ? 'bg-amber-50 border-amber-300 text-amber-800'
-                : 'bg-slate-100 border-slate-200 text-slate-700 hover:bg-slate-200'
-            }`}
-          >
-            <Sliders size={12} />
-            <span>{playbackSpeed}x</span>
-          </button>
+        {/* 1-Tap Quick Seek Jumps Bar */}
+        <div className="flex items-center justify-center gap-1.5 pt-0.5">
+          {[-15, -5, 5, 15].map((delta) => (
+            <button
+              key={delta}
+              onClick={() => onSeekRelative(delta)}
+              className="px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 font-mono text-[10px] font-bold active:scale-95 transition-all border border-slate-200/60"
+            >
+              {delta > 0 ? `+${delta}s` : `${delta}s`}
+            </button>
+          ))}
+        </div>
+
+        {/* 1-Tap Playback Speed Segmented Bar */}
+        <div className="flex items-center justify-between gap-1 bg-slate-100 p-1 rounded-xl border border-slate-200/80">
+          {[0.75, 1.0, 1.25, 1.5, 2.0].map((spd) => {
+            const isSelected = playbackSpeed === spd;
+            return (
+              <button
+                key={spd}
+                onClick={() => onSetSpeed(spd)}
+                className={`flex-1 py-1 rounded-lg text-xs font-mono font-bold transition-all ${
+                  isSelected
+                    ? 'bg-slate-900 text-white shadow-2xs'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+              >
+                {spd}x
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Secondary Toolstrip: Sleep Timer, A-B Loop, Active Recall */}
+        <div className="pt-1.5 border-t border-slate-200 grid grid-cols-3 gap-2">
 
           {/* A-B Loop */}
           <button
@@ -316,28 +334,6 @@ export const FullScreenPlayer: React.FC<FullScreenPlayerProps> = ({
             <span>Recall</span>
           </button>
         </div>
-
-        {/* Speed Selection Flyout */}
-        {showSpeedMenu && (
-          <div className="bg-white border border-slate-200 p-2.5 rounded-2xl shadow-lg flex flex-wrap justify-between gap-1 animate-in fade-in zoom-in-95 duration-100">
-            {speedOptions.map((spd) => (
-              <button
-                key={spd}
-                onClick={() => {
-                  onSetSpeed(spd);
-                  setShowSpeedMenu(false);
-                }}
-                className={`py-1.5 px-2.5 rounded-lg text-xs font-mono font-bold transition-colors ${
-                  playbackSpeed === spd
-                    ? 'bg-slate-900 text-white'
-                    : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
-                }`}
-              >
-                {spd}x
-              </button>
-            ))}
-          </div>
-        )}
 
         {/* Sleep Timer Selection Flyout */}
         {showTimerMenu && (

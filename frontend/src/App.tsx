@@ -60,6 +60,7 @@ export const App: React.FC = () => {
   // Playback & UI Modals
   const [isFullScreenPlayerOpen, setIsFullScreenPlayerOpen] = useState(false);
   const [isAssessmentModalOpen, setIsAssessmentModalOpen] = useState(false);
+  const [activeAssessmentItems, setActiveAssessmentItems] = useState<RevisionItem[] | null>(null);
 
   const [playbackState, setPlaybackState] = useState<PlaybackState>({
     currentAudio: null,
@@ -289,12 +290,54 @@ export const App: React.FC = () => {
     setStorageInfo(bridge.getStorageInfo());
   };
 
+  const handleCycleSpeed = () => {
+    const speeds = [1.0, 1.25, 1.5, 2.0];
+    const curIdx = speeds.indexOf(playbackState.playbackSpeed);
+    const nextSpeed = speeds[(curIdx + 1) % speeds.length];
+    handleSetSpeed(nextSpeed);
+  };
+
+  // Launch Active Recall specifically for any selected AudioItem
+  const handleOpenAssessmentForAudio = (audio: AudioItem) => {
+    const existing = revisionItems.filter(r => r.audio_id === audio.id);
+    if (existing.length > 0) {
+      setActiveAssessmentItems(existing);
+    } else {
+      const keyTermsStr = audio.key_terms && audio.key_terms.length > 0
+        ? audio.key_terms.join(', ')
+        : 'Fundamental laws and core derivations';
+      const dynamicItem: RevisionItem = {
+        id: `rev-${audio.id}-${Date.now()}`,
+        assessment_id: `asm-${audio.id}`,
+        audio_id: audio.id,
+        audio_title: audio.title,
+        subject_name: audio.subject_name || 'General',
+        assessment_type: 'flashcard',
+        prompt: `Recall the core concepts, derivations, and definitions covered in "${audio.title}".`,
+        correct_answer: `Key terms & topics: ${keyTermsStr}. Review your audio notes to verify your recall.`,
+        explanation: 'Active retrieval practice stimulates synaptic consolidation even when recalling high-level outlines.',
+        ease_factor: 2.50,
+        repetition_count: 0,
+        interval_days: 1,
+        next_review_due: new Date().toISOString().split('T')[0],
+        status: 'learning'
+      };
+      setActiveAssessmentItems([dynamicItem]);
+    }
+    setIsAssessmentModalOpen(true);
+  };
+
   // Spaced Repetition Rating Recording
   const handleRecordRecallRating = (item: RevisionItem, rating: RatingScore) => {
     const updated = calculateNextReview(item, rating);
-    setRevisionItems(prev =>
-      prev.map(r => (r.id === item.id ? { ...r, ...updated, last_rating: rating, last_reviewed_at: new Date().toISOString() } : r))
-    );
+    setRevisionItems(prev => {
+      const exists = prev.some(r => r.id === item.id);
+      if (exists) {
+        return prev.map(r => (r.id === item.id ? { ...r, ...updated, last_rating: rating, last_reviewed_at: new Date().toISOString() } : r));
+      } else {
+        return [...prev, { ...item, ...updated, last_rating: rating, last_reviewed_at: new Date().toISOString() }];
+      }
+    });
 
     // Update Daily Stats for Recall Success
     const todayStr = new Date().toISOString().split('T')[0];
@@ -413,7 +456,9 @@ export const App: React.FC = () => {
             todayListeningSeconds={todayListening}
             onPlayAudio={handlePlayAudio}
             onOpenAssessment={() => setIsAssessmentModalOpen(true)}
+            onOpenAssessmentForAudio={handleOpenAssessmentForAudio}
             onGoToRecord={() => setCurrentTab('record')}
+            onUpdateGoal={(m) => setUserSettings(prev => ({ ...prev, daily_listening_goal_minutes: m }))}
           />
         )}
 
@@ -425,6 +470,7 @@ export const App: React.FC = () => {
             onToggleFavorite={handleToggleFavorite}
             onToggleOffline={handleToggleOffline}
             onGoToRecord={() => setCurrentTab('record')}
+            onOpenAssessmentForAudio={handleOpenAssessmentForAudio}
           />
         )}
 
@@ -432,6 +478,7 @@ export const App: React.FC = () => {
           <ProgressTab
             dailyStats={dailyStats}
             revisionItems={revisionItems}
+            onOpenAssessment={() => setIsAssessmentModalOpen(true)}
           />
         )}
 
@@ -469,6 +516,7 @@ export const App: React.FC = () => {
           onTogglePlay={handleTogglePlay}
           onSeekRelative={handleSeekRelative}
           onOpenFullScreen={() => setIsFullScreenPlayerOpen(true)}
+          onCycleSpeed={handleCycleSpeed}
         />
       )}
 
@@ -488,7 +536,11 @@ export const App: React.FC = () => {
           onToggleOffline={handleToggleOffline}
           onOpenAssessment={() => {
             setIsFullScreenPlayerOpen(false);
-            setIsAssessmentModalOpen(true);
+            if (playbackState.currentAudio) {
+              handleOpenAssessmentForAudio(playbackState.currentAudio);
+            } else {
+              setIsAssessmentModalOpen(true);
+            }
           }}
         />
       )}
@@ -496,8 +548,11 @@ export const App: React.FC = () => {
       {/* Spaced Repetition / Recall Assessment Modal */}
       {isAssessmentModalOpen && (
         <AssessmentModal
-          items={revisionsDueToday.length > 0 ? revisionsDueToday : revisionItems.slice(0, 3)}
-          onClose={() => setIsAssessmentModalOpen(false)}
+          items={activeAssessmentItems || (revisionsDueToday.length > 0 ? revisionsDueToday : revisionItems.slice(0, 3))}
+          onClose={() => {
+            setIsAssessmentModalOpen(false);
+            setActiveAssessmentItems(null);
+          }}
           onRecordRating={handleRecordRecallRating}
         />
       )}

@@ -1,5 +1,5 @@
-import React from 'react';
-import { Play, Sparkles, Clock, Flame, ArrowRight, Mic, CheckCircle2 } from 'lucide-react';
+import React, { useState } from 'react';
+import { Play, Sparkles, Clock, Flame, ArrowRight, Mic, CheckCircle2, Zap, Star } from 'lucide-react';
 import { AudioItem, RevisionItem, UserSettings } from '../types';
 import { formatDuration } from '../services/learningEngine';
 
@@ -10,7 +10,9 @@ interface HomeTabProps {
   todayListeningSeconds: number;
   onPlayAudio: (audio: AudioItem) => void;
   onOpenAssessment: () => void;
+  onOpenAssessmentForAudio?: (audio: AudioItem) => void;
   onGoToRecord: () => void;
+  onUpdateGoal?: (minutes: number) => void;
 }
 
 export const HomeTab: React.FC<HomeTabProps> = ({
@@ -20,11 +22,25 @@ export const HomeTab: React.FC<HomeTabProps> = ({
   todayListeningSeconds,
   onPlayAudio,
   onOpenAssessment,
-  onGoToRecord
+  onOpenAssessmentForAudio,
+  onGoToRecord,
+  onUpdateGoal
 }) => {
+  const [filterMode, setFilterMode] = useState<'all' | 'due' | 'favorites' | 'short'>('all');
   const goalSeconds = userSettings.daily_listening_goal_minutes * 60;
   const goalProgress = Math.min(100, Math.round((todayListeningSeconds / (goalSeconds || 1)) * 100));
   const continueAudio = recentAudio.length > 0 ? recentAudio[0] : null;
+
+  const dueAudioIds = new Set(revisionsDue.map(r => r.audio_id));
+
+  const filteredRecentAudio = recentAudio.filter(audio => {
+    if (filterMode === 'due') return dueAudioIds.has(audio.id);
+    if (filterMode === 'favorites') return !!audio.is_favorite;
+    if (filterMode === 'short') return audio.duration_seconds <= 300;
+    return true;
+  });
+
+  const goalPresets = [15, 30, 45, 60];
 
   return (
     <div className="space-y-5 pb-28 pt-4 px-4 max-w-md mx-auto">
@@ -50,7 +66,7 @@ export const HomeTab: React.FC<HomeTabProps> = ({
         </div>
       </div>
 
-      {/* Daily Listening Goal Card */}
+      {/* Daily Listening Goal Card with 1-Tap Quick Presets */}
       <div className="bg-white border border-slate-200/80 rounded-2xl p-4.5 shadow-[0_1px_3px_rgba(0,0,0,0.04)] space-y-3">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
@@ -72,6 +88,30 @@ export const HomeTab: React.FC<HomeTabProps> = ({
             className="bg-amber-500 h-full rounded-full transition-all duration-500"
             style={{ width: `${goalProgress}%` }}
           />
+        </div>
+
+        {/* 1-Tap Target Preset Buttons */}
+        <div className="flex items-center justify-between pt-1 border-t border-slate-100">
+          <span className="text-[11px] font-medium text-slate-500">Quick Target:</span>
+          <div className="flex items-center gap-1.5">
+            {goalPresets.map(preset => {
+              const isActive = userSettings.daily_listening_goal_minutes === preset;
+              return (
+                <button
+                  key={preset}
+                  onClick={() => onUpdateGoal?.(preset)}
+                  className={`px-2.5 py-0.5 rounded-full text-[11px] font-mono font-bold transition-all border ${
+                    isActive
+                      ? 'bg-slate-900 border-slate-900 text-white shadow-2xs'
+                      : 'bg-slate-50 border-slate-200 text-slate-600 hover:border-slate-300 hover:bg-slate-100'
+                  }`}
+                  aria-label={`Set daily target to ${preset} minutes`}
+                >
+                  {preset}m
+                </button>
+              );
+            })}
+          </div>
         </div>
 
         <div className="flex items-center justify-between text-[11px] text-slate-500">
@@ -168,50 +208,129 @@ export const HomeTab: React.FC<HomeTabProps> = ({
         </div>
       </div>
 
-      {/* Recent Audio Lessons */}
+      {/* Recent Audio Lessons with 1-Tap Filter Pills */}
       <div className="space-y-2.5">
         <div className="flex items-center justify-between px-1">
           <h2 className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
-            Recent Lessons
+            Lessons
           </h2>
           <span className="text-xs text-slate-600 font-medium font-mono">
-            {recentAudio.length} total
+            {filteredRecentAudio.length} shown
           </span>
         </div>
 
-        <div className="space-y-1.5">
-          {recentAudio.slice(0, 4).map((audio) => (
-            <div
-              key={audio.id}
-              onClick={() => onPlayAudio(audio)}
-              className="bg-white border border-slate-200/70 hover:border-slate-300 p-3 rounded-xl flex items-center justify-between gap-3 cursor-pointer transition-all active:scale-[0.99] shadow-2xs"
-            >
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-1.5 mb-1">
-                  <span className="px-2 py-0.2 rounded-full bg-slate-100 text-[10px] font-bold text-slate-700 font-mono">
-                    {audio.subject_name || 'General'}
-                  </span>
-                  {audio.is_downloaded_offline && (
-                    <span className="px-1.5 py-0.2 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 text-[9px] font-bold font-mono">
-                      OFFLINE
-                    </span>
-                  )}
-                </div>
-                <h4 className="text-xs font-bold text-slate-900 truncate">
-                  {audio.title}
-                </h4>
-              </div>
+        {/* 1-Tap Quick Filter Pills */}
+        <div className="flex items-center gap-1.5 overflow-x-auto pb-1 no-scrollbar">
+          <button
+            onClick={() => setFilterMode('all')}
+            className={`px-3 py-1 rounded-full text-[11px] font-bold font-mono transition-all border ${
+              filterMode === 'all'
+                ? 'bg-slate-900 border-slate-900 text-white shadow-2xs'
+                : 'bg-white border-slate-200 text-slate-600 hover:border-slate-300'
+            }`}
+          >
+            All ({recentAudio.length})
+          </button>
+          <button
+            onClick={() => setFilterMode('due')}
+            className={`px-3 py-1 rounded-full text-[11px] font-bold font-mono transition-all border flex items-center gap-1 ${
+              filterMode === 'due'
+                ? 'bg-amber-500 border-amber-500 text-slate-950 shadow-2xs'
+                : 'bg-white border-slate-200 text-slate-600 hover:border-slate-300'
+            }`}
+          >
+            <span>🔥 Due Recall</span>
+            <span className="text-[10px] opacity-80 font-normal">({revisionsDue.length})</span>
+          </button>
+          <button
+            onClick={() => setFilterMode('favorites')}
+            className={`px-3 py-1 rounded-full text-[11px] font-bold font-mono transition-all border flex items-center gap-1 ${
+              filterMode === 'favorites'
+                ? 'bg-amber-500 border-amber-500 text-slate-950 shadow-2xs'
+                : 'bg-white border-slate-200 text-slate-600 hover:border-slate-300'
+            }`}
+          >
+            <Star size={11} fill={filterMode === 'favorites' ? 'currentColor' : 'none'} />
+            <span>Favorites</span>
+          </button>
+          <button
+            onClick={() => setFilterMode('short')}
+            className={`px-3 py-1 rounded-full text-[11px] font-bold font-mono transition-all border ${
+              filterMode === 'short'
+                ? 'bg-slate-900 border-slate-900 text-white shadow-2xs'
+                : 'bg-white border-slate-200 text-slate-600 hover:border-slate-300'
+            }`}
+          >
+            ⚡ Quick &lt;5m
+          </button>
+        </div>
 
-              <div className="flex items-center gap-2 flex-shrink-0">
-                <span className="text-[11px] text-slate-400 font-mono">
-                  {formatDuration(audio.duration_seconds)}
-                </span>
-                <div className="w-7 h-7 rounded-full bg-slate-100 hover:bg-amber-500 hover:text-slate-950 text-slate-700 flex items-center justify-center transition-colors">
-                  <Play size={12} fill="currentColor" className="translate-x-0.5" />
-                </div>
-              </div>
+        {/* Lesson List */}
+        <div className="space-y-1.5">
+          {filteredRecentAudio.length === 0 ? (
+            <div className="bg-white border border-slate-200 rounded-xl p-6 text-center text-xs text-slate-500">
+              No lessons match this filter. Tap 'All' to view all lessons.
             </div>
-          ))}
+          ) : (
+            filteredRecentAudio.slice(0, 5).map((audio) => {
+              const isDue = dueAudioIds.has(audio.id);
+              return (
+                <div
+                  key={audio.id}
+                  className="bg-white border border-slate-200/70 hover:border-slate-300 p-3 rounded-xl flex items-center justify-between gap-3 transition-all shadow-2xs"
+                >
+                  <div
+                    onClick={() => onPlayAudio(audio)}
+                    className="flex-1 min-w-0 cursor-pointer"
+                  >
+                    <div className="flex items-center gap-1.5 mb-1">
+                      <span className="px-2 py-0.2 rounded-full bg-slate-100 text-[10px] font-bold text-slate-700 font-mono">
+                        {audio.subject_name || 'General'}
+                      </span>
+                      {audio.is_downloaded_offline && (
+                        <span className="px-1.5 py-0.2 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 text-[9px] font-bold font-mono">
+                          OFFLINE
+                        </span>
+                      )}
+                      {isDue && (
+                        <span className="px-1.5 py-0.2 rounded-full bg-amber-50 text-amber-700 border border-amber-300 text-[9px] font-bold font-mono flex items-center gap-0.5">
+                          <Sparkles size={8} /> DUE
+                        </span>
+                      )}
+                    </div>
+                    <h4 className="text-xs font-bold text-slate-900 truncate hover:text-amber-600 transition-colors">
+                      {audio.title}
+                    </h4>
+                  </div>
+
+                  <div className="flex items-center gap-1.5 flex-shrink-0">
+                    <span className="text-[11px] text-slate-400 font-mono mr-1">
+                      {formatDuration(audio.duration_seconds)}
+                    </span>
+
+                    {/* Direct 1-Tap Recall Button */}
+                    <button
+                      onClick={() => onOpenAssessmentForAudio ? onOpenAssessmentForAudio(audio) : onOpenAssessment()}
+                      className="px-2 py-1 rounded-lg bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200/80 text-[10px] font-bold font-mono flex items-center gap-1 active:scale-95 transition-all shadow-2xs"
+                      title="Test active recall for this lesson"
+                    >
+                      <Zap size={10} fill="currentColor" />
+                      <span>Recall</span>
+                    </button>
+
+                    {/* Direct 1-Tap Play Button */}
+                    <button
+                      onClick={() => onPlayAudio(audio)}
+                      className="w-7 h-7 rounded-full bg-slate-900 hover:bg-slate-800 text-white flex items-center justify-center transition-all active:scale-95 shadow-2xs"
+                      aria-label="Play lesson"
+                    >
+                      <Play size={12} fill="currentColor" className="translate-x-0.5" />
+                    </button>
+                  </div>
+                </div>
+              );
+            })
+          )}
         </div>
       </div>
     </div>
