@@ -29,6 +29,7 @@ import {
 import { bridge } from './services/bridge';
 import { evaluateCompletedPlay, calculateNextReview } from './services/learningEngine';
 import { googleDriveService } from './services/googleDrive';
+import { audioStorage } from './services/audioStorage';
 
 export const App: React.FC = () => {
   const [currentTab, setCurrentTab] = useState<TabType>('home');
@@ -323,12 +324,20 @@ export const App: React.FC = () => {
     });
   };
 
+  // Check Google Drive connection status on mount
+  useEffect(() => {
+    if (googleDriveService.isConnected()) {
+      setIsDriveConnected(true);
+      googleDriveService.fetchUserProfile().catch(() => {});
+    }
+  }, []);
+
   // Save new recording
   const handleSaveAudio = async (partialItem: Partial<AudioItem>, fileBlob?: Blob) => {
     const newId = `aud-${Date.now()}`;
     const newItem: AudioItem = {
       id: newId,
-      title: partialItem.title || 'Untitled Lecture',
+      title: partialItem.title || 'Untitled Lecture Note',
       subject_id: partialItem.subject_id,
       subject_name: partialItem.subject_name || 'General',
       duration_seconds: partialItem.duration_seconds || 60,
@@ -343,14 +352,26 @@ export const App: React.FC = () => {
       created_at: new Date().toISOString()
     };
 
-    // If Google Drive connected and blob exists, upload directly to Drive
+    // 1. Save blob to IndexedDB for 100% offline local playback
+    if (fileBlob) {
+      try {
+        await audioStorage.saveAudioBlob(newId, fileBlob);
+        newItem.file_url = URL.createObjectURL(fileBlob);
+      } catch (e) {
+        console.warn('Failed saving blob to IndexedDB', e);
+      }
+    }
+
+    // 2. If Google Drive connected and blob exists, upload directly to Drive
     if (googleDriveService.isConnected() && fileBlob) {
       try {
         const uploaded = await googleDriveService.uploadAudio(fileBlob, `${newItem.title}.m4a`);
         newItem.google_drive_file_id = uploaded.id;
-        newItem.file_url = uploaded.webContentLink;
-      } catch (err) {
-        console.warn('Google Drive direct upload skipped or failed, saved locally:', err);
+        if (uploaded.webContentLink) {
+          newItem.file_url = uploaded.webContentLink;
+        }
+      } catch (err: any) {
+        console.warn('Google Drive direct upload failed, kept in local offline storage:', err);
       }
     }
 
@@ -358,11 +379,17 @@ export const App: React.FC = () => {
     setCurrentTab('library');
   };
 
-  // Google Drive connection mockup/trigger
-  const handleConnectDrive = () => {
-    // In production, initiates Google OAuth flow
-    googleDriveService.setAccessToken('mock-token-smriti');
-    setIsDriveConnected(true);
+  // Google Drive connection trigger
+  const handleConnectDrive = async () => {
+    try {
+      await googleDriveService.authorize();
+      setIsDriveConnected(true);
+      const info = await bridge.getStorageInfoAsync();
+      setStorageInfo(info);
+    } catch (err: any) {
+      console.error('Google Drive sign-in error:', err);
+      alert(`Google Drive Sign-In: ${err.message || 'Could not complete authorization'}`);
+    }
   };
 
   const handleDisconnectDrive = () => {

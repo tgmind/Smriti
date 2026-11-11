@@ -144,8 +144,10 @@ class SmritiWebBridge(
     fun stopRecording() {
         val file = recorderHelper.stopRecording()
         if (file != null) {
+            val relativePath = file.relativeTo(context.cacheDir).path
+            val secureAssetUri = "https://appassets.androidplatform.net/cache/$relativePath"
             val payload = JSONObject().apply {
-                put("fileUri", file.toURI().toString())
+                put("fileUri", secureAssetUri)
                 put("filePath", file.absolutePath)
                 put("fileSizeBytes", file.length())
             }

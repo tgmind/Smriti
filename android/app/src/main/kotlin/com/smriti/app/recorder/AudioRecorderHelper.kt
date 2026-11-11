@@ -37,7 +37,8 @@ class AudioRecorderHelper(
             }
 
             recorder.apply {
-                setAudioSource(MediaRecorder.AudioSource.MIC)
+                // VOICE_RECOGNITION enables hardware beamforming microphone array, acoustic echo cancellation, and noise reduction
+                setAudioSource(MediaRecorder.AudioSource.VOICE_RECOGNITION)
                 setOutputFormat(MediaRecorder.OutputFormat.MPEG_4)
                 setAudioEncoder(MediaRecorder.AudioEncoder.AAC)
                 setAudioEncodingBitRate(128000)

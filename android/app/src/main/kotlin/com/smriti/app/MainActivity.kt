@@ -72,6 +72,7 @@ class MainActivity : ComponentActivity() {
                     factory = { context ->
                         val assetLoader = WebViewAssetLoader.Builder()
                             .addPathHandler("/assets/", WebViewAssetLoader.AssetsPathHandler(context))
+                            .addPathHandler("/cache/", WebViewAssetLoader.InternalStoragePathHandler(context, context.cacheDir))
                             .build()
 
                         WebView(context).apply {

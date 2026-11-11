@@ -42,11 +42,18 @@ export const RecordTab: React.FC<RecordTabProps> = ({
         const amp = data.amplitude || 10;
         setLiveAmplitudes(prev => [...prev.slice(1), amp]);
       } else if (eventName === 'recordingCompleted') {
+        const finalUrl = data.fileUri || (data.blob ? URL.createObjectURL(data.blob) : null);
+        setRecordedUrl(finalUrl);
+        setTrimEndSeconds(recordedDuration > 0 ? recordedDuration : (data.durationSeconds || 15));
+        setRecordingState('review');
+
         if (data.blob) {
           setRecordedBlob(data.blob);
-          setRecordedUrl(data.fileUri);
-          setTrimEndSeconds(recordedDuration);
-          setRecordingState('review');
+        } else if (finalUrl) {
+          fetch(finalUrl)
+            .then(res => res.blob())
+            .then(blob => setRecordedBlob(blob))
+            .catch(err => console.warn('Note: Could not convert fileUri to blob', err));
         }
       }
     });
@@ -82,7 +89,7 @@ export const RecordTab: React.FC<RecordTabProps> = ({
   }, [recordedUrl, recordingState]);
 
   const handleStartRecording = async () => {
-    const success = await bridge.startRecording();
+    const success = await bridge.startRecording({ enableNoiseSuppression: enhancementEnabled });
     if (success) {
       setRecordedDuration(0);
       setRecordingState('recording');
@@ -91,14 +98,6 @@ export const RecordTab: React.FC<RecordTabProps> = ({
 
   const handleStopRecording = () => {
     bridge.stopRecording();
-    if (!bridge.isNativeApp()) {
-      setTimeout(() => {
-        if (recordingState !== 'review') {
-          setRecordingState('review');
-          setTrimEndSeconds(recordedDuration);
-        }
-      }, 500);
-    }
   };
 
   const handleTogglePreview = () => {
@@ -127,6 +126,16 @@ export const RecordTab: React.FC<RecordTabProps> = ({
         .map(t => t.trim())
         .filter(Boolean);
 
+      let finalBlob = recordedBlob;
+      if (!finalBlob && recordedUrl) {
+        try {
+          const res = await fetch(recordedUrl);
+          finalBlob = await res.blob();
+        } catch (e) {
+          console.warn('Note: Could not extract blob from url', e);
+        }
+      }
+
       await onSaveAudio(
         {
           title: title.trim(),
@@ -135,14 +144,14 @@ export const RecordTab: React.FC<RecordTabProps> = ({
           duration_seconds: effectiveDuration,
           source_type: 'recorded',
           file_format: 'm4a',
-          file_size_bytes: recordedBlob ? recordedBlob.size : 2500000,
+          file_size_bytes: finalBlob ? finalBlob.size : 2500000,
           audio_enhancement_applied: enhancementEnabled,
           waveform_peaks: liveAmplitudes,
           key_terms: terms,
           is_favorite: false,
           is_downloaded_offline: true
         },
-        recordedBlob || undefined
+        finalBlob || undefined
       );
 
       // Reset
