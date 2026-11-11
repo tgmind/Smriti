@@ -4,11 +4,15 @@ import android.Manifest
 import android.content.ComponentName
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.graphics.Color
 import android.os.Build
 import android.os.Bundle
 import android.view.ViewGroup
+import android.webkit.ConsoleMessage
 import android.webkit.WebChromeClient
+import android.webkit.WebResourceError
 import android.webkit.WebResourceRequest
+import android.webkit.WebResourceResponse
 import android.webkit.WebSettings
 import android.webkit.WebView
 import android.webkit.WebViewClient
@@ -23,6 +27,7 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.core.content.ContextCompat
 import androidx.media3.session.MediaController
 import androidx.media3.session.SessionToken
+import androidx.webkit.WebViewAssetLoader
 import com.google.common.util.concurrent.ListenableFuture
 import com.google.common.util.concurrent.MoreExecutors
 import com.smriti.app.bridge.SmritiWebBridge
@@ -65,17 +70,29 @@ class MainActivity : ComponentActivity() {
                 AndroidView(
                     modifier = Modifier.fillMaxSize(),
                     factory = { context ->
+                        val assetLoader = WebViewAssetLoader.Builder()
+                            .addPathHandler("/assets/", WebViewAssetLoader.AssetsPathHandler(context))
+                            .build()
+
                         WebView(context).apply {
                             layoutParams = ViewGroup.LayoutParams(
                                 ViewGroup.LayoutParams.MATCH_PARENT,
                                 ViewGroup.LayoutParams.MATCH_PARENT
                             )
+                            setBackgroundColor(Color.parseColor("#0d121c"))
+
+                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT) {
+                                WebView.setWebContentsDebuggingEnabled(true)
+                            }
 
                             settings.apply {
                                 javaScriptEnabled = true
                                 domStorageEnabled = true
                                 allowFileAccess = true
                                 allowContentAccess = true
+                                allowFileAccessFromFileURLs = true
+                                allowUniversalAccessFromFileURLs = true
+                                databaseEnabled = true
                                 cacheMode = WebSettings.LOAD_DEFAULT
                                 mixedContentMode = WebSettings.MIXED_CONTENT_ALWAYS_ALLOW
                             }
@@ -84,18 +101,47 @@ class MainActivity : ComponentActivity() {
                             bridge = nativeBridge
                             addJavascriptInterface(nativeBridge, "SmritiBridge")
 
-                            webChromeClient = WebChromeClient()
+                            webChromeClient = object : WebChromeClient() {
+                                override fun onConsoleMessage(consoleMessage: ConsoleMessage?): Boolean {
+                                    android.util.Log.d(
+                                        "SmritiWebView",
+                                        "${consoleMessage?.message()} -- From line ${consoleMessage?.lineNumber()} of ${consoleMessage?.sourceId()}"
+                                    )
+                                    return true
+                                }
+                            }
+
                             webViewClient = object : WebViewClient() {
+                                override fun shouldInterceptRequest(
+                                    view: WebView?,
+                                    request: WebResourceRequest?
+                                ): WebResourceResponse? {
+                                    return request?.url?.let { assetLoader.shouldInterceptRequest(it) }
+                                }
+
                                 override fun shouldOverrideUrlLoading(
                                     view: WebView?,
                                     request: WebResourceRequest?
                                 ): Boolean {
-                                    return false // Load inside WebView
+                                    val url = request?.url?.toString() ?: return false
+                                    if (url.startsWith("https://appassets.androidplatform.net") || url.startsWith("file:///")) {
+                                        return false
+                                    }
+                                    return false
+                                }
+
+                                override fun onReceivedError(
+                                    view: WebView?,
+                                    request: WebResourceRequest?,
+                                    error: WebResourceError?
+                                ) {
+                                    super.onReceivedError(view, request, error)
+                                    android.util.Log.e("SmritiWebView", "Error: ${error?.description} for ${request?.url}")
                                 }
                             }
 
-                            // Load bundled local production app
-                            loadUrl("file:///android_asset/dist/index.html")
+                            // Load bundled local production app via secure AndroidX AssetLoader domain
+                            loadUrl("https://appassets.androidplatform.net/assets/dist/index.html")
                             webView = this
                         }
                     }
