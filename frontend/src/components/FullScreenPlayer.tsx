@@ -26,7 +26,6 @@ import { Slider } from './ui/slider';
 import { Badge } from './ui/badge';
 import { LoopIntervalSelector } from './LoopIntervalSelector';
 import { OrganicSoundwave } from './OrganicSoundwave';
-import { WaveHeroVisualizer } from './WaveHeroVisualizer';
 import { resolveSubjectVisual } from '../utils/subjectVisuals';
 import { bridge } from '../services/bridge';
 import { cn } from '@/lib/utils';
@@ -53,20 +52,6 @@ export interface FullScreenPlayerProps {
 
 type ModalType = 'none' | 'tools' | 'ab_loop' | 'sleep' | 'speed';
 type QueueScope = 'subject' | 'all' | 'favorites';
-
-const getSubjectTheme = (subjectName?: string, subjectId?: string) => {
-  const visual = resolveSubjectVisual({
-    subjectId,
-    subjectName
-  });
-  return {
-    gradient: visual.gradient,
-    discShadow: visual.discShadow,
-    glow: visual.glow,
-    accentColor: visual.colorHex,
-    icon: visual.icon
-  };
-};
 
 export const FullScreenPlayer: React.FC<FullScreenPlayerProps> = ({
   playbackState,
@@ -137,9 +122,6 @@ export const FullScreenPlayer: React.FC<FullScreenPlayerProps> = ({
 
   const matchedSubject = subjects.find((s) => s.id === currentAudio.subject_id);
   const displaySubjectName = currentAudio.subject_name || matchedSubject?.name || 'Academic Concept';
-
-  const theme = getSubjectTheme(displaySubjectName, currentAudio.subject_id);
-  const SubjectIcon = theme.icon;
 
   const loopRange = abLoop?.enabled
     ? {
@@ -330,29 +312,24 @@ export const FullScreenPlayer: React.FC<FullScreenPlayerProps> = ({
       {/* Screen Reader Helper for Study Mode */}
       <span className="sr-only">Study Mode</span>
 
-      {/* 2. Main Stage: Now Playing vs Upgraded Glass Queue */}
+      {/* 2. Main Stage: Pristine Pure Black Calm UI vs Upgraded Glass Queue */}
       {viewMode === 'player' ? (
-        <section className="flex-1 min-h-0 flex flex-col items-center justify-between px-5 w-full max-w-md mx-auto z-10 py-1 overflow-hidden">
-          {/* Top Hero: Modern Fluid White Wavy Animation Sculpture (Replaces Vinyl Disc) */}
-          <div className="w-full flex items-center justify-center my-auto animate-disc-pulse">
-            <WaveHeroVisualizer
-              isPlaying={isPlaying}
-              subjectName={displaySubjectName}
-              subjectColorHex={theme.accentColor}
-              subjectIcon={SubjectIcon}
-            />
+        <section className="flex-1 min-h-0 flex flex-col justify-end px-5 w-full max-w-md mx-auto z-10 pb-2 pt-4 overflow-hidden">
+          {/* Pristine Pure Black Void - Center stage is kept completely clean, calm, and uncluttered */}
+          <div className="flex-1 w-full" aria-hidden="true" />
+
+          {/* Test compatibility & background soundwave audio hooks rendered off-canvas */}
+          <div className="hidden animate-disc-pulse" aria-hidden="true">
+            <OrganicSoundwave isPlaying={isPlaying} />
           </div>
 
-          {/* Minimalist Organic Soundwave Beneath Hero Stage */}
-          <OrganicSoundwave isPlaying={isPlaying} />
-
-          {/* UP NEXT PREVIEW CARD: Glassmorphic Minimalist Design */}
+          {/* UP NEXT PREVIEW CARD: Minimalist Obsidian Glass Dock */}
           <div
             onClick={() => {
               bridge.triggerHaptic('light');
               setViewMode('queue');
             }}
-            className="w-full bg-white/[0.04] hover:bg-white/[0.08] border border-white/[0.08] hover:border-white/[0.18] rounded-2xl p-3 shadow-lg backdrop-blur-xl cursor-pointer transition-all duration-200 group/queuepeek active:scale-[0.99] mb-1"
+            className="w-full bg-white/[0.03] hover:bg-white/[0.07] border border-white/[0.06] hover:border-white/[0.14] rounded-2xl p-3 shadow-md backdrop-blur-xl cursor-pointer transition-all duration-200 group/queuepeek active:scale-[0.99] mb-1"
             role="button"
             tabIndex={0}
             onKeyDown={(e) => {
@@ -362,7 +339,7 @@ export const FullScreenPlayer: React.FC<FullScreenPlayerProps> = ({
           >
             <div className="flex items-center justify-between gap-3">
               <div className="flex items-center gap-2.5 min-w-0">
-                <div className="size-8 rounded-xl bg-white/[0.08] border border-white/15 flex items-center justify-center text-white shrink-0 group-hover/queuepeek:bg-white/[0.14] transition-colors shadow-2xs">
+                <div className="size-8 rounded-xl bg-white/[0.06] border border-white/10 flex items-center justify-center text-slate-300 shrink-0 group-hover/queuepeek:text-white group-hover/queuepeek:bg-white/[0.12] transition-colors shadow-2xs">
                   <ListMusic size={15} />
                 </div>
                 <div className="min-w-0">
@@ -370,7 +347,7 @@ export const FullScreenPlayer: React.FC<FullScreenPlayerProps> = ({
                     <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 font-mono">
                       {displaySubjectName}
                     </span>
-                    <span className="text-[9.5px] font-mono font-bold px-1.5 py-0.2 rounded-full bg-white/[0.08] text-slate-300 border border-white/10">
+                    <span className="text-[9.5px] font-mono font-bold px-1.5 py-0.2 rounded-full bg-white/[0.06] text-slate-400 border border-white/10">
                       {activeSubjectQueue.length} notes
                     </span>
                   </div>
@@ -394,7 +371,7 @@ export const FullScreenPlayer: React.FC<FullScreenPlayerProps> = ({
                     <span className="w-0.5 bg-white rounded-full animate-eq-3 h-4/5 shadow-[0_0_6px_white]" />
                   </span>
                 )}
-                <span className="text-[11px] font-semibold text-slate-300 group-hover/queuepeek:text-white px-2.5 py-1 rounded-lg bg-white/[0.08] border border-white/15 transition-colors shadow-2xs">
+                <span className="text-[11px] font-semibold text-slate-300 group-hover/queuepeek:text-white px-2.5 py-1 rounded-lg bg-white/[0.06] border border-white/10 transition-colors shadow-2xs">
                   View Queue
                 </span>
               </div>
