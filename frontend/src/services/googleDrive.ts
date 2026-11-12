@@ -432,9 +432,9 @@ class GoogleDriveService {
           }
         });
       }
-      // Automatic setup for fresh/new Google Drive account: provision foundational study subjects if only General exists
-      const isOnlyGeneral = !subjects || subjects.length === 0 || (subjects.length === 1 && subjects[0].name.toLowerCase() === 'general');
-      if (isOnlyGeneral) {
+      // Automatic setup for fresh/new Google Drive account: provision foundational study subjects ONLY if subjects array was not provided at all
+      const isBrandNewSetup = subjects === undefined;
+      if (isBrandNewSetup) {
         ['Physics', 'Chemistry', 'Mathematics', 'Biology'].forEach(n => subjectNames.add(n));
       }
 
@@ -553,9 +553,13 @@ class GoogleDriveService {
   }
 
   /**
-   * Deletes a subject folder from Google Drive and purges its cached ID.
+   * Deletes a subject folder from Google Drive and all files inside it (or moves them to target folder),
+   * and purges its cached ID.
    */
-  public async deleteSubjectFolder(subjectName: string): Promise<boolean> {
+  public async deleteSubjectFolder(
+    subjectName: string,
+    options?: { deleteFiles?: boolean; moveToFolderId?: string }
+  ): Promise<boolean> {
     if (!this.accessToken) return false;
     const cleanName = (subjectName || '').trim();
     if (!cleanName) return false;
@@ -563,26 +567,116 @@ class GoogleDriveService {
     try {
       const rootId = this.rootFolderId || (await this.getOrCreateFolder('Smriti'));
       const q = `'${rootId}' in parents and name = '${cleanName.replace(/'/g, "\\'")}' and mimeType = 'application/vnd.google-apps.folder' and trashed = false`;
-      const res = await fetch(
-        `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(q)}&fields=files(id,name)`,
+      let res = await fetch(
+        `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(q)}&fields=files(id,name,parents)`,
         { headers: { Authorization: `Bearer ${this.accessToken}` } }
       );
 
+      let filesToDelete: Array<{ id: string; name: string }> = [];
       if (res.ok) {
         const data = await res.json();
-        if (data.files && Array.isArray(data.files)) {
-          for (const f of data.files) {
-            await fetch(`https://www.googleapis.com/drive/v3/files/${f.id}`, {
-              method: 'DELETE',
-              headers: { Authorization: `Bearer ${this.accessToken}` }
-            }).catch(() => {});
+        if (data.files && Array.isArray(data.files) && data.files.length > 0) {
+          filesToDelete = data.files;
+        }
+      }
+
+      // Fallback search by name if parent query returned 0 files
+      if (filesToDelete.length === 0) {
+        const fallbackQ = `name = '${cleanName.replace(/'/g, "\\'")}' and mimeType = 'application/vnd.google-apps.folder' and trashed = false`;
+        const fallbackRes = await fetch(
+          `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(fallbackQ)}&fields=files(id,name,parents)`,
+          { headers: { Authorization: `Bearer ${this.accessToken}` } }
+        );
+        if (fallbackRes.ok) {
+          const fallbackData = await fallbackRes.json();
+          if (fallbackData.files && Array.isArray(fallbackData.files)) {
+            filesToDelete = fallbackData.files;
           }
         }
       }
 
+      // Also check cached ID
       const norm = cleanName.toLowerCase();
+      const cachedId =
+        this.subjectFolderCache.get(`${rootId}:${norm}`) ||
+        this.subjectFolderCache.get(`root:${norm}`) ||
+        this.subjectFolderCache.get(norm);
+      if (cachedId && !filesToDelete.some(f => f.id === cachedId)) {
+        filesToDelete.push({ id: cachedId, name: cleanName });
+      }
+
+      for (const f of filesToDelete) {
+        // 1. Handle child files inside this folder
+        try {
+          const childrenQ = `'${f.id}' in parents and trashed = false`;
+          const childrenRes = await fetch(
+            `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(childrenQ)}&fields=files(id,name,parents)`,
+            { headers: { Authorization: `Bearer ${this.accessToken}` } }
+          );
+          if (childrenRes.ok) {
+            const childrenData = await childrenRes.json();
+            if (childrenData.files && Array.isArray(childrenData.files)) {
+              for (const child of childrenData.files) {
+                if (options?.moveToFolderId) {
+                  // Move child audio file to target folder (e.g. General)
+                  await fetch(
+                    `https://www.googleapis.com/drive/v3/files/${encodeURIComponent(child.id)}?addParents=${encodeURIComponent(options.moveToFolderId)}&removeParents=${encodeURIComponent(f.id)}`,
+                    {
+                      method: 'PATCH',
+                      headers: { Authorization: `Bearer ${this.accessToken}` }
+                    }
+                  ).catch(() => {});
+                } else {
+                  // Delete child file permanently (with trash fallback)
+                  const delChildRes = await fetch(`https://www.googleapis.com/drive/v3/files/${encodeURIComponent(child.id)}`, {
+                    method: 'DELETE',
+                    headers: { Authorization: `Bearer ${this.accessToken}` }
+                  }).catch(() => null);
+
+                  if (!delChildRes || (!delChildRes.ok && delChildRes.status !== 404)) {
+                    await fetch(`https://www.googleapis.com/drive/v3/files/${encodeURIComponent(child.id)}`, {
+                      method: 'PATCH',
+                      headers: {
+                        Authorization: `Bearer ${this.accessToken}`,
+                        'Content-Type': 'application/json'
+                      },
+                      body: JSON.stringify({ trashed: true })
+                    }).catch(() => {});
+                  }
+                }
+              }
+            }
+          }
+        } catch (childErr) {
+          console.warn(`Notice processing children of folder ${f.id}:`, childErr);
+        }
+
+        // 2. Delete the folder itself permanently (with trash fallback)
+        const delRes = await fetch(`https://www.googleapis.com/drive/v3/files/${encodeURIComponent(f.id)}`, {
+          method: 'DELETE',
+          headers: { Authorization: `Bearer ${this.accessToken}` }
+        }).catch(() => null);
+
+        if (!delRes || (!delRes.ok && delRes.status !== 404)) {
+          await fetch(`https://www.googleapis.com/drive/v3/files/${encodeURIComponent(f.id)}`, {
+            method: 'PATCH',
+            headers: {
+              Authorization: `Bearer ${this.accessToken}`,
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ trashed: true })
+          }).catch(() => {});
+        }
+      }
+
       this.subjectFolderCache.delete(`${rootId}:${norm}`);
+      this.subjectFolderCache.delete(`root:${norm}`);
       this.subjectFolderCache.delete(norm);
+      for (const f of filesToDelete) {
+        for (const [key, val] of this.subjectFolderCache.entries()) {
+          if (val === f.id) this.subjectFolderCache.delete(key);
+        }
+      }
       return true;
     } catch (err) {
       console.warn(`Error deleting subject folder "${subjectName}":`, err);

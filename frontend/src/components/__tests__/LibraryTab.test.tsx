@@ -241,4 +241,74 @@ describe('LibraryTab Apple Music Redesign', () => {
     // Subject count header shows (2) unique subjects: Chemistry & General
     expect(html).toContain('(2)');
   });
+
+  it('renders back button in header and compact header without Switch button when in subfolder', () => {
+    const html = renderToString(
+      <LibraryTab
+        audioItems={mockAudioItems}
+        subjects={mockSubjects}
+        initialSubjectId="sub-phys"
+        onPlayAudio={vi.fn()}
+        onToggleFavorite={vi.fn()}
+        onToggleOffline={vi.fn()}
+        onGoToRecord={vi.fn()}
+        onDeleteSubject={vi.fn()}
+      />
+    );
+
+    // 1. Back button to folders is present
+    expect(html).toContain('aria-label="Back to folders"');
+
+    // 2. Switch button is completely removed
+    expect(html).not.toContain('Switch');
+
+    // 3. Compact header displays subject and stats cleanly
+    expect(html).toContain('Physics');
+    expect(html).toContain('1 lesson');
+    expect(html).toContain('3:00');
+    expect(html).toContain('offline');
+  });
+
+  it('renders View Note with back button, upgraded player, authoritative seekbar, and removes Concept & Formula Summary card', () => {
+    const html = renderToString(
+      <LibraryTab
+        audioItems={mockAudioItems}
+        subjects={mockSubjects}
+        initialAudioId="audio-1"
+        onPlayAudio={vi.fn()}
+        onSetSpeed={vi.fn()}
+        onToggleFavorite={vi.fn()}
+        onToggleOffline={vi.fn()}
+        onGoToRecord={vi.fn()}
+        playbackState={{
+          currentAudio: mockAudioItems[0],
+          isPlaying: false,
+          positionSeconds: 45,
+          durationSeconds: 180,
+          playbackSpeed: 1.25,
+          isRepeatTrack: false,
+          isRepeatQueue: false,
+          abLoop: { enabled: false, startSeconds: 0, endSeconds: 0 },
+          sleepTimerRemainingSeconds: null,
+          learningModeActive: false
+        }}
+      />
+    );
+
+    // 1. Back button to subject folder exists
+    expect(html).toContain('aria-label="Back to subject folder"');
+
+    // 2. Note title & clean metadata
+    expect(html).toContain('Gauss Law &amp; Electric Flux');
+    expect(html).toContain('MP3 Audio');
+
+    // 3. Upgraded player authoratative engine maintains paused position and speed
+    expect(html).toContain('Paused');
+    expect(html).toContain('1.25x');
+    expect(html).toContain('0:45'); // Accurately displays 45s position even when paused!
+
+    // 4. "Concept & Formula Summary" card is completely removed
+    expect(html).not.toContain('Concept &amp; Formula Summary');
+    expect(html).not.toContain('Concept & Formula Summary');
+  });
 });

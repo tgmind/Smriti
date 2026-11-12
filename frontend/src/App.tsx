@@ -869,7 +869,15 @@ export const App: React.FC = () => {
     // 2. Google Drive two-way handshake
     if (googleDriveService.isConnected()) {
       try {
-        await googleDriveService.deleteSubjectFolder(subjectName);
+        let generalFolderId: string | undefined;
+        if (!deleteRecordings) {
+          generalFolderId = await googleDriveService.getOrCreateSubjectFolder('General');
+        }
+
+        await googleDriveService.deleteSubjectFolder(subjectName, {
+          deleteFiles: deleteRecordings,
+          moveToFolderId: generalFolderId
+        });
         await googleDriveService.saveCatalog({
           subjects: nextSubjects,
           audioItems: nextAudioItems

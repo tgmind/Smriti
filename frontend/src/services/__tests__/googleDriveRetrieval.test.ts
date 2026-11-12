@@ -517,6 +517,67 @@ describe('Google Drive Automatic Cloud Data Retrieval on Connect', () => {
     expect(deletedUrls[0]).toContain('/files/folder-chem-99');
   });
 
+  it('deleteSubjectFolder deletes all child files inside folder and does not resurrect folder on sync', async () => {
+    googleDriveService.setAccessToken('mock-token-delete-folder-children', 3600);
+
+    const deletedUrls: string[] = [];
+
+    globalThis.fetch = vi.fn().mockImplementation(async (url: string, options?: any) => {
+      const urlStr = String(url);
+      const decoded = decodeURIComponent(urlStr);
+
+      if (options?.method === 'DELETE') {
+        deletedUrls.push(urlStr);
+        return { ok: true, status: 200, json: async () => ({}) };
+      }
+
+      // Smriti root search
+      if (decoded.includes("name = 'Smriti'")) {
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({ files: [{ id: 'smriti-root-id', name: 'Smriti' }] })
+        };
+      }
+
+      // Search for Biology folder
+      if (decoded.includes("name = 'Biology'")) {
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({
+            files: [{ id: 'folder-bio-123', name: 'Biology', parents: ['smriti-root-id'] }]
+          })
+        };
+      }
+
+      // Querying children of Biology folder
+      if (decoded.includes("'folder-bio-123' in parents")) {
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({
+            files: [
+              { id: 'bio-audio-file-1', name: 'Cell Division.m4a', mimeType: 'audio/mp4' },
+              { id: 'bio-audio-file-2', name: 'Genetics.m4a', mimeType: 'audio/mp4' }
+            ]
+          })
+        };
+      }
+
+      return { ok: true, status: 200, json: async () => ({ files: [] }) };
+    });
+
+    const success = await googleDriveService.deleteSubjectFolder('Biology', { deleteFiles: true });
+
+    expect(success).toBe(true);
+    // Deleted 2 child audio files + the folder itself = 3 deletes
+    expect(deletedUrls).toHaveLength(3);
+    expect(deletedUrls).toContain('https://www.googleapis.com/drive/v3/files/bio-audio-file-1');
+    expect(deletedUrls).toContain('https://www.googleapis.com/drive/v3/files/bio-audio-file-2');
+    expect(deletedUrls).toContain('https://www.googleapis.com/drive/v3/files/folder-bio-123');
+  });
+
   it('consolidateSubjectFolders merges duplicate folders and deletes empty duplicates', async () => {
     googleDriveService.setAccessToken('mock-token-consolidate', 3600);
 
