@@ -32,6 +32,7 @@ import {
   DriveTransferItem,
   GoogleDriveStorageQuota
 } from '../services/googleDrive';
+import { LineArtAudioVisualizer } from './ui/LineArtAudioVisualizer';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   Carousel,
@@ -260,36 +261,29 @@ export const HomeTab: React.FC<HomeTabProps> = ({
   };
 
   const handleTriggerSyncAll = () => {
-    // Quick demo/active sync to Google Drive
+    if (!isDriveConnected && onConnectDrive) {
+      onConnectDrive();
+      return;
+    }
     const unsynced = recentAudio.filter((a) => !a.google_drive_file_id);
-    const target = unsynced.length > 0 ? unsynced[0] : recentAudio[0];
-    if (target) {
-      googleDriveService.startSimulatedTransfer(
-        'upload',
-        target.title,
-        target.file_size_bytes || 3500000,
-        target.id
-      );
+    unsynced.forEach((target) => {
       if (onSyncToDrive) {
         onSyncToDrive(target);
       }
-    }
+    });
   };
 
   const handleTriggerDownloadAll = () => {
+    if (!isDriveConnected && onConnectDrive) {
+      onConnectDrive();
+      return;
+    }
     const cloudOnly = recentAudio.filter((a) => !a.is_downloaded_offline);
-    const target = cloudOnly.length > 0 ? cloudOnly[0] : recentAudio[0];
-    if (target) {
-      googleDriveService.startSimulatedTransfer(
-        'download',
-        target.title,
-        target.file_size_bytes || 4200000,
-        target.id
-      );
+    cloudOnly.forEach((target) => {
       if (onDownloadFromDrive) {
         onDownloadFromDrive(target);
       }
-    }
+    });
   };
 
   return (
@@ -464,7 +458,7 @@ export const HomeTab: React.FC<HomeTabProps> = ({
         </div>
       </div>
 
-      {/* Continue Listening: Sleek Minimalist Studio Card */}
+      {/* Continue Listening: Spotify / YouTube Music Style Premium Dark Studio Card */}
       {continueAudio &&
         (() => {
           const continueDuration =
@@ -494,60 +488,98 @@ export const HomeTab: React.FC<HomeTabProps> = ({
 
           return (
             <div
-              className={`bg-gradient-to-br from-white via-sky-50/40 to-blue-50/20 text-slate-900 rounded-3xl p-4 sm:p-5 space-y-3.5 border transition-all duration-300 relative overflow-hidden group shadow-xs ${
+              className={`relative overflow-hidden rounded-3xl p-4.5 sm:p-5 space-y-4 border transition-all duration-300 group shadow-xl ${
                 isCurrentAudioPlaying
-                  ? 'border-sky-300/80 shadow-[0_4px_20px_-4px_rgba(36,161,222,0.15)] ring-1 ring-[#24A1DE]/25'
-                  : 'border-sky-200/70 hover:border-sky-300/60 hover:shadow-sm'
+                  ? 'bg-gradient-to-br from-slate-950 via-[#0a0f1d] to-[#04070e] text-white border-sky-500/35 shadow-[0_16px_40px_-8px_rgba(0,0,0,0.8),0_0_24px_rgba(36,161,222,0.15)] ring-1 ring-sky-400/20'
+                  : 'bg-gradient-to-br from-slate-950 via-[#0a0f1d] to-[#04070e] text-white border-white/[0.08] hover:border-white/[0.14] shadow-[0_12px_32px_-6px_rgba(0,0,0,0.6)]'
               }`}
             >
-              {/* Card Header: Status Indicator & State Pill */}
-              <div className="flex items-center justify-between">
+              {/* Dynamic Atmospheric Backlight Glow */}
+              <div className="pointer-events-none absolute -top-12 -right-12 size-48 rounded-full bg-gradient-to-bl from-sky-500/15 via-blue-600/5 to-transparent blur-3xl opacity-70" />
+              <div className="pointer-events-none absolute -bottom-10 -left-10 size-44 rounded-full bg-gradient-to-tr from-indigo-500/10 via-purple-600/5 to-transparent blur-2xl opacity-60" />
+
+              {/* Background Flowing Line-Art Soundwave Contours (Zero dashed noise, pure liquid silk) */}
+              <LineArtAudioVisualizer
+                variant="background"
+                subjectName={continueAudio.subject_name}
+                isPlaying={isCurrentAudioPlaying}
+              />
+
+              {/* Card Header: Live Status Indicator & State Pill */}
+              <div className="flex items-center justify-between relative z-10">
                 <div className="flex items-center gap-2">
                   <span
                     className={`size-2 rounded-full transition-colors ${
                       isCurrentAudioPlaying
-                        ? 'bg-[#24A1DE] animate-pulse ring-4 ring-sky-200/60'
+                        ? 'bg-[#24A1DE] animate-pulse ring-4 ring-sky-400/25'
                         : 'bg-amber-400'
                     }`}
                   />
-                  <span className="text-[11px] font-bold uppercase tracking-wider text-slate-700">
+                  <span className="text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400 font-sans">
                     {isCurrentAudioPlaying ? 'Currently Playing' : 'Continue Listening'}
                   </span>
                 </div>
                 {isCurrentAudioPlaying ? (
-                  <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-semibold bg-sky-100/80 text-sky-700 border border-sky-200/60 font-mono tracking-tight shadow-2xs">
-                    <span className="size-1.5 rounded-full bg-[#24A1DE] animate-ping" />
-                    Playing
-                  </span>
+                  <div className="flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-sky-500/15 border border-sky-400/25 text-sky-300 text-[10px] font-medium tracking-wide shadow-xs">
+                    <span className="flex items-end gap-0.5 h-2.5">
+                      <span className="w-0.5 bg-sky-400 rounded-full animate-eq-1" />
+                      <span className="w-0.5 bg-sky-300 rounded-full animate-eq-2" />
+                      <span className="w-0.5 bg-sky-400 rounded-full animate-eq-3" />
+                    </span>
+                    <span>Playing</span>
+                  </div>
                 ) : (
-                  <span className="text-[10px] font-mono font-medium text-slate-500 bg-slate-100/90 px-2 py-0.5 rounded-full border border-slate-200/60">
+                  <span className="text-[10px] font-medium tracking-wide text-slate-400/80">
                     {cardProgressPercent > 0
                       ? `${Math.round(cardProgressPercent)}% completed`
-                      : 'Ready to play'}
+                      : 'Tap to listen'}
                   </span>
                 )}
               </div>
 
-              {/* Card Body: Subject, Title & Hero Action Button */}
-              <div className="flex items-center justify-between gap-3 relative z-10">
+              {/* Card Body: Aesthetic Vinyl Turntable + Track Metadata + Hero Play Action */}
+              <div className="flex items-center gap-3.5 relative z-10">
+                {/* Artwork: High-Craft Vinyl Record with Grooves, Sheen & Tonearm */}
+                <div
+                  className="size-16 sm:size-17 rounded-2xl bg-[#080b12] border border-white/[0.12] p-1.5 shadow-[0_8px_20px_rgba(0,0,0,0.6)] flex items-center justify-center shrink-0 relative overflow-hidden group-hover:border-sky-400/40 transition-all duration-300"
+                  title="Acoustic Turntable Visualizer"
+                >
+                  <LineArtAudioVisualizer
+                    variant="turntable"
+                    subjectName={continueAudio.subject_name}
+                    isPlaying={isCurrentAudioPlaying}
+                    className="w-full h-full"
+                  />
+                </div>
+
+                {/* Track Details & Subject Badge */}
                 <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-1.5 mb-1">
-                    <span className="inline-flex items-center gap-1 text-[10px] font-mono font-bold uppercase tracking-wider text-[#24A1DE]">
-                      <SubjectIcon size={12} strokeWidth={2.4} />
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="text-[10px] font-bold uppercase tracking-[0.14em] text-sky-400/90 flex items-center gap-1">
+                      <SubjectIcon size={11} strokeWidth={2.4} />
                       {continueAudio.subject_name || subjectVisual.label}
                     </span>
                     {continueAudio.is_favorite && (
-                      <Star size={11} className="text-amber-500 fill-amber-500" />
+                      <Star size={11} className="text-amber-400 fill-amber-400" />
                     )}
+                    {continueAudio.play_count && continueAudio.play_count > 0 ? (
+                      <span className="text-[10px] text-slate-400 font-sans">
+                        • {continueAudio.play_count} plays
+                      </span>
+                    ) : null}
                   </div>
                   <h3
-                    className="text-sm sm:text-base font-bold text-slate-900 truncate tracking-tight leading-snug"
+                    className="text-[15px] sm:text-base font-semibold text-white truncate tracking-tight leading-snug group-hover:text-sky-200 transition-colors"
                     title={continueAudio.title}
                   >
                     {continueAudio.title}
                   </h3>
+                  <p className="text-[11px] text-slate-400 font-sans truncate mt-0.5">
+                    High Fidelity • Audio Study Vault
+                  </p>
                 </div>
 
+                {/* Spotify-Style Hero Circular Play/Pause Button */}
                 <button
                   onClick={() => onPlayAudio(continueAudio)}
                   aria-label={
@@ -555,18 +587,18 @@ export const HomeTab: React.FC<HomeTabProps> = ({
                       ? `Pause ${continueAudio.title}`
                       : `Play ${continueAudio.title}`
                   }
-                  className="size-12 rounded-full bg-[#24A1DE] hover:bg-[#1a8bc4] active:scale-95 text-white flex items-center justify-center transition-all duration-200 shadow-md shadow-[#24A1DE]/25 shrink-0 cursor-pointer"
+                  className="size-11 sm:size-12 rounded-full bg-gradient-to-br from-sky-400 to-[#24A1DE] hover:from-sky-300 hover:to-sky-500 active:scale-92 text-white flex items-center justify-center transition-all duration-200 shadow-[0_4px_16px_rgba(36,161,222,0.35)] shrink-0 cursor-pointer ring-1 ring-white/20"
                 >
                   {isCurrentAudioPlaying ? (
-                    <Pause size={19} fill="currentColor" />
+                    <Pause size={18} fill="currentColor" />
                   ) : (
-                    <Play size={19} fill="currentColor" className="translate-x-0.5" />
+                    <Play size={18} fill="currentColor" className="translate-x-0.5" />
                   )}
                 </button>
               </div>
 
-              {/* Interactive Scrubbable Seek Bar */}
-              <div className="space-y-1.5 relative z-10">
+              {/* Interactive Scrubbable Dark Seek Bar */}
+              <div className="space-y-1.5 relative z-10 pt-0.5">
                 <div
                   className="relative w-full py-1.5 cursor-pointer group/seek select-none"
                   title="Tap or scrub to seek"
@@ -577,22 +609,22 @@ export const HomeTab: React.FC<HomeTabProps> = ({
                     onSeek(pct * continueDuration);
                   }}
                 >
-                  {/* Track */}
-                  <div className="relative h-2 w-full bg-slate-200/80 group-hover/seek:bg-slate-300/80 rounded-full transition-colors">
-                    {/* Fill */}
+                  {/* Dark Track */}
+                  <div className="relative h-1.5 sm:h-2 w-full bg-white/10 group-hover/seek:bg-white/20 rounded-full transition-colors">
+                    {/* Glowing Luminous Fill */}
                     <div
-                      className="bg-gradient-to-r from-sky-400 via-[#24A1DE] to-[#0284c7] h-full rounded-full transition-[width] duration-150 relative"
+                      className="bg-gradient-to-r from-sky-400 via-[#24A1DE] to-cyan-300 h-full rounded-full transition-[width] duration-150 relative shadow-[0_0_8px_rgba(56,189,248,0.4)]"
                       style={{ width: `${cardProgressPercent}%` }}
                     >
                       {/* Scrubber thumb handle at active position */}
-                      <div className="absolute right-0 top-1/2 -translate-y-1/2 translate-x-1/2 size-3.5 bg-white rounded-full border-2 border-[#24A1DE] shadow-sm transition-transform duration-150 group-hover/seek:scale-125" />
+                      <div className="absolute right-0 top-1/2 -translate-y-1/2 translate-x-1/2 size-3.5 bg-white rounded-full shadow-[0_2px_6px_rgba(0,0,0,0.5)] transition-transform duration-150 group-hover/seek:scale-125" />
                     </div>
                   </div>
                 </div>
 
                 {/* Timestamps */}
-                <div className="flex justify-between items-center text-[10px] font-mono text-slate-500 font-medium">
-                  <span className={isCurrentAudioPlaying ? 'text-sky-600 font-semibold' : ''}>
+                <div className="flex justify-between items-center text-[10px] font-mono text-slate-400 font-medium">
+                  <span className={isCurrentAudioPlaying ? 'text-sky-300 font-semibold' : ''}>
                     {formatDuration(currentPos)}
                   </span>
                   <span>{formatDuration(continueDuration)}</span>
@@ -601,6 +633,28 @@ export const HomeTab: React.FC<HomeTabProps> = ({
             </div>
           );
         })()}
+
+      {/* Empty State: When no audio note has been recorded/imported yet */}
+      {!continueAudio && (
+        <div className="bg-white border border-slate-200/80 rounded-3xl p-5 text-center space-y-2.5 shadow-2xs">
+          <div className="size-11 rounded-2xl bg-sky-50 text-[#24A1DE] flex items-center justify-center mx-auto shadow-2xs">
+            <Mic size={20} />
+          </div>
+          <div>
+            <h3 className="text-sm font-bold text-slate-900">No Audio Notes Yet</h3>
+            <p className="text-xs text-slate-500 mt-0.5 max-w-xs mx-auto">
+              Record a lecture note or import audio to start your personalized study session.
+            </p>
+          </div>
+          <button
+            onClick={onGoToRecord}
+            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-full bg-slate-950 hover:bg-slate-800 text-white text-xs font-semibold active:scale-95 transition-all shadow-xs cursor-pointer"
+          >
+            <Mic size={14} />
+            <span>Record First Lesson</span>
+          </button>
+        </div>
+      )}
 
       {/* Action Chips Row (Record, Folders, Drive) */}
       <div className="grid grid-cols-3 gap-2">
@@ -934,14 +988,6 @@ export const HomeTab: React.FC<HomeTabProps> = ({
                           aria-label={`Download ${audio.title} for offline`}
                           onClick={() => {
                             if (onDownloadFromDrive) onDownloadFromDrive(audio);
-                            else {
-                              googleDriveService.startSimulatedTransfer(
-                                'download',
-                                audio.title,
-                                audio.file_size_bytes,
-                                audio.id
-                              );
-                            }
                           }}
                           title="Download for offline access"
                         >

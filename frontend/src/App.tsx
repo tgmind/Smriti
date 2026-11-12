@@ -19,9 +19,6 @@ import {
 } from './types';
 import {
   DEMO_SUBJECTS,
-  DEMO_AUDIO_ITEMS,
-  DEMO_REVISION_ITEMS,
-  DEMO_DAILY_STATS,
   DEFAULT_USER_SETTINGS
 } from './services/supabase';
 import { bridge } from './services/bridge';
@@ -33,18 +30,40 @@ export const App: React.FC = () => {
   const [currentTab, setCurrentTab] = useState<TabType>('home');
   const [audioItems, setAudioItems] = useState<AudioItem[]>(() => {
     const saved = localStorage.getItem('smriti_audio_items');
-    return saved ? JSON.parse(saved) : DEMO_AUDIO_ITEMS;
+    if (!saved) return [];
+    try {
+      const parsed: AudioItem[] = JSON.parse(saved);
+      // Remove any previously stored demo/fake audio entries
+      const demoIds = new Set(['aud-1', 'aud-2', 'aud-3', 'aud-4']);
+      return parsed.filter(item => !demoIds.has(item.id));
+    } catch {
+      return [];
+    }
   });
 
   const [subjects] = useState<Subject[]>(DEMO_SUBJECTS);
   const [revisionItems] = useState<RevisionItem[]>(() => {
     const saved = localStorage.getItem('smriti_revisions');
-    return saved ? JSON.parse(saved) : DEMO_REVISION_ITEMS;
+    if (!saved) return [];
+    try {
+      const parsed: RevisionItem[] = JSON.parse(saved);
+      const demoRevIds = new Set(['rev-1', 'rev-2', 'rev-3']);
+      return parsed.filter(item => !demoRevIds.has(item.id));
+    } catch {
+      return [];
+    }
   });
 
   const [dailyStats, setDailyStats] = useState<DailyStudyStats[]>(() => {
     const saved = localStorage.getItem('smriti_daily_stats');
-    return saved ? JSON.parse(saved) : DEMO_DAILY_STATS;
+    if (!saved) return [];
+    try {
+      const parsed: DailyStudyStats[] = JSON.parse(saved);
+      const demoDates = new Set(['2026-11-06', '2026-11-07', '2026-11-08', '2026-11-09', '2026-11-10', '2026-11-11']);
+      return parsed.filter(stat => !demoDates.has(stat.study_date));
+    } catch {
+      return [];
+    }
   });
 
   const [userSettings, setUserSettings] = useState<UserSettings>(() => {
@@ -453,6 +472,10 @@ export const App: React.FC = () => {
 
   const handleSyncItemToDrive = async (audio: AudioItem) => {
     try {
+      if (!googleDriveService.isConnected()) {
+        await handleConnectDrive();
+        return;
+      }
       const blob = await audioStorage.getAudioBlob(audio.id);
       if (blob && googleDriveService.isConnected()) {
         const uploaded = await googleDriveService.uploadAudio(blob, `${audio.title}.m4a`);
@@ -463,8 +486,6 @@ export const App: React.FC = () => {
               : item
           )
         );
-      } else {
-        await googleDriveService.startSimulatedTransfer('upload', audio.title, audio.file_size_bytes, audio.id);
       }
     } catch (e) {
       console.warn('Sync to drive error:', e);
@@ -473,6 +494,10 @@ export const App: React.FC = () => {
 
   const handleDownloadItemFromDrive = async (audio: AudioItem) => {
     try {
+      if (!googleDriveService.isConnected()) {
+        await handleConnectDrive();
+        return;
+      }
       if (audio.google_drive_file_id && googleDriveService.isConnected()) {
         const blob = await googleDriveService.downloadAudio(audio.google_drive_file_id, audio.title);
         if (blob) {
@@ -481,11 +506,6 @@ export const App: React.FC = () => {
             prev.map(item => (item.id === audio.id ? { ...item, is_downloaded_offline: true } : item))
           );
         }
-      } else {
-        await googleDriveService.startSimulatedTransfer('download', audio.title, audio.file_size_bytes, audio.id);
-        setAudioItems(prev =>
-          prev.map(item => (item.id === audio.id ? { ...item, is_downloaded_offline: true } : item))
-        );
       }
     } catch (e) {
       console.warn('Download from drive error:', e);
@@ -596,6 +616,8 @@ export const App: React.FC = () => {
       <Navigation
         currentTab={currentTab}
         onSelectTab={setCurrentTab}
+        isPlaying={playbackState.isPlaying}
+        onTogglePlay={handleTogglePlay}
         attachedPlayer={
           !isFullScreenPlayerOpen && playbackState.currentAudio ? (
             <MiniPlayer

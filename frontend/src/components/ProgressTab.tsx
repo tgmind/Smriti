@@ -86,28 +86,34 @@ export const ProgressTab: React.FC<ProgressTabProps> = ({
           </span>
         </div>
 
-        {/* 6-Day Trend Visual */}
+        {/* Exposure Trend Visual */}
         <div className="pt-1">
-          <div className="flex items-end justify-between gap-2 h-24 pt-2 border-b border-slate-100 pb-2">
-            {dailyStats.map((stat, idx) => {
-              const maxSecs = Math.max(...dailyStats.map(s => s.total_listening_seconds), 3600);
-              const heightPct = Math.max(14, (stat.total_listening_seconds / maxSecs) * 100);
-              const dayLabel = stat.study_date.split('-').slice(1).join('/');
+          {dailyStats.length === 0 ? (
+            <div className="h-24 flex items-center justify-center text-xs text-slate-400 italic border-b border-slate-100 pb-2">
+              No study exposure recorded yet. Listen to lessons to view your daily trend.
+            </div>
+          ) : (
+            <div className="flex items-end justify-between gap-2 h-24 pt-2 border-b border-slate-100 pb-2">
+              {dailyStats.map((stat, idx) => {
+                const maxSecs = Math.max(...dailyStats.map(s => s.total_listening_seconds), 3600);
+                const heightPct = Math.max(14, (stat.total_listening_seconds / maxSecs) * 100);
+                const dayLabel = stat.study_date.split('-').slice(1).join('/');
 
-              return (
-                <div key={idx} className="flex-1 flex flex-col items-center gap-1.5 h-full justify-end">
-                  <div
-                    className="w-full max-w-[28px] rounded-xl bg-blue-600 hover:bg-blue-500 transition-all shadow-2xs cursor-default"
-                    style={{ height: `${heightPct}%` }}
-                    title={`${stat.study_date}: ${Math.round(stat.total_listening_seconds / 60)} minutes (${stat.completed_plays} plays)`}
-                  />
-                  <span className="text-[9px] font-mono font-medium text-slate-500">
-                    {dayLabel}
-                  </span>
-                </div>
-              );
-            })}
-          </div>
+                return (
+                  <div key={idx} className="flex-1 flex flex-col items-center gap-1.5 h-full justify-end">
+                    <div
+                      className="w-full max-w-[28px] rounded-xl bg-blue-600 hover:bg-blue-500 transition-all shadow-2xs cursor-default"
+                      style={{ height: `${heightPct}%` }}
+                      title={`${stat.study_date}: ${Math.round(stat.total_listening_seconds / 60)} minutes (${stat.completed_plays} plays)`}
+                    />
+                    <span className="text-[9px] font-mono font-medium text-slate-500">
+                      {dayLabel}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </div>
 
         <div className="grid grid-cols-2 gap-2.5 pt-1">
@@ -152,32 +158,38 @@ export const ProgressTab: React.FC<ProgressTabProps> = ({
         </div>
 
         <div className="space-y-1.5">
-          {[...dailyStats].reverse().map((stat, idx) => {
-            const minutes = Math.round(stat.total_listening_seconds / 60);
-            return (
-              <div
-                key={idx}
-                className="flex items-center justify-between p-2.5 rounded-2xl bg-slate-50/70 border border-slate-100 text-xs"
-              >
-                <div>
-                  <span className="font-mono font-bold text-slate-800 block">
-                    {stat.study_date}
-                  </span>
-                  <span className="text-[10px] text-slate-400 font-mono">
-                    {stat.completed_plays} completed {stat.completed_plays === 1 ? 'play' : 'plays'}
-                  </span>
+          {dailyStats.length === 0 ? (
+            <div className="p-4 text-center text-xs text-slate-400 italic">
+              No study activity logged yet.
+            </div>
+          ) : (
+            [...dailyStats].reverse().map((stat, idx) => {
+              const minutes = Math.round(stat.total_listening_seconds / 60);
+              return (
+                <div
+                  key={idx}
+                  className="flex items-center justify-between p-2.5 rounded-2xl bg-slate-50/70 border border-slate-100 text-xs"
+                >
+                  <div>
+                    <span className="font-mono font-bold text-slate-800 block">
+                      {stat.study_date}
+                    </span>
+                    <span className="text-[10px] text-slate-400 font-mono">
+                      {stat.completed_plays} completed {stat.completed_plays === 1 ? 'play' : 'plays'}
+                    </span>
+                  </div>
+                  <div className="text-right">
+                    <span className="font-mono font-bold text-blue-700 block">
+                      {minutes} min
+                    </span>
+                    <span className="text-[10px] text-slate-400 font-mono">
+                      {formatDuration(stat.total_listening_seconds)}
+                    </span>
+                  </div>
                 </div>
-                <div className="text-right">
-                  <span className="font-mono font-bold text-blue-700 block">
-                    {minutes} min
-                  </span>
-                  <span className="text-[10px] text-slate-400 font-mono">
-                    {formatDuration(stat.total_listening_seconds)}
-                  </span>
-                </div>
-              </div>
-            );
-          })}
+              );
+            })
+          )}
         </div>
       </div>
     </div>

@@ -94,16 +94,13 @@ export const GoogleDriveStorage: React.FC<GoogleDriveStorageProps> = ({
 
   const totalBytes = quota?.totalBytes || 15 * 1024 * 1024 * 1024;
 
-  // Realistic breakdown calculation
-  // Smriti notes take smritiAudioBytes (or min realistic 48MB if new user to visualize)
-  const smritiBytes = Math.max(smritiAudioBytes, 48 * 1024 * 1024);
-  const otherDriveBytes = Math.max(
-    0,
-    (quota?.driveBytes || 2.1 * 1024 * 1024 * 1024) - smritiBytes
-  );
-  const otherGoogleBytes =
-    quota?.otherGoogleBytes || 2.05 * 1024 * 1024 * 1024; // Gmail, Photos
-  const totalUsedBytes = smritiBytes + otherDriveBytes + otherGoogleBytes;
+  // Real breakdown calculation - strictly user's actual audio notes and authentic quota
+  const smritiBytes = smritiAudioBytes;
+  const otherDriveBytes = quota ? Math.max(0, quota.driveBytes - smritiBytes) : 0;
+  const otherGoogleBytes = quota?.otherGoogleBytes || 0;
+  const totalUsedBytes = isDriveConnected
+    ? smritiBytes + otherDriveBytes + otherGoogleBytes
+    : smritiBytes;
   const freeBytes = Math.max(0, totalBytes - totalUsedBytes);
 
   const usedPercent = Math.min(100, Math.round((totalUsedBytes / totalBytes) * 100));
@@ -204,7 +201,7 @@ export const GoogleDriveStorage: React.FC<GoogleDriveStorageProps> = ({
               </span>
             </div>
             <p className="text-xs font-semibold text-slate-700 mt-0.5 flex items-center gap-1">
-              <span>{quota?.userEmail || 'scholar@drive.connected'}</span>
+              <span>{quota?.userEmail || (isDriveConnected ? 'Personal Google Account' : 'Offline / Local Vault')}</span>
               {isDriveConnected && (
                 <ShieldCheck size={12} className="text-emerald-600 shrink-0" />
               )}

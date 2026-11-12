@@ -1,5 +1,5 @@
 import React from 'react';
-import { Home, Folder, BarChart3, Mic, User } from 'lucide-react';
+import { Home, Folder, BarChart3, Mic, User, Play } from 'lucide-react';
 
 export type TabType = 'home' | 'library' | 'progress' | 'record' | 'profile';
 
@@ -7,12 +7,16 @@ interface NavigationProps {
   currentTab: TabType;
   onSelectTab: (tab: TabType) => void;
   attachedPlayer?: React.ReactNode;
+  isPlaying?: boolean;
+  onTogglePlay?: () => void;
 }
 
 export const Navigation: React.FC<NavigationProps> = ({
   currentTab,
   onSelectTab,
-  attachedPlayer
+  attachedPlayer,
+  isPlaying = false,
+  onTogglePlay
 }) => {
   const leftTabs = [
     { id: 'home' as TabType, label: 'Home', icon: Home },
@@ -70,18 +74,40 @@ export const Navigation: React.FC<NavigationProps> = ({
             })}
           </div>
 
-          {/* Center Action Button (Record Studio) */}
-          <button
-            onClick={() => onSelectTab('record')}
-            aria-label="Record Audio Note"
-            className={`w-11 h-11 rounded-full flex items-center justify-center text-white transition-all duration-200 shadow-md active:scale-90 cursor-pointer ${
-              currentTab === 'record'
-                ? 'bg-amber-500 shadow-amber-500/40 ring-4 ring-amber-400/30 scale-105'
-                : 'bg-blue-600 hover:bg-blue-500 shadow-blue-600/30 hover:scale-105'
-            }`}
-          >
-            <Mic size={20} strokeWidth={2.4} />
-          </button>
+          {/* Center Action Button: Recorder normally; becomes modern aesthetic Sunset Amber-Coral Play/Pause button in compact player mode */}
+          {hasPlayer ? (
+            <button
+              onClick={() => onTogglePlay && onTogglePlay()}
+              aria-label={isPlaying ? 'Pause audio' : 'Play audio'}
+              title={isPlaying ? 'Pause audio playback' : 'Resume audio playback'}
+              className="w-11 h-11 rounded-full flex items-center justify-center text-white transition-all duration-200 cursor-pointer bg-gradient-to-tr from-amber-500 via-orange-500 to-rose-500 hover:from-amber-400 hover:to-rose-400 shadow-md shadow-orange-500/25 border border-white/20 hover:scale-105 active:scale-95 group/playbtn"
+            >
+              {isPlaying ? (
+                <div className="flex items-center justify-center gap-1">
+                  <span className="w-1 h-3.5 bg-white rounded-full shadow-2xs transition-transform group-hover/playbtn:scale-y-110" />
+                  <span className="w-1 h-3.5 bg-white rounded-full shadow-2xs transition-transform group-hover/playbtn:scale-y-110" />
+                </div>
+              ) : (
+                <Play
+                  size={16}
+                  fill="currentColor"
+                  className="translate-x-0.5 text-white transition-transform group-hover/playbtn:scale-110"
+                />
+              )}
+            </button>
+          ) : (
+            <button
+              onClick={() => onSelectTab('record')}
+              aria-label="Record Audio Note"
+              className={`w-11 h-11 rounded-full flex items-center justify-center text-white transition-all duration-200 shadow-md active:scale-90 cursor-pointer ${
+                currentTab === 'record'
+                  ? 'bg-amber-500 shadow-amber-500/40 ring-4 ring-amber-400/30 scale-105'
+                  : 'bg-blue-600 hover:bg-blue-500 shadow-blue-600/30 hover:scale-105'
+              }`}
+            >
+              <Mic size={20} strokeWidth={2.4} />
+            </button>
+          )}
 
           {/* Right Tabs */}
           <div className="flex items-center gap-1">

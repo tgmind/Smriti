@@ -14,6 +14,7 @@ import { UserSettings, StorageOverview, AudioItem, RevisionItem, DailyStudyStats
 import { exportDataAsJSON, exportDataAsCSV } from '../services/supabase';
 import { bridge } from '../services/bridge';
 import { GoogleDriveStorage } from './GoogleDriveStorage';
+import { googleDriveService } from '../services/googleDrive';
 
 interface ProfileTabProps {
   userSettings: UserSettings;
@@ -71,7 +72,7 @@ export const ProfileTab: React.FC<ProfileTabProps> = ({
           Scholar
         </h2>
         <p className="text-xs text-slate-500 font-medium font-mono">
-          {isDriveConnected ? 'scholar@drive.connected' : 'scholar@smriti.local'}
+          {isDriveConnected ? (googleDriveService.getUserProfile()?.email || 'Google Drive Connected') : 'Offline Student Vault'}
         </p>
       </div>
 

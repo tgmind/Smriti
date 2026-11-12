@@ -197,11 +197,14 @@ describe('Telegram-Style Compact Player Architecture & UI Design', () => {
     expect(html).toContain('waveGradCompact');
   });
 
-  it('attaches seamlessly above Navigation in a unified curvy container with rounded-[22px]', () => {
-    const html = renderToString(
+  it('attaches seamlessly above Navigation in a unified curvy container and transforms record button to contrasting play/pause', () => {
+    // 1. In compact player mode with audio playing: recorder button transforms to modern contrasting Play/Pause
+    const htmlWithPlayer = renderToString(
       <Navigation
         currentTab="home"
         onSelectTab={vi.fn()}
+        isPlaying={true}
+        onTogglePlay={vi.fn()}
         attachedPlayer={
           <MiniPlayer
             playbackState={activePlaybackState}
@@ -218,12 +221,25 @@ describe('Telegram-Style Compact Player Architecture & UI Design', () => {
     );
 
     // Verify unified curvy container with rounded-[22px] (not too rounded)
-    expect(html).toContain('rounded-[22px]');
-    expect(html).toContain('border-t border-white/10');
+    expect(htmlWithPlayer).toContain('rounded-[22px]');
+    expect(htmlWithPlayer).toContain('border-t border-white/10');
     // Verify compact player contents are inside
-    expect(html).toContain('percentage to Fraction.mp3');
+    expect(htmlWithPlayer).toContain('percentage to Fraction.mp3');
     // Verify navigation tabs are inside
-    expect(html).toContain('aria-label="Home"');
-    expect(html).toContain('aria-label="Record Audio Note"');
+    expect(htmlWithPlayer).toContain('aria-label="Home"');
+    // Verify recorder button transformed to aesthetic Sunset Amber-Coral Play/Pause button according to color theory
+    expect(htmlWithPlayer).toContain('aria-label="Pause audio"');
+    expect(htmlWithPlayer).toContain('from-amber-500');
+    expect(htmlWithPlayer).toContain('to-rose-500');
+
+    // 2. In normal mode without player: button remains the standard recorder button
+    const htmlWithoutPlayer = renderToString(
+      <Navigation
+        currentTab="home"
+        onSelectTab={vi.fn()}
+      />
+    );
+    expect(htmlWithoutPlayer).toContain('aria-label="Record Audio Note"');
+    expect(htmlWithoutPlayer).toContain('rounded-full');
   });
 });

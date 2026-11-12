@@ -162,6 +162,11 @@ describe('HomeTab Component - 3 Tabs & Google Drive Attachments Architecture', (
     expect(html).toContain('Playing');
     expect(html).toContain('Pause Thermodynamics Carnot Cycle');
 
+    // Verify Spotify/YouTube Music dark styling and line-art graphic visualizer
+    expect(html).toContain('from-slate-950');
+    expect(html).toContain('bgContourGrad');
+    expect(html).toContain('Audio Study Vault');
+
     // Verify single seekbar with timestamps
     expect(html).toContain('Tap or scrub to seek');
     expect(html).toContain('0:15');
