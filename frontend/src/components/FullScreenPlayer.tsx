@@ -25,6 +25,7 @@ import { AudioItem, PlaybackState } from '../types';
 import { formatDuration } from '../services/learningEngine';
 import { Slider } from './ui/slider';
 import { Badge } from './ui/badge';
+import { LoopIntervalSelector } from './LoopIntervalSelector';
 
 interface FullScreenPlayerProps {
   playbackState: PlaybackState;
@@ -446,7 +447,7 @@ export const FullScreenPlayer: React.FC<FullScreenPlayerProps> = ({
       {activeModal !== 'none' && (
         <div className="fixed inset-0 z-50 bg-slate-950/40 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-150">
           <div
-            className="w-full max-w-sm bg-white/98 backdrop-blur-2xl rounded-3xl border border-slate-200/90 shadow-[0_20px_60px_rgba(0,0,0,0.18)] p-5 space-y-4 animate-in zoom-in-95 duration-150 text-slate-900"
+            className="w-full max-w-sm sm:max-w-md bg-white/98 backdrop-blur-2xl rounded-3xl border border-slate-200/90 shadow-[0_20px_60px_rgba(0,0,0,0.18)] p-4 sm:p-5 space-y-4 max-h-[90dvh] overflow-y-auto animate-in zoom-in-95 duration-150 text-slate-900"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Modal Header */}
@@ -463,13 +464,13 @@ export const FullScreenPlayer: React.FC<FullScreenPlayerProps> = ({
                     {activeModal === 'ab_loop' && 'A⇄B Repeat Segment'}
                     {activeModal === 'sleep' && 'Sleep Timer'}
                     {activeModal === 'speed' && 'Playback Speed'}
-                    {activeModal === 'tools' && 'Study Tools'}
+                    {activeModal === 'tools' && 'Study Tools & Loop'}
                   </h4>
                   <p className="text-[11px] text-slate-500 font-medium">
-                    {activeModal === 'ab_loop' && 'Loop a key explanation or formula'}
+                    {activeModal === 'ab_loop' && 'Visual slider & selector for repeat interval'}
                     {activeModal === 'sleep' && 'Automatically pause when timer completes'}
                     {activeModal === 'speed' && 'Speed up or slow down narration'}
-                    {activeModal === 'tools' && 'Configure learning tools'}
+                    {activeModal === 'tools' && 'Fine-tune loop interval, timer & speed'}
                   </p>
                 </div>
               </div>
@@ -483,46 +484,16 @@ export const FullScreenPlayer: React.FC<FullScreenPlayerProps> = ({
               </button>
             </div>
 
-            {/* Modal Body: A-B Repeat Tool */}
+            {/* Modal Body: A-B Repeat Tool via Minimalist Visual Slider & Selector */}
             {(activeModal === 'ab_loop' || activeModal === 'tools') && (
-              <div className="space-y-3">
-                <div className="flex items-center justify-between bg-slate-50 p-2.5 rounded-2xl border border-slate-200/80 text-xs">
-                  <span className="font-semibold text-slate-700">Current Loop Interval:</span>
-                  <span className="font-mono font-bold text-amber-700 bg-amber-50 px-2 py-0.5 rounded-lg border border-amber-200/80">
-                    {abLoop?.enabled
-                      ? `${formatDuration(abLoop.startSeconds)} → ${formatDuration(abLoop.endSeconds)}`
-                      : 'Loop Disabled'}
-                  </span>
-                </div>
-
-                <div className="grid grid-cols-2 gap-2">
-                  <button
-                    onClick={() => onToggleABLoop(safePosition, abLoop?.endSeconds || safeDuration)}
-                    className="py-2.5 px-3 rounded-2xl bg-white hover:bg-slate-50 border border-slate-200/90 text-xs font-mono font-bold text-slate-800 flex items-center justify-center gap-1.5 shadow-2xs active:scale-95 transition-all cursor-pointer"
-                  >
-                    <span>Set A: {formatDuration(safePosition)}</span>
-                  </button>
-
-                  <button
-                    onClick={() => onToggleABLoop(abLoop?.startSeconds || 0, safePosition)}
-                    className="py-2.5 px-3 rounded-2xl bg-white hover:bg-slate-50 border border-slate-200/90 text-xs font-mono font-bold text-slate-800 flex items-center justify-center gap-1.5 shadow-2xs active:scale-95 transition-all cursor-pointer"
-                  >
-                    <span>Set B: {formatDuration(safePosition)}</span>
-                  </button>
-                </div>
-
-                {abLoop?.enabled && (
-                  <button
-                    onClick={() => {
-                      onToggleABLoop(undefined, undefined);
-                      setActiveModal('none');
-                    }}
-                    className="w-full py-2 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200/80 text-xs font-bold transition-all active:scale-95 cursor-pointer"
-                  >
-                    Clear Active Repeat Loop
-                  </button>
-                )}
-              </div>
+              <LoopIntervalSelector
+                currentPosition={safePosition}
+                duration={safeDuration}
+                activeLoop={abLoop}
+                onSetLoop={(start, end) => onToggleABLoop(start, end)}
+                onClearLoop={() => onToggleABLoop(undefined, undefined)}
+                onSeek={onSeek}
+              />
             )}
 
             {/* Modal Body: Sleep Timer */}
