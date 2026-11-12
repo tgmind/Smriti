@@ -1,22 +1,19 @@
 import React, { useState } from 'react';
 import {
-  HardDrive,
   Trash2,
   FileSpreadsheet,
   FileJson,
   ShieldCheck,
   CheckCircle2,
-  LogOut,
   Sliders,
   Database,
-  Cloud,
   ChevronRight,
-  Sparkles,
-  ArrowRight
+  Sparkles
 } from 'lucide-react';
 import { UserSettings, StorageOverview, AudioItem, RevisionItem, DailyStudyStats } from '../types';
 import { exportDataAsJSON, exportDataAsCSV } from '../services/supabase';
 import { bridge } from '../services/bridge';
+import { GoogleDriveStorage } from './GoogleDriveStorage';
 
 interface ProfileTabProps {
   userSettings: UserSettings;
@@ -53,11 +50,6 @@ export const ProfileTab: React.FC<ProfileTabProps> = ({
     setTimeout(() => setCacheClearedSuccess(false), 3000);
   };
 
-  const localUsedMb = (
-    (storageInfo.cachedAudioBytes + storageInfo.explicitDownloadsBytes + storageInfo.metadataDbBytes) /
-    (1024 * 1024)
-  ).toFixed(1);
-
   return (
     <div className="space-y-4 pb-28 pt-3 px-4 max-w-md mx-auto">
       {/* Top Header: Account */}
@@ -83,70 +75,13 @@ export const ProfileTab: React.FC<ProfileTabProps> = ({
         </p>
       </div>
 
-      {/* "Your Plan" / Storage Overview Card (Dropbox style in Image 1) */}
-      <div className="bg-white border border-slate-200/80 rounded-3xl p-4.5 shadow-2xs space-y-3.5">
-        <div className="flex items-start justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-11 h-11 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center shadow-2xs">
-              <Cloud size={22} strokeWidth={2.2} />
-            </div>
-            <div>
-              <div className="flex items-center gap-1.5">
-                <h3 className="text-xs font-bold text-slate-950 uppercase tracking-wider">
-                  Your Storage
-                </h3>
-                <span className="px-2 py-0.2 rounded-full text-[10px] font-bold font-mono bg-blue-50 text-blue-700 border border-blue-200">
-                  {isDriveConnected ? 'Connected' : 'Free & Offline'}
-                </span>
-              </div>
-              <p className="text-xs font-semibold text-slate-800 mt-0.5">
-                {isDriveConnected ? 'Personal Google Drive Sync' : 'Local Offline Storage'}
-              </p>
-            </div>
-          </div>
-        </div>
-
-        {/* Storage Bar */}
-        <div className="space-y-1.5 pt-1">
-          <div className="flex justify-between text-[11px] font-mono text-slate-500">
-            <span>Used: <strong className="text-slate-900">{localUsedMb} MB</strong></span>
-            <span>Limit: {userSettings.cache_limit_mb} MB cache</span>
-          </div>
-          <div className="w-full bg-slate-100 rounded-full h-2 overflow-hidden">
-            <div
-              className="bg-blue-600 h-full rounded-full transition-all duration-300"
-              style={{
-                width: `${Math.min(100, Math.max(8, (parseFloat(localUsedMb) / userSettings.cache_limit_mb) * 100))}%`
-              }}
-            />
-          </div>
-        </div>
-
-        {/* Action Button: Black Pill Button with Arrow */}
-        {isDriveConnected ? (
-          <button
-            onClick={onDisconnectDrive}
-            className="w-full py-2.5 px-4 rounded-2xl bg-slate-950 hover:bg-slate-800 text-white text-xs font-semibold flex items-center justify-between active:scale-98 transition-all cursor-pointer shadow-xs"
-          >
-            <span className="flex items-center gap-2">
-              <LogOut size={14} className="text-rose-400" />
-              <span>Disconnect Google Drive</span>
-            </span>
-            <ArrowRight size={14} />
-          </button>
-        ) : (
-          <button
-            onClick={onConnectDrive}
-            className="w-full py-2.5 px-4 rounded-2xl bg-slate-950 hover:bg-slate-800 text-white text-xs font-semibold flex items-center justify-between active:scale-98 transition-all cursor-pointer shadow-xs"
-          >
-            <span className="flex items-center gap-2">
-              <HardDrive size={14} className="text-blue-400" />
-              <span>Connect Personal Google Drive</span>
-            </span>
-            <ArrowRight size={14} />
-          </button>
-        )}
-      </div>
+      {/* Google Drive Storage (Realistic Quota, Recharts Breakdown & Progress) */}
+      <GoogleDriveStorage
+        audioItems={audioItems}
+        isDriveConnected={isDriveConnected}
+        onConnectDrive={onConnectDrive}
+        onDisconnectDrive={onDisconnectDrive}
+      />
 
       {/* Settings List Items with Squircles & Chevrons (Like Image 1) */}
       <div className="space-y-2">

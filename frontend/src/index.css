@@ -31,6 +31,21 @@
 
   --color-sky-deep: #0284c7;
   --color-sky-pill: #f0f9ff;
+
+  /* Chart tokens */
+  --chart-1: #2563eb;
+  --chart-2: #f59e0b;
+  --chart-3: #ef4444;
+  --chart-4: #10b981;
+  --chart-5: #94a3b8;
+}
+
+:root {
+  --chart-1: #2563eb;
+  --chart-2: #f59e0b;
+  --chart-3: #ef4444;
+  --chart-4: #10b981;
+  --chart-5: #94a3b8;
 }
 
 /* Base Light Theme Setup */
