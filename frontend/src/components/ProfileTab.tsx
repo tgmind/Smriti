@@ -8,8 +8,7 @@ import {
   CheckCircle2,
   LogOut,
   Sliders,
-  Database,
-  Clock
+  Database
 } from 'lucide-react';
 import { UserSettings, StorageOverview, AudioItem, RevisionItem, DailyStudyStats } from '../types';
 import { exportDataAsJSON, exportDataAsCSV } from '../services/supabase';
@@ -147,28 +146,6 @@ export const ProfileTab: React.FC<ProfileTabProps> = ({
           <div className="flex items-center justify-between py-1">
             <span className="text-slate-600">Pending Sync Events</span>
             <span className="font-mono font-bold text-amber-700">{storageInfo.pendingSyncCount} pending</span>
-          </div>
-        </div>
-
-        {/* Daily Goal Target Configuration */}
-        <div className="pt-1">
-          <label className="text-[11px] font-bold text-slate-700 block mb-1.5 flex items-center gap-1">
-            <Clock size={12} /> Daily Listening Target
-          </label>
-          <div className="grid grid-cols-4 gap-1.5">
-            {[15, 30, 45, 60].map((mins) => (
-              <button
-                key={mins}
-                onClick={() => onUpdateSettings({ daily_listening_goal_minutes: mins })}
-                className={`py-1.5 rounded-lg text-xs font-mono font-bold transition-all border shadow-2xs ${
-                  userSettings.daily_listening_goal_minutes === mins
-                    ? 'bg-slate-900 border-slate-900 text-white'
-                    : 'bg-white border-slate-200 text-slate-700 hover:border-slate-300'
-                }`}
-              >
-                {mins}m
-              </button>
-            ))}
           </div>
         </div>
 

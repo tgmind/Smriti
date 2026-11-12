@@ -2,7 +2,6 @@ import React, { useState, useEffect, useRef } from 'react';
 import { TabType, Navigation } from './components/Navigation';
 import { MiniPlayer } from './components/MiniPlayer';
 import { FullScreenPlayer } from './components/FullScreenPlayer';
-import { AssessmentModal } from './components/AssessmentModal';
 import { HomeTab } from './components/HomeTab';
 import { LibraryTab } from './components/LibraryTab';
 import { ProgressTab } from './components/ProgressTab';
@@ -16,7 +15,6 @@ import {
   DailyStudyStats,
   UserSettings,
   PlaybackState,
-  RatingScore,
   StorageOverview
 } from './types';
 import {
@@ -27,7 +25,7 @@ import {
   DEFAULT_USER_SETTINGS
 } from './services/supabase';
 import { bridge } from './services/bridge';
-import { evaluateCompletedPlay, calculateNextReview } from './services/learningEngine';
+import { evaluateCompletedPlay } from './services/learningEngine';
 import { googleDriveService } from './services/googleDrive';
 import { audioStorage } from './services/audioStorage';
 
@@ -39,7 +37,7 @@ export const App: React.FC = () => {
   });
 
   const [subjects] = useState<Subject[]>(DEMO_SUBJECTS);
-  const [revisionItems, setRevisionItems] = useState<RevisionItem[]>(() => {
+  const [revisionItems] = useState<RevisionItem[]>(() => {
     const saved = localStorage.getItem('smriti_revisions');
     return saved ? JSON.parse(saved) : DEMO_REVISION_ITEMS;
   });
@@ -59,8 +57,6 @@ export const App: React.FC = () => {
 
   // Playback & UI Modals
   const [isFullScreenPlayerOpen, setIsFullScreenPlayerOpen] = useState(false);
-  const [isAssessmentModalOpen, setIsAssessmentModalOpen] = useState(false);
-  const [activeAssessmentItems, setActiveAssessmentItems] = useState<RevisionItem[] | null>(null);
 
   const [playbackState, setPlaybackState] = useState<PlaybackState>({
     currentAudio: null,
@@ -297,76 +293,6 @@ export const App: React.FC = () => {
     handleSetSpeed(nextSpeed);
   };
 
-  // Launch Active Recall specifically for any selected AudioItem
-  const handleOpenAssessmentForAudio = (audio: AudioItem) => {
-    const existing = revisionItems.filter(r => r.audio_id === audio.id);
-    if (existing.length > 0) {
-      setActiveAssessmentItems(existing);
-    } else {
-      const keyTermsStr = audio.key_terms && audio.key_terms.length > 0
-        ? audio.key_terms.join(', ')
-        : 'Fundamental laws and core derivations';
-      const dynamicItem: RevisionItem = {
-        id: `rev-${audio.id}-${Date.now()}`,
-        assessment_id: `asm-${audio.id}`,
-        audio_id: audio.id,
-        audio_title: audio.title,
-        subject_name: audio.subject_name || 'General',
-        assessment_type: 'flashcard',
-        prompt: `Recall the core concepts, derivations, and definitions covered in "${audio.title}".`,
-        correct_answer: `Key terms & topics: ${keyTermsStr}. Review your audio notes to verify your recall.`,
-        explanation: 'Active retrieval practice stimulates synaptic consolidation even when recalling high-level outlines.',
-        ease_factor: 2.50,
-        repetition_count: 0,
-        interval_days: 1,
-        next_review_due: new Date().toISOString().split('T')[0],
-        status: 'learning'
-      };
-      setActiveAssessmentItems([dynamicItem]);
-    }
-    setIsAssessmentModalOpen(true);
-  };
-
-  // Spaced Repetition Rating Recording
-  const handleRecordRecallRating = (item: RevisionItem, rating: RatingScore) => {
-    const updated = calculateNextReview(item, rating);
-    setRevisionItems(prev => {
-      const exists = prev.some(r => r.id === item.id);
-      if (exists) {
-        return prev.map(r => (r.id === item.id ? { ...r, ...updated, last_rating: rating, last_reviewed_at: new Date().toISOString() } : r));
-      } else {
-        return [...prev, { ...item, ...updated, last_rating: rating, last_reviewed_at: new Date().toISOString() }];
-      }
-    });
-
-    // Update Daily Stats for Recall Success
-    const todayStr = new Date().toISOString().split('T')[0];
-    const isSuccess = rating >= 2;
-
-    setDailyStats(prev => {
-      const idx = prev.findIndex(s => s.study_date === todayStr);
-      if (idx >= 0) {
-        const copy = [...prev];
-        copy[idx] = {
-          ...copy[idx],
-          assessments_taken: copy[idx].assessments_taken + 1,
-          successful_recalls: copy[idx].successful_recalls + (isSuccess ? 1 : 0)
-        };
-        return copy;
-      }
-      return [
-        ...prev,
-        {
-          study_date: todayStr,
-          total_listening_seconds: 0,
-          completed_plays: 0,
-          assessments_taken: 1,
-          successful_recalls: isSuccess ? 1 : 0
-        }
-      ];
-    });
-  };
-
   // Check Google Drive connection status on mount
   useEffect(() => {
     if (googleDriveService.isConnected()) {
@@ -440,10 +366,6 @@ export const App: React.FC = () => {
     setIsDriveConnected(false);
   };
 
-  const todayStr = new Date().toISOString().split('T')[0];
-  const todayListening = dailyStats.find(s => s.study_date === todayStr)?.total_listening_seconds || 1850;
-  const revisionsDueToday = revisionItems.filter(r => r.next_review_due <= todayStr);
-
   return (
     <div className="min-h-screen bg-slate-50 text-slate-900 flex flex-col font-sans select-none">
       {/* Active Tab Screen */}
@@ -451,14 +373,9 @@ export const App: React.FC = () => {
         {currentTab === 'home' && (
           <HomeTab
             recentAudio={audioItems}
-            revisionsDue={revisionsDueToday}
             userSettings={userSettings}
-            todayListeningSeconds={todayListening}
             onPlayAudio={handlePlayAudio}
-            onOpenAssessment={() => setIsAssessmentModalOpen(true)}
-            onOpenAssessmentForAudio={handleOpenAssessmentForAudio}
             onGoToRecord={() => setCurrentTab('record')}
-            onUpdateGoal={(m) => setUserSettings(prev => ({ ...prev, daily_listening_goal_minutes: m }))}
           />
         )}
 
@@ -466,7 +383,6 @@ export const App: React.FC = () => {
           <LibraryTab
             audioItems={audioItems}
             subjects={subjects}
-            revisionsDue={revisionsDueToday}
             playbackState={playbackState}
             onTogglePlay={handleTogglePlay}
             onSeek={handleSeek}
@@ -475,15 +391,12 @@ export const App: React.FC = () => {
             onToggleFavorite={handleToggleFavorite}
             onToggleOffline={handleToggleOffline}
             onGoToRecord={() => setCurrentTab('record')}
-            onOpenAssessmentForAudio={handleOpenAssessmentForAudio}
           />
         )}
 
         {currentTab === 'progress' && (
           <ProgressTab
             dailyStats={dailyStats}
-            revisionItems={revisionItems}
-            onOpenAssessment={() => setIsAssessmentModalOpen(true)}
           />
         )}
 
@@ -539,26 +452,6 @@ export const App: React.FC = () => {
           onSetSleepTimer={handleSetSleepTimer}
           onToggleFavorite={handleToggleFavorite}
           onToggleOffline={handleToggleOffline}
-          onOpenAssessment={() => {
-            setIsFullScreenPlayerOpen(false);
-            if (playbackState.currentAudio) {
-              handleOpenAssessmentForAudio(playbackState.currentAudio);
-            } else {
-              setIsAssessmentModalOpen(true);
-            }
-          }}
-        />
-      )}
-
-      {/* Spaced Repetition / Recall Assessment Modal */}
-      {isAssessmentModalOpen && (
-        <AssessmentModal
-          items={activeAssessmentItems || (revisionsDueToday.length > 0 ? revisionsDueToday : revisionItems.slice(0, 3))}
-          onClose={() => {
-            setIsAssessmentModalOpen(false);
-            setActiveAssessmentItems(null);
-          }}
-          onRecordRating={handleRecordRecallRating}
         />
       )}
 
@@ -566,7 +459,6 @@ export const App: React.FC = () => {
       <Navigation
         currentTab={currentTab}
         onSelectTab={setCurrentTab}
-        revisionDueCount={revisionsDueToday.length}
       />
     </div>
   );

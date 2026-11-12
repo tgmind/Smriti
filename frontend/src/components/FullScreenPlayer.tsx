@@ -9,7 +9,6 @@ import {
   Repeat,
   Repeat1,
   Timer,
-  Zap,
   Star,
   Download,
   CheckCircle2
@@ -29,7 +28,6 @@ interface FullScreenPlayerProps {
   onSetSleepTimer: (minutes: number | null) => void;
   onToggleFavorite: (audioId: string) => void;
   onToggleOffline: (audio: AudioItem) => void;
-  onOpenAssessment: () => void;
 }
 
 export const FullScreenPlayer: React.FC<FullScreenPlayerProps> = ({
@@ -43,8 +41,7 @@ export const FullScreenPlayer: React.FC<FullScreenPlayerProps> = ({
   onToggleABLoop,
   onSetSleepTimer,
   onToggleFavorite,
-  onToggleOffline,
-  onOpenAssessment
+  onToggleOffline
 }) => {
   const {
     currentAudio,
@@ -294,8 +291,8 @@ export const FullScreenPlayer: React.FC<FullScreenPlayerProps> = ({
           })}
         </div>
 
-        {/* Secondary Toolstrip: Sleep Timer, A-B Loop, Active Recall */}
-        <div className="pt-1.5 border-t border-slate-200 grid grid-cols-3 gap-2">
+        {/* Secondary Toolstrip: Sleep Timer & A-B Loop */}
+        <div className="pt-1.5 border-t border-slate-200 grid grid-cols-2 gap-2">
 
           {/* A-B Loop */}
           <button
@@ -323,15 +320,6 @@ export const FullScreenPlayer: React.FC<FullScreenPlayerProps> = ({
             <span className="font-mono text-[11px]">
               {sleepTimerRemainingSeconds ? `${Math.ceil(sleepTimerRemainingSeconds / 60)}m` : 'Sleep'}
             </span>
-          </button>
-
-          {/* Active Recall Action */}
-          <button
-            onClick={onOpenAssessment}
-            className="py-2 px-2 rounded-xl text-xs font-semibold bg-amber-500 hover:bg-amber-600 text-slate-950 flex items-center justify-center gap-1 shadow-2xs active:scale-95 transition-all"
-          >
-            <Zap size={12} fill="currentColor" />
-            <span>Recall</span>
           </button>
         </div>
 

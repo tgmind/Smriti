@@ -20,17 +20,15 @@ import {
   Folder,
   Clock,
   FileAudio,
-  Flame,
   Check
 } from 'lucide-react';
-import { AudioItem, Subject, RevisionItem, PlaybackState } from '../types';
+import { AudioItem, Subject, PlaybackState } from '../types';
 import { formatDuration } from '../services/learningEngine';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 export interface LibraryTabProps {
   audioItems: AudioItem[];
   subjects: Subject[];
-  revisionsDue?: RevisionItem[];
   playbackState?: PlaybackState;
   onTogglePlay?: () => void;
   onSeek?: (seconds: number) => void;
@@ -39,17 +37,15 @@ export interface LibraryTabProps {
   onToggleFavorite: (audioId: string) => void;
   onToggleOffline: (audio: AudioItem) => void;
   onGoToRecord: () => void;
-  onOpenAssessmentForAudio?: (audio: AudioItem) => void;
 }
 
 type LibraryViewMode = 'topics' | 'subject' | 'note';
-type FilterMode = 'all' | 'due' | 'favorites' | 'offline' | 'short';
+type FilterMode = 'all' | 'favorites' | 'offline' | 'short';
 type SortMode = 'recent' | 'duration' | 'title';
 
 export const LibraryTab: React.FC<LibraryTabProps> = ({
   audioItems,
   subjects,
-  revisionsDue = [],
   playbackState,
   onTogglePlay,
   onSeek,
@@ -57,8 +53,7 @@ export const LibraryTab: React.FC<LibraryTabProps> = ({
   onPlayAudio,
   onToggleFavorite,
   onToggleOffline,
-  onGoToRecord,
-  onOpenAssessmentForAudio
+  onGoToRecord
 }) => {
   // 3-Tier Navigation State: Library (topics) -> Subject -> Audio Note
   const [viewMode, setViewMode] = useState<LibraryViewMode>('topics');
@@ -70,9 +65,6 @@ export const LibraryTab: React.FC<LibraryTabProps> = ({
   const [filterMode, setFilterMode] = useState<FilterMode>('all');
   const [sortMode, setSortMode] = useState<SortMode>('recent');
   const [selectedTopicTag, setSelectedTopicTag] = useState<string | null>(null);
-
-  // Set of due audio IDs from spaced repetition
-  const dueAudioIds = useMemo(() => new Set(revisionsDue.map(r => r.audio_id)), [revisionsDue]);
 
   // Selected subject & audio objects
   const selectedSubject = useMemo(
@@ -195,17 +187,15 @@ export const LibraryTab: React.FC<LibraryTabProps> = ({
   const libraryStats = useMemo(() => {
     const totalDurationSeconds = audioItems.reduce((acc, curr) => acc + curr.duration_seconds, 0);
     const totalOffline = audioItems.filter(a => a.is_downloaded_offline).length;
-    const totalDue = audioItems.filter(a => dueAudioIds.has(a.id)).length;
     const totalFavorites = audioItems.filter(a => a.is_favorite).length;
     return {
       totalSubjects: subjects.length,
       totalAudios: audioItems.length,
       totalDurationSeconds,
       totalOffline,
-      totalDue,
       totalFavorites
     };
-  }, [audioItems, subjects, dueAudioIds]);
+  }, [audioItems, subjects]);
 
   // Filter and sort audio items for a specific subject (or all if subject is null)
   const getSubjectAudios = (subjectId: string | null) => {
@@ -214,7 +204,6 @@ export const LibraryTab: React.FC<LibraryTabProps> = ({
       items = items.filter(a => a.subject_id === subjectId);
     }
 
-    if (filterMode === 'due') items = items.filter(a => dueAudioIds.has(a.id));
     if (filterMode === 'favorites') items = items.filter(a => a.is_favorite);
     if (filterMode === 'offline') items = items.filter(a => a.is_downloaded_offline);
     if (filterMode === 'short') items = items.filter(a => a.duration_seconds <= 300);
@@ -270,7 +259,6 @@ export const LibraryTab: React.FC<LibraryTabProps> = ({
   // =========================================================================
   if (viewMode === 'note' && selectedAudio) {
     const isPlaying = isAudioPlaying(selectedAudio.id);
-    const isDue = dueAudioIds.has(selectedAudio.id);
     const audioSubject = subjects.find(s => s.id === selectedAudio.subject_id);
     const subjectTheme = audioSubject ? getSubjectTheme(audioSubject.color_hex) : getSubjectTheme('');
     const SubjectIcon = audioSubject ? getSubjectIcon(audioSubject.icon_name) : BookOpen;
@@ -331,12 +319,6 @@ export const LibraryTab: React.FC<LibraryTabProps> = ({
                 </span>
               )}
             </div>
-
-            {isDue && (
-              <span className="px-2.5 py-0.5 rounded-full bg-amber-50 text-amber-800 border border-amber-300 text-[10px] font-bold font-mono flex items-center gap-1 shadow-2xs">
-                <Sparkles size={10} className="text-amber-600" /> SPACING DUE
-              </span>
-            )}
           </div>
 
           {/* Title & Metadata */}
@@ -443,35 +425,6 @@ export const LibraryTab: React.FC<LibraryTabProps> = ({
           </div>
         </div>
 
-        {/* 1-Tap Active Recall CTA Banner */}
-        <div className="bg-gradient-to-br from-amber-500/15 via-amber-50/60 to-white border border-amber-300/80 rounded-2xl p-4 shadow-2xs space-y-2.5">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <div className="w-7 h-7 rounded-lg bg-amber-500 text-slate-950 flex items-center justify-center shadow-xs">
-                <Zap size={14} fill="currentColor" />
-              </div>
-              <h3 className="text-xs font-extrabold uppercase tracking-wider text-amber-950 font-mono">
-                Active Recall Practice
-              </h3>
-            </div>
-            <span className="text-[10px] font-mono font-bold bg-amber-200/80 text-amber-900 px-2 py-0.5 rounded-full">
-              SM-2 Engine
-            </span>
-          </div>
-
-          <p className="text-xs text-slate-600 leading-relaxed">
-            Test yourself on the core formulas and concepts covered in this note to advance memory stability.
-          </p>
-
-          <button
-            onClick={() => onOpenAssessmentForAudio ? onOpenAssessmentForAudio(selectedAudio) : undefined}
-            className="w-full py-2.5 rounded-xl bg-slate-950 hover:bg-slate-800 text-white text-xs font-bold transition-all active:scale-98 shadow-xs flex items-center justify-center gap-2 cursor-pointer"
-          >
-            <span>Start Active Retrieval Test</span>
-            <Zap size={13} className="fill-amber-400 text-amber-400" />
-          </button>
-        </div>
-
         {/* Concept Notes & Formula Breakdown */}
         <div className="bg-white border border-slate-200/90 rounded-2xl p-4.5 shadow-2xs space-y-3">
           <div className="flex items-center gap-2 border-b border-slate-100 pb-2.5">
@@ -537,7 +490,6 @@ export const LibraryTab: React.FC<LibraryTabProps> = ({
     const subjectTheme = getSubjectTheme(selectedSubject.color_hex);
     const SubjectIcon = getSubjectIcon(selectedSubject.icon_name);
     const totalSubjectDuration = subjectAudios.reduce((acc, curr) => acc + curr.duration_seconds, 0);
-    const subjectDueCount = subjectAudios.filter(a => dueAudioIds.has(a.id)).length;
 
     return (
       <div className="space-y-4 pb-28 pt-3 px-4 max-w-md mx-auto animate-in">
@@ -576,13 +528,6 @@ export const LibraryTab: React.FC<LibraryTabProps> = ({
                 </p>
               </div>
             </div>
-
-            {subjectDueCount > 0 && (
-              <span className="px-2.5 py-1 rounded-full bg-amber-500 text-slate-950 text-xs font-bold font-mono shadow-2xs shrink-0 flex items-center gap-1">
-                <Flame size={12} className="fill-slate-950" />
-                {subjectDueCount} Due
-              </span>
-            )}
           </div>
 
           <div className="flex items-center gap-4 text-xs font-mono text-slate-600 pt-1 border-t border-slate-200/60">
@@ -702,7 +647,6 @@ export const LibraryTab: React.FC<LibraryTabProps> = ({
           ) : (
             subjectAudios.map((audio) => {
               const isPlaying = isAudioPlaying(audio.id);
-              const isDue = dueAudioIds.has(audio.id);
 
               return (
                 <div
@@ -723,11 +667,6 @@ export const LibraryTab: React.FC<LibraryTabProps> = ({
                         {audio.audio_enhancement_applied && (
                           <span className="px-1.5 py-0.2 rounded-md bg-sky-50 text-sky-700 border border-sky-200/80 text-[9px] font-bold font-mono flex items-center gap-0.5">
                             <Sparkles size={8} /> DSP
-                          </span>
-                        )}
-                        {isDue && (
-                          <span className="px-1.5 py-0.2 rounded-md bg-amber-50 text-amber-800 border border-amber-300 text-[9px] font-bold font-mono flex items-center gap-0.5">
-                            <Flame size={8} className="fill-amber-600 text-amber-600" /> DUE
                           </span>
                         )}
                       </div>
@@ -787,23 +726,13 @@ export const LibraryTab: React.FC<LibraryTabProps> = ({
                       {formatDuration(audio.duration_seconds)}
                     </span>
 
-                    <div className="flex items-center gap-2">
-                      <button
-                        onClick={() => onOpenAssessmentForAudio ? onOpenAssessmentForAudio(audio) : undefined}
-                        className="px-2 py-0.5 rounded-md bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-200/80 text-[10px] font-bold font-mono flex items-center gap-1 cursor-pointer transition-colors"
-                      >
-                        <Zap size={10} className="fill-amber-600 text-amber-600" />
-                        <span>Recall</span>
-                      </button>
-
-                      <button
-                        onClick={() => handleOpenAudioNote(audio)}
-                        className="text-slate-700 hover:text-slate-950 font-bold flex items-center gap-0.5 text-[10px] cursor-pointer"
-                      >
-                        <span>View Note</span>
-                        <ChevronRight size={13} />
-                      </button>
-                    </div>
+                    <button
+                      onClick={() => handleOpenAudioNote(audio)}
+                      className="text-slate-700 hover:text-slate-950 font-bold flex items-center gap-0.5 text-xs cursor-pointer"
+                    >
+                      <span>View Note</span>
+                      <ChevronRight size={14} />
+                    </button>
                   </div>
                 </div>
               );
@@ -876,24 +805,19 @@ export const LibraryTab: React.FC<LibraryTabProps> = ({
             </span>
           </TabsTrigger>
 
-          <TabsTrigger value="due" className="flex items-center justify-center gap-1 text-xs">
-            <Flame className="size-3.5 text-amber-600 fill-amber-500" />
-            <span>Due</span>
-            {libraryStats.totalDue > 0 && (
-              <span className="text-[10px] font-mono font-bold px-1.5 py-0.2 rounded-full bg-amber-100 text-amber-900 border border-amber-300/70">
-                {libraryStats.totalDue}
-              </span>
-            )}
-          </TabsTrigger>
-
           <TabsTrigger value="favorites" className="flex items-center justify-center gap-1 text-xs">
-            <Star className="size-3 text-amber-500 fill-amber-400" />
+            <Star className="size-3.5 text-amber-500 fill-amber-400" />
             <span>Favs</span>
           </TabsTrigger>
 
           <TabsTrigger value="offline" className="flex items-center justify-center gap-1 text-xs">
-            <CheckCircle2 className="size-3 text-emerald-600" />
+            <CheckCircle2 className="size-3.5 text-emerald-600" />
             <span>Offline</span>
+          </TabsTrigger>
+
+          <TabsTrigger value="short" className="flex items-center justify-center gap-1 text-xs">
+            <Zap className="size-3.5 text-sky-500 fill-sky-500" />
+            <span>&lt;5m</span>
           </TabsTrigger>
         </TabsList>
       </Tabs>
@@ -915,7 +839,6 @@ export const LibraryTab: React.FC<LibraryTabProps> = ({
       <div className="bg-white border border-slate-200/90 rounded-2xl divide-y divide-slate-100 shadow-[0_1px_3px_rgba(0,0,0,0.03)] overflow-hidden">
         {subjects.map((subject) => {
           const subjectAudios = audiosBySubject.get(subject.id) || [];
-          const subjectDueCount = subjectAudios.filter(a => dueAudioIds.has(a.id)).length;
           const totalDuration = subjectAudios.reduce((acc, curr) => acc + curr.duration_seconds, 0);
           const latestAudio = subjectAudios[0];
           const SubjectIcon = getSubjectIcon(subject.icon_name);
@@ -943,12 +866,6 @@ export const LibraryTab: React.FC<LibraryTabProps> = ({
                   <h3 className="text-xs font-bold text-slate-950 group-hover:text-amber-600 transition-colors">
                     {subject.name}
                   </h3>
-                  {subjectDueCount > 0 && (
-                    <span className="px-1.5 py-0.2 rounded-full bg-amber-500 text-slate-950 text-[9px] font-bold font-mono flex items-center gap-0.5 shadow-2xs">
-                      <Flame size={9} className="fill-slate-950" />
-                      {subjectDueCount} Due
-                    </span>
-                  )}
                 </div>
 
                 {/* Subtitle / Latest Note Snippet */}
