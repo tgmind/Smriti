@@ -11,7 +11,6 @@ import {
   Zap,
   X,
   ChevronRight,
-  ArrowLeft,
   Atom,
   FlaskConical,
   Dna,
@@ -22,11 +21,32 @@ import {
   FileAudio,
   Check,
   SlidersHorizontal,
-  Cloud
+  Cloud,
+  FolderTree,
+  LayoutGrid,
+  Scissors
 } from 'lucide-react';
 import { AudioItem, Subject, PlaybackState } from '../types';
 import { formatDuration } from '../services/learningEngine';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import {
+  Breadcrumb,
+  BreadcrumbList,
+  BreadcrumbItem,
+  BreadcrumbLink,
+  BreadcrumbPage,
+  BreadcrumbSeparator,
+} from '@/components/ui/breadcrumb';
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+} from '@/components/ui/dropdown-menu';
+import { FileTree } from '@/components/ui/file-tree';
+import { AudioTrimmer } from './AudioTrimmer';
 
 export interface LibraryTabProps {
   audioItems: AudioItem[];
@@ -67,6 +87,8 @@ export const LibraryTab: React.FC<LibraryTabProps> = ({
   const [filterMode, setFilterMode] = useState<FilterMode>('all');
   const [sortMode, setSortMode] = useState<SortMode>('recent');
   const [selectedTopicTag, setSelectedTopicTag] = useState<string | null>(null);
+  const [layoutMode, setLayoutMode] = useState<'folders' | 'tree'>('folders');
+  const [isTrimmingNote, setIsTrimmingNote] = useState(false);
 
   // Selected subject & audio objects
   const selectedSubject = useMemo(
@@ -267,18 +289,39 @@ export const LibraryTab: React.FC<LibraryTabProps> = ({
 
     return (
       <div className="space-y-4 pb-28 pt-3 px-4 max-w-md mx-auto animate-in">
-        {/* Navigation Breadcrumb & Back Header */}
-        <div className="flex items-center justify-between border-b border-slate-200/80 pb-3">
-          <button
-            onClick={handleBackToSubject}
-            className="flex items-center gap-1.5 text-xs font-bold text-slate-700 hover:text-slate-950 transition-colors cursor-pointer group"
-          >
-            <ArrowLeft size={16} className="group-hover:-translate-x-0.5 transition-transform" />
-            <span>Back to {audioSubject?.name || 'Subject'}</span>
-          </button>
+        {/* Navigation Breadcrumb Header */}
+        <div className="flex items-center justify-between border-b border-slate-200/80 pb-2.5">
+          <Breadcrumb>
+            <BreadcrumbList>
+              <BreadcrumbItem>
+                <BreadcrumbLink onClick={handleBackToTopics}>Library</BreadcrumbLink>
+              </BreadcrumbItem>
+              <BreadcrumbSeparator />
+              <BreadcrumbItem>
+                <BreadcrumbLink onClick={handleBackToSubject}>{audioSubject?.name || 'Subject'}</BreadcrumbLink>
+              </BreadcrumbItem>
+              <BreadcrumbSeparator />
+              <BreadcrumbItem>
+                <BreadcrumbPage>{selectedAudio.title}</BreadcrumbPage>
+              </BreadcrumbItem>
+            </BreadcrumbList>
+          </Breadcrumb>
 
-          {/* Quick Actions (Favorite & Offline) */}
-          <div className="flex items-center gap-1.5">
+          {/* Quick Actions (Favorite, Offline, Trim) */}
+          <div className="flex items-center gap-1.5 shrink-0">
+            <button
+              type="button"
+              onClick={() => setIsTrimmingNote(!isTrimmingNote)}
+              className={`p-2 rounded-xl border transition-all cursor-pointer ${
+                isTrimmingNote
+                  ? 'bg-blue-600 border-blue-600 text-white shadow-2xs'
+                  : 'bg-white border-slate-200 text-slate-600 hover:text-slate-900 hover:bg-slate-50'
+              }`}
+              title="Toggle Audio Trimmer"
+            >
+              <Scissors size={14} />
+            </button>
+
             <button
               onClick={() => onToggleFavorite(selectedAudio.id)}
               className={`p-2 rounded-xl border transition-all cursor-pointer ${
@@ -288,7 +331,7 @@ export const LibraryTab: React.FC<LibraryTabProps> = ({
               }`}
               title={selectedAudio.is_favorite ? 'Favorited' : 'Add to Favorites'}
             >
-              <Star size={15} fill={selectedAudio.is_favorite ? 'currentColor' : 'none'} />
+              <Star size={14} fill={selectedAudio.is_favorite ? 'currentColor' : 'none'} />
             </button>
 
             <button
@@ -300,10 +343,20 @@ export const LibraryTab: React.FC<LibraryTabProps> = ({
               }`}
               title={selectedAudio.is_downloaded_offline ? 'Downloaded offline' : 'Download for offline study'}
             >
-              {selectedAudio.is_downloaded_offline ? <CheckCircle2 size={15} /> : <Download size={15} />}
+              {selectedAudio.is_downloaded_offline ? <CheckCircle2 size={14} /> : <Download size={14} />}
             </button>
           </div>
         </div>
+
+        {/* Visual Audio Trimmer Preview */}
+        {isTrimmingNote && (
+          <AudioTrimmer
+            durationSeconds={selectedAudio.duration_seconds}
+            audioUrl={selectedAudio.file_url}
+            waveformPeaks={selectedAudio.waveform_peaks}
+            onTrimChange={() => {}}
+          />
+        )}
 
         {/* Audio Note Header Card */}
         <div className="bg-white border border-slate-200/90 rounded-2xl p-4.5 shadow-2xs space-y-3">
@@ -495,23 +548,51 @@ export const LibraryTab: React.FC<LibraryTabProps> = ({
 
     return (
       <div className="space-y-4 pb-28 pt-3 px-4 max-w-md mx-auto animate-in">
-        {/* Navigation Breadcrumb Header */}
-        <div className="flex items-center justify-between">
-          <button
-            onClick={handleBackToTopics}
-            className="flex items-center gap-1.5 text-xs font-bold text-slate-700 hover:text-slate-950 transition-colors cursor-pointer group"
-          >
-            <ArrowLeft size={16} className="group-hover:-translate-x-0.5 transition-transform" />
-            <span>All Subject Topics</span>
-          </button>
+        {/* Navigation Breadcrumb & Dropdown Subject Switcher */}
+        <div className="flex items-center justify-between border-b border-slate-200/80 pb-2.5">
+          <Breadcrumb>
+            <BreadcrumbList>
+              <BreadcrumbItem>
+                <BreadcrumbLink onClick={handleBackToTopics}>Library</BreadcrumbLink>
+              </BreadcrumbItem>
+              <BreadcrumbSeparator />
+              <BreadcrumbItem>
+                <BreadcrumbPage>{selectedSubject.name}</BreadcrumbPage>
+              </BreadcrumbItem>
+            </BreadcrumbList>
+          </Breadcrumb>
 
-          <button
-            onClick={onGoToRecord}
-            className="py-1 px-2.5 rounded-full bg-slate-950 text-white font-semibold text-[11px] flex items-center gap-1 hover:bg-slate-800 active:scale-95 transition-all shadow-xs cursor-pointer"
-          >
-            <Plus size={13} />
-            <span>Add to {selectedSubject.name}</span>
-          </button>
+          <div className="flex items-center gap-1.5">
+            <DropdownMenu>
+              <DropdownMenuTrigger
+                className="flex items-center gap-1 px-2.5 py-1 rounded-xl bg-white border border-slate-200 text-xs font-semibold text-slate-700 hover:text-slate-950 shadow-2xs hover:bg-slate-50 cursor-pointer"
+              >
+                <span>Switch</span>
+                <ChevronRight size={12} className="rotate-90 text-slate-400" />
+              </DropdownMenuTrigger>
+              <DropdownMenuContent>
+                <DropdownMenuLabel>Jump to Subject</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                {subjects.map(s => (
+                  <DropdownMenuItem
+                    key={s.id}
+                    onClick={() => handleOpenSubject(s.id)}
+                    className={s.id === selectedSubject.id ? 'font-bold bg-blue-50 text-blue-700' : ''}
+                  >
+                    {s.name}
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
+
+            <button
+              onClick={onGoToRecord}
+              className="py-1 px-2.5 rounded-full bg-slate-950 text-white font-semibold text-[11px] flex items-center gap-1 hover:bg-slate-800 active:scale-95 transition-all shadow-xs cursor-pointer"
+            >
+              <Plus size={13} />
+              <span>Record</span>
+            </button>
+          </div>
         </div>
 
         {/* Subject Topic Banner Card (Telegram Style Topic Card) */}
@@ -861,87 +942,124 @@ export const LibraryTab: React.FC<LibraryTabProps> = ({
         </TabsList>
       </Tabs>
 
-      {/* SOFT SAGE CONTAINER FOR SUBJECT FOLDERS (Matching Image 1 Screen 2) */}
+      {/* SOFT SAGE CONTAINER FOR SUBJECT FOLDERS & HIERARCHY TREE */}
       <div className="bg-[#EAF5F0] border border-emerald-150/70 rounded-3xl p-4 space-y-3 shadow-2xs">
         <div className="flex items-center justify-between px-1">
           <div className="flex items-center gap-1.5">
             <span className="text-xs font-bold text-slate-900">
-              Subject Folders
+              {layoutMode === 'tree' ? 'Subject & Lesson Hierarchy' : 'Subject Folders'}
             </span>
           </div>
-          <span className="text-[10px] font-mono font-semibold px-2 py-0.5 rounded-full bg-white/70 text-emerald-900 border border-emerald-200/60">
-            {subjects.length} Topics
-          </span>
+
+          {/* View Mode Toggle: Folders vs File Tree */}
+          <div className="flex items-center gap-1 bg-white/90 p-0.5 rounded-xl border border-emerald-200/80 shadow-2xs">
+            <button
+              type="button"
+              onClick={() => setLayoutMode('folders')}
+              className={`px-2 py-0.5 rounded-lg text-[10px] font-mono font-bold transition-all flex items-center gap-1 cursor-pointer ${
+                layoutMode === 'folders'
+                  ? 'bg-slate-950 text-white shadow-2xs'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              <LayoutGrid size={11} />
+              <span>Folders</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setLayoutMode('tree')}
+              className={`px-2 py-0.5 rounded-lg text-[10px] font-mono font-bold transition-all flex items-center gap-1 cursor-pointer ${
+                layoutMode === 'tree'
+                  ? 'bg-slate-950 text-white shadow-2xs'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              <FolderTree size={11} />
+              <span>File Tree</span>
+            </button>
+          </div>
         </div>
 
-        {/* Clean Subject Folder Cards */}
-        <div className="space-y-2">
-          {subjects.map((subject) => {
-            const subjectAudios = audiosBySubject.get(subject.id) || [];
-            const totalDuration = subjectAudios.reduce((acc, curr) => acc + curr.duration_seconds, 0);
-            const latestAudio = subjectAudios[0];
-            const SubjectIcon = getSubjectIcon(subject.icon_name);
-            const subjectTheme = getSubjectTheme(subject.color_hex);
+        {/* View Option 1: File Tree (Subject -> Lesson -> Concept hierarchy) */}
+        {layoutMode === 'tree' ? (
+          <FileTree
+            subjects={subjects}
+            audioItems={allFilteredAudios}
+            onSelectAudio={handleOpenAudioNote}
+            onSelectSubject={handleOpenSubject}
+            onSelectConcept={(concept) => setSelectedTopicTag(concept)}
+            activeAudioId={playbackState?.currentAudio?.id}
+          />
+        ) : (
+          /* View Option 2: Clean Subject Folder Cards */
+          <div className="space-y-2">
+            {subjects.map((subject) => {
+              const subjectAudios = audiosBySubject.get(subject.id) || [];
+              const totalDuration = subjectAudios.reduce((acc, curr) => acc + curr.duration_seconds, 0);
+              const latestAudio = subjectAudios[0];
+              const SubjectIcon = getSubjectIcon(subject.icon_name);
+              const subjectTheme = getSubjectTheme(subject.color_hex);
 
-            const subjectTerms = Array.from(
-              new Set(subjectAudios.flatMap(a => a.key_terms || []))
-            ).slice(0, 3);
+              const subjectTerms = Array.from(
+                new Set(subjectAudios.flatMap(a => a.key_terms || []))
+              ).slice(0, 3);
 
-            return (
-              <div
-                key={subject.id}
-                onClick={() => handleOpenSubject(subject.id)}
-                className="group bg-white hover:bg-slate-50/90 border border-slate-200/80 rounded-2xl p-3.5 flex items-center justify-between gap-3 transition-all cursor-pointer shadow-2xs hover:shadow-xs active:scale-[0.99]"
-              >
-                {/* Left: Soft Squircle */}
-                <div className={`w-11 h-11 rounded-2xl ${subjectTheme.bg} flex items-center justify-center shrink-0 shadow-2xs group-hover:scale-105 transition-transform`}>
-                  <SubjectIcon size={20} />
-                </div>
-
-                {/* Middle: Subject Title & Details */}
-                <div className="flex-1 min-w-0">
-                  <h3 className="text-xs font-bold text-slate-950 group-hover:text-blue-600 transition-colors">
-                    {subject.name}
-                  </h3>
-                  <p className="text-[11px] text-slate-500 truncate mt-0.5">
-                    {latestAudio
-                      ? `Latest: ${latestAudio.title}`
-                      : subject.description || 'No audio notes recorded yet'}
-                  </p>
-
-                  {subjectTerms.length > 0 && (
-                    <div className="flex items-center gap-1 mt-1 overflow-hidden">
-                      {subjectTerms.map(tag => (
-                        <span
-                          key={tag}
-                          className="text-[9px] font-mono text-slate-400 bg-slate-100 px-1.5 py-0.2 rounded"
-                        >
-                          #{tag}
-                        </span>
-                      ))}
-                    </div>
-                  )}
-                </div>
-
-                {/* Right: File Count & Chevron */}
-                <div className="text-right shrink-0 flex items-center gap-2">
-                  <div>
-                    <span className="text-[10px] font-mono font-bold text-slate-700 bg-slate-100 px-2 py-0.5 rounded-full block">
-                      {subjectAudios.length} {subjectAudios.length === 1 ? 'file' : 'files'}
-                    </span>
-                    <span className="text-[9px] font-mono text-slate-400 block mt-0.5">
-                      {formatDuration(totalDuration)}
-                    </span>
+              return (
+                <div
+                  key={subject.id}
+                  onClick={() => handleOpenSubject(subject.id)}
+                  className="group bg-white hover:bg-slate-50/90 border border-slate-200/80 rounded-2xl p-3.5 flex items-center justify-between gap-3 transition-all cursor-pointer shadow-2xs hover:shadow-xs active:scale-[0.99]"
+                >
+                  {/* Left: Soft Squircle */}
+                  <div className={`w-11 h-11 rounded-2xl ${subjectTheme.bg} flex items-center justify-center shrink-0 shadow-2xs group-hover:scale-105 transition-transform`}>
+                    <SubjectIcon size={20} />
                   </div>
-                  <ChevronRight
-                    size={16}
-                    className="text-slate-300 group-hover:text-slate-600 group-hover:translate-x-0.5 transition-all"
-                  />
+
+                  {/* Middle: Subject Title & Details */}
+                  <div className="flex-1 min-w-0">
+                    <h3 className="text-xs font-bold text-slate-950 group-hover:text-blue-600 transition-colors">
+                      {subject.name}
+                    </h3>
+                    <p className="text-[11px] text-slate-500 truncate mt-0.5">
+                      {latestAudio
+                        ? `Latest: ${latestAudio.title}`
+                        : subject.description || 'No audio notes recorded yet'}
+                    </p>
+
+                    {subjectTerms.length > 0 && (
+                      <div className="flex items-center gap-1 mt-1 overflow-hidden">
+                        {subjectTerms.map(tag => (
+                          <span
+                            key={tag}
+                            className="text-[9px] font-mono text-slate-400 bg-slate-100 px-1.5 py-0.2 rounded"
+                          >
+                            #{tag}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Right: File Count & Chevron */}
+                  <div className="text-right shrink-0 flex items-center gap-2">
+                    <div>
+                      <span className="text-[10px] font-mono font-bold text-slate-700 bg-slate-100 px-2 py-0.5 rounded-full block">
+                        {subjectAudios.length} {subjectAudios.length === 1 ? 'file' : 'files'}
+                      </span>
+                      <span className="text-[9px] font-mono text-slate-400 block mt-0.5">
+                        {formatDuration(totalDuration)}
+                      </span>
+                    </div>
+                    <ChevronRight
+                      size={16}
+                      className="text-slate-300 group-hover:text-slate-600 group-hover:translate-x-0.5 transition-all"
+                    />
+                  </div>
                 </div>
-              </div>
-            );
-          })}
-        </div>
+              );
+            })}
+          </div>
+        )}
       </div>
 
       {/* If Searching: Direct Audio Search Results */}
