@@ -69,7 +69,7 @@ describe('Telegram-Style Compact Player Architecture & UI Design', () => {
     learningModeActive: false
   };
 
-  it('renders Telegram-style compact bar with play state, title, speed badge, and close button', () => {
+  it('renders Telegram-style compact bar with Spotify text hierarchy, speed badge, and mid-separation progress', () => {
     const html = renderToString(
       <MiniPlayer
         playbackState={activePlaybackState}
@@ -83,7 +83,7 @@ describe('Telegram-Style Compact Player Architecture & UI Design', () => {
       />
     );
 
-    // Verify Title & Subject
+    // Verify Title & Subject shifted left with Spotify typography
     expect(html).toContain('percentage to Fraction.mp3');
     expect(html).toContain('Mathematics');
 
@@ -100,8 +100,9 @@ describe('Telegram-Style Compact Player Architecture & UI Design', () => {
     // Verify Queue badge count
     expect(html).toContain('3');
 
-    // Verify Preserved Blue Wave Accent
-    expect(html).toContain('waveGradCompact');
+    // Verify Mid-Separation Audio Progress Bar
+    expect(html).toContain('aria-label="Seek progress bar"');
+    expect(html).toContain('group/midprogress');
   });
 
   it('filters queue to the active audio subject and does not blur background', () => {
@@ -127,7 +128,7 @@ describe('Telegram-Style Compact Player Architecture & UI Design', () => {
     expect(html).toContain('aria-label="Open track menu"');
   });
 
-  it('handles paused state with white play triangle and correct aria-labels', () => {
+  it('handles paused state with correct timecodes and aria-labels in sheet modal', () => {
     const pausedState: PlaybackState = {
       ...activePlaybackState,
       isPlaying: false,
@@ -138,6 +139,7 @@ describe('Telegram-Style Compact Player Architecture & UI Design', () => {
       <MiniPlayer
         playbackState={pausedState}
         audioQueue={mockQueue}
+        initialSheetOpen={true}
         onTogglePlay={vi.fn()}
         onSeek={vi.fn()}
         onSeekRelative={vi.fn()}
@@ -178,11 +180,12 @@ describe('Telegram-Style Compact Player Architecture & UI Design', () => {
     expect(html).toContain('0:55'); // Fallback to currentAudio.duration_seconds
   });
 
-  it('renders with BlueWaveDesign containing waveGradFront to preserve the signature Blue wavy design', () => {
+  it('renders with BlueWaveDesign containing waveGradFront to preserve the signature Blue wavy design in sheet modal', () => {
     const html = renderToString(
       <MiniPlayer
         playbackState={activePlaybackState}
         audioQueue={mockQueue}
+        initialSheetOpen={true}
         onTogglePlay={vi.fn()}
         onSeek={vi.fn()}
         onSeekRelative={vi.fn()}
@@ -194,7 +197,6 @@ describe('Telegram-Style Compact Player Architecture & UI Design', () => {
 
     // Verify waveGradFront is present in the SVG definitions preserving the Blue wavy design
     expect(html).toContain('waveGradFront');
-    expect(html).toContain('waveGradCompact');
   });
 
   it('attaches seamlessly above Navigation in a unified curvy container and transforms record button to contrasting play/pause', () => {
@@ -222,7 +224,8 @@ describe('Telegram-Style Compact Player Architecture & UI Design', () => {
 
     // Verify unified curvy container with rounded-[22px] (not too rounded)
     expect(htmlWithPlayer).toContain('rounded-[22px]');
-    expect(htmlWithPlayer).toContain('border-t border-white/10');
+    // Verify mid separation progress bar is present between compact player and navigation
+    expect(htmlWithPlayer).toContain('aria-label="Seek progress bar"');
     // Verify compact player contents are inside
     expect(htmlWithPlayer).toContain('percentage to Fraction.mp3');
     // Verify navigation tabs are inside

@@ -39,7 +39,7 @@ export const Navigation: React.FC<NavigationProps> = ({
             : 'max-w-xs rounded-full'
         }`}
       >
-        {/* Attached Telegram-Style Compact Player Tier */}
+        {/* Attached Telegram/Spotify-Style Compact Player Tier */}
         {attachedPlayer && (
           <div className="w-full">
             {attachedPlayer}
@@ -47,11 +47,7 @@ export const Navigation: React.FC<NavigationProps> = ({
         )}
 
         {/* Navigation Bar Tier */}
-        <div
-          className={`w-full p-1.5 px-3 flex items-center justify-between transition-colors ${
-            hasPlayer ? 'border-t border-white/10' : ''
-          }`}
-        >
+        <div className="w-full p-1.5 px-3 flex items-center justify-between transition-colors">
           {/* Left Tabs */}
           <div className="flex items-center gap-1">
             {leftTabs.map((tab) => {

@@ -14,10 +14,6 @@ import {
   Download,
   Star,
   CheckCircle2,
-  Atom,
-  Binary,
-  FlaskConical,
-  Dna,
   Sparkles,
   Layers,
   BookOpen
@@ -26,6 +22,7 @@ import { AudioItem, PlaybackState } from '../types';
 import { formatDuration } from '../services/learningEngine';
 import { BlueWaveDesign } from './ui/BlueWaveDesign';
 import { Slider } from './ui/slider';
+import { resolveSubjectVisual } from '../utils/subjectVisuals';
 
 export interface MiniPlayerProps {
   playbackState: PlaybackState;
@@ -46,41 +43,11 @@ export interface MiniPlayerProps {
   onToggleOffline?: (audio: AudioItem) => void;
 }
 
-const getSubjectVisual = (subjectName?: string) => {
-  const name = (subjectName || '').toLowerCase();
-  if (name.includes('phys')) {
-    return {
-      gradient: 'from-sky-500 via-indigo-500 to-blue-600',
-      accentColor: '#0284c7',
-      icon: Atom
-    };
-  }
-  if (name.includes('math')) {
-    return {
-      gradient: 'from-amber-400 via-orange-500 to-amber-600',
-      accentColor: '#d97706',
-      icon: Binary
-    };
-  }
-  if (name.includes('chem')) {
-    return {
-      gradient: 'from-rose-400 via-pink-500 to-rose-600',
-      accentColor: '#e11d48',
-      icon: FlaskConical
-    };
-  }
-  if (name.includes('bio')) {
-    return {
-      gradient: 'from-emerald-400 via-teal-500 to-emerald-600',
-      accentColor: '#059669',
-      icon: Dna
-    };
-  }
-  return {
-    gradient: 'from-cyan-500 via-blue-600 to-indigo-600',
-    accentColor: '#0284c7',
-    icon: Sparkles
-  };
+const getSubjectVisual = (subjectName?: string, subjectId?: string) => {
+  return resolveSubjectVisual({
+    subjectId,
+    subjectName
+  });
 };
 
 export const MiniPlayer: React.FC<MiniPlayerProps> = ({
@@ -154,7 +121,7 @@ export const MiniPlayer: React.FC<MiniPlayerProps> = ({
   const currentDisplayPos = scrubPosition !== null ? scrubPosition : safePosition;
   const progressPercent = Math.min(100, Math.max(0, (currentDisplayPos / safeDuration) * 100));
 
-  const visual = getSubjectVisual(currentAudio.subject_name);
+  const visual = getSubjectVisual(currentAudio.subject_name, currentAudio.subject_id);
   const SubjectIcon = visual.icon;
 
   // Telegram-style Subject Architecture: Filter queue by the particular subject
@@ -653,97 +620,49 @@ export const MiniPlayer: React.FC<MiniPlayerProps> = ({
   return (
     <>
       {/* ─────────────────────────────────────────────────────────────
-          1. TELEGRAM-STYLE COMPACT PLAYER BAR
+          1. TELEGRAM/SPOTIFY-STYLE COMPACT PLAYER BAR
           Attached beautifully right above the bottom navigation bar
           in the same curvy design (not too rounded corners)
          ───────────────────────────────────────────────────────────── */}
       <div className="w-full select-none pointer-events-auto transition-all duration-200">
         <div className="w-full relative group bg-slate-950/95 text-white">
-          {/* Top Interactive Progress Scrubber Line */}
-          <div
-            className="w-full bg-white/10 hover:bg-white/20 h-1 cursor-pointer relative group/scrubber transition-colors"
-            title="Tap or drag to seek"
-            onMouseMove={handleScrubberMouseMove}
-            onMouseLeave={() => setHoverTime(null)}
-            onClick={(e) => {
-              const rect = e.currentTarget.getBoundingClientRect();
-              const pct = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
-              handleSeekInternal(pct * safeDuration);
-            }}
-          >
-            <div
-              className="bg-[#24A1DE] h-full transition-[width] duration-100"
-              style={{ width: `${progressPercent}%` }}
-            />
-
-            {/* Hover Scrub Tooltip */}
-            {hoverTime && (
-              <div
-                className="absolute -top-6 -translate-x-1/2 rounded bg-slate-900 px-1.5 py-0.5 text-[9px] font-mono text-white pointer-events-none z-30 shadow-xs border border-white/10"
-                style={{ left: `${hoverTime.x}px` }}
-              >
-                {hoverTime.time}
-              </div>
-            )}
-
-            {/* Hover thumb */}
-            <div
-              className="absolute top-1/2 -translate-y-1/2 size-2 rounded-full bg-[#24A1DE] opacity-0 group-hover/scrubber:opacity-100 transition-opacity pointer-events-none -translate-x-1/2 shadow-xs"
-              style={{ left: `${progressPercent}%` }}
-            />
-          </div>
-
-          {/* Main Bar Content */}
-          <div className="py-2 px-3 flex items-center justify-between gap-2.5">
-            {/* Left: Telegram-Style Circular Blue Play/Pause Button */}
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                onTogglePlay();
-              }}
-              className={`size-9 rounded-full text-white active:scale-90 transition-transform shadow-xs flex items-center justify-center shrink-0 cursor-pointer ${
-                isPlaying
-                  ? 'bg-slate-800 hover:bg-slate-700 shadow-slate-900/30'
-                  : 'bg-[#24A1DE] hover:bg-[#1a8bc4] shadow-[#24A1DE]/30'
-              }`}
-              aria-label={isPlaying ? 'Pause' : 'Play'}
-              title={isPlaying ? 'Pause audio' : 'Play audio'}
-            >
-              {isPlaying ? (
-                <div className="flex items-end justify-center gap-0.75 h-3.5 w-3.5">
-                  <span className="w-0.75 bg-white rounded-full animate-eq-1" />
-                  <span className="w-0.75 bg-white rounded-full animate-eq-2" />
-                  <span className="w-0.75 bg-white rounded-full animate-eq-3" />
-                </div>
-              ) : (
-                <Play size={14} fill="currentColor" className="translate-x-0.5 text-white" />
-              )}
-            </button>
-
-            {/* Center: Track Metadata & Title (Tap to expand Telegram sheet) */}
+          {/* Main Bar Content: Spotify-Style Typography & Left-Shifted Layout */}
+          <div className="pl-4 pr-3 py-2.5 flex items-center justify-between gap-3">
+            {/* Left: Track Metadata & Title (Shifted to left with decent margin padding) */}
             <div
               className="flex-1 min-w-0 cursor-pointer group/title flex flex-col justify-center"
               onClick={() => setIsSheetOpen(true)}
               title="Tap to view playlist and full player"
             >
-              <div className="flex items-center gap-1.5 min-w-0">
-                <h4 className="text-xs font-bold text-white truncate leading-tight group-hover/title:text-[#24A1DE] transition-colors">
+              <div className="flex items-center gap-2 min-w-0">
+                <h4 className="text-[13px] sm:text-[13.5px] font-semibold text-white truncate leading-tight group-hover/title:text-sky-300 transition-colors tracking-tight">
                   {currentAudio.title}
                 </h4>
+                {isPlaying && (
+                  <span
+                    className="inline-flex items-end gap-0.5 h-2.5 w-2.5 shrink-0 text-sky-400 mb-0.5"
+                    title="Playing"
+                    aria-hidden="true"
+                  >
+                    <span className="w-0.5 bg-sky-400 rounded-full animate-eq-1 h-full" />
+                    <span className="w-0.5 bg-sky-400 rounded-full animate-eq-2 h-2/3" />
+                    <span className="w-0.5 bg-sky-400 rounded-full animate-eq-3 h-4/5" />
+                  </span>
+                )}
               </div>
 
-              <div className="flex items-center gap-1.5 text-[10px] text-slate-400 font-medium leading-none mt-1">
-                <span className="text-sky-300 font-semibold truncate">
+              <div className="flex items-center gap-1.5 text-[11px] text-zinc-400 font-medium leading-none mt-1">
+                <span className="text-zinc-300 font-medium truncate">
                   {currentAudio.subject_name || 'Academic Audio'}
                 </span>
-                <span className="text-slate-600">•</span>
-                <span className="font-mono text-slate-400 shrink-0">
-                  {formatDuration(safePosition)} / {formatDuration(safeDuration)}
+                <span className="text-zinc-600 font-bold">•</span>
+                <span className="font-mono text-zinc-400 text-[10.5px] tracking-tight shrink-0">
+                  {formatDuration(currentDisplayPos)} / {formatDuration(safeDuration)}
                 </span>
               </div>
             </div>
 
-            {/* Right Action Cluster: Telegram Speed Pill + Queue Expand + Dismiss */}
+            {/* Right Action Cluster: Speed Pill + Queue Expand + Dismiss */}
             <div className="flex items-center gap-1.5 shrink-0">
               {/* Telegram-style Speed Pill (1X, 1.25X, 1.5X, 2X) */}
               {onCycleSpeed && (
@@ -752,7 +671,7 @@ export const MiniPlayer: React.FC<MiniPlayerProps> = ({
                     e.stopPropagation();
                     onCycleSpeed();
                   }}
-                  className="px-2 py-0.5 rounded-lg border border-[#24A1DE]/40 bg-[#24A1DE]/15 hover:bg-[#24A1DE]/25 text-sky-300 font-mono text-[10px] font-bold active:scale-90 transition-all cursor-pointer shadow-2xs"
+                  className="px-2 py-0.5 rounded-lg border border-sky-400/30 bg-sky-500/10 hover:bg-sky-500/20 text-sky-300 font-mono text-[10px] font-bold active:scale-90 transition-all cursor-pointer shadow-2xs"
                   title="Cycle playback speed"
                   aria-label={`Playback speed ${playbackSpeed}x`}
                 >
@@ -766,7 +685,7 @@ export const MiniPlayer: React.FC<MiniPlayerProps> = ({
                   e.stopPropagation();
                   setIsSheetOpen(true);
                 }}
-                className="size-7 rounded-full text-slate-300 hover:text-white hover:bg-white/10 flex items-center justify-center active:scale-90 transition-all cursor-pointer relative"
+                className="size-7 rounded-full text-zinc-400 hover:text-white hover:bg-white/10 flex items-center justify-center active:scale-90 transition-all cursor-pointer relative"
                 title={`Open ${currentAudio.subject_name || 'subject'} playlist (${activeSubjectQueue.length} notes)`}
                 aria-label="Open playlist queue"
               >
@@ -785,7 +704,7 @@ export const MiniPlayer: React.FC<MiniPlayerProps> = ({
                     e.stopPropagation();
                     onDismiss();
                   }}
-                  className="size-7 rounded-full text-slate-400 hover:text-rose-400 hover:bg-rose-500/20 flex items-center justify-center active:scale-90 transition-all cursor-pointer"
+                  className="size-7 rounded-full text-zinc-400 hover:text-rose-400 hover:bg-rose-500/20 flex items-center justify-center active:scale-90 transition-all cursor-pointer"
                   title="Close player"
                   aria-label="Close and dismiss player"
                 >
@@ -795,8 +714,45 @@ export const MiniPlayer: React.FC<MiniPlayerProps> = ({
             </div>
           </div>
 
-          {/* Preserve the Blue Wavy Design: Subtle bottom micro-wave accent */}
-          <BlueWaveDesign variant="compact" isPlaying={isPlaying} />
+          {/* Mid Separation of Navigation and Compact Player: Aesthetic Audio Progress Bar */}
+          <div
+            className="w-full relative py-1 cursor-pointer group/midprogress select-none"
+            title="Tap or drag along mid separation to seek"
+            aria-label="Seek progress bar"
+            role="slider"
+            aria-valuenow={Math.round(currentDisplayPos)}
+            aria-valuemin={0}
+            aria-valuemax={Math.round(safeDuration)}
+            onMouseMove={handleScrubberMouseMove}
+            onMouseLeave={() => setHoverTime(null)}
+            onClick={(e) => {
+              const rect = e.currentTarget.getBoundingClientRect();
+              const pct = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+              handleSeekInternal(pct * safeDuration);
+            }}
+          >
+            {/* Base Track (Subtle dark separation line) */}
+            <div className="relative w-full h-[2.5px] group-hover/midprogress:h-[3.5px] bg-white/[0.08] transition-all overflow-visible">
+              {/* Luminous Gradient Progress Fill */}
+              <div
+                className="h-full bg-gradient-to-r from-sky-400 via-[#24A1DE] to-cyan-300 relative shadow-[0_0_8px_rgba(56,189,248,0.5)] transition-[width] duration-100"
+                style={{ width: `${progressPercent}%` }}
+              >
+                {/* Scrubber Pin / Glowing Bead on the leading edge */}
+                <div className="absolute right-0 top-1/2 -translate-y-1/2 translate-x-1/2 size-2 bg-white rounded-full shadow-[0_0_6px_rgba(56,189,248,0.9)] opacity-0 group-hover/midprogress:opacity-100 transition-opacity pointer-events-none" />
+              </div>
+            </div>
+
+            {/* Hover Time Tooltip */}
+            {hoverTime && (
+              <div
+                className="absolute -top-6 -translate-x-1/2 rounded bg-slate-900/95 backdrop-blur-sm px-1.5 py-0.5 text-[9px] font-mono text-sky-300 pointer-events-none z-30 shadow-md border border-white/10"
+                style={{ left: `${hoverTime.x}px` }}
+              >
+                {hoverTime.time}
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
