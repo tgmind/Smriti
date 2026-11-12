@@ -655,12 +655,13 @@ export const MiniPlayer: React.FC<MiniPlayerProps> = ({
       {/* ─────────────────────────────────────────────────────────────
           1. TELEGRAM-STYLE COMPACT PLAYER BAR
           Attached beautifully right above the bottom navigation bar
+          in the same curvy design (not too rounded corners)
          ───────────────────────────────────────────────────────────── */}
-      <div className="w-full max-w-md mx-auto select-none pointer-events-auto transition-all duration-200">
-        <div className="bg-white/95 backdrop-blur-xl border border-slate-200/90 shadow-[0_8px_24px_rgba(0,0,0,0.08)] rounded-2xl overflow-hidden relative group hover:border-slate-300">
+      <div className="w-full select-none pointer-events-auto transition-all duration-200">
+        <div className="w-full relative group bg-slate-950/95 text-white">
           {/* Top Interactive Progress Scrubber Line */}
           <div
-            className="w-full bg-slate-100 hover:bg-slate-200/80 h-1 cursor-pointer relative group/scrubber transition-colors"
+            className="w-full bg-white/10 hover:bg-white/20 h-1 cursor-pointer relative group/scrubber transition-colors"
             title="Tap or drag to seek"
             onMouseMove={handleScrubberMouseMove}
             onMouseLeave={() => setHoverTime(null)}
@@ -678,7 +679,7 @@ export const MiniPlayer: React.FC<MiniPlayerProps> = ({
             {/* Hover Scrub Tooltip */}
             {hoverTime && (
               <div
-                className="absolute -top-6 -translate-x-1/2 rounded bg-slate-900 px-1.5 py-0.5 text-[9px] font-mono text-white pointer-events-none z-30 shadow-xs"
+                className="absolute -top-6 -translate-x-1/2 rounded bg-slate-900 px-1.5 py-0.5 text-[9px] font-mono text-white pointer-events-none z-30 shadow-xs border border-white/10"
                 style={{ left: `${hoverTime.x}px` }}
               >
                 {hoverTime.time}
@@ -702,8 +703,8 @@ export const MiniPlayer: React.FC<MiniPlayerProps> = ({
               }}
               className={`size-9 rounded-full text-white active:scale-90 transition-transform shadow-xs flex items-center justify-center shrink-0 cursor-pointer ${
                 isPlaying
-                  ? 'bg-slate-950 hover:bg-slate-900 shadow-slate-900/20'
-                  : 'bg-[#24A1DE] hover:bg-[#1a8bc4] shadow-[#24A1DE]/25'
+                  ? 'bg-slate-800 hover:bg-slate-700 shadow-slate-900/30'
+                  : 'bg-[#24A1DE] hover:bg-[#1a8bc4] shadow-[#24A1DE]/30'
               }`}
               aria-label={isPlaying ? 'Pause' : 'Play'}
               title={isPlaying ? 'Pause audio' : 'Play audio'}
@@ -726,17 +727,17 @@ export const MiniPlayer: React.FC<MiniPlayerProps> = ({
               title="Tap to view playlist and full player"
             >
               <div className="flex items-center gap-1.5 min-w-0">
-                <h4 className="text-xs font-bold text-slate-900 truncate leading-tight group-hover/title:text-[#24A1DE] transition-colors">
+                <h4 className="text-xs font-bold text-white truncate leading-tight group-hover/title:text-[#24A1DE] transition-colors">
                   {currentAudio.title}
                 </h4>
               </div>
 
-              <div className="flex items-center gap-1.5 text-[10px] text-slate-500 font-medium leading-none mt-1">
-                <span className="text-slate-700 font-semibold truncate">
+              <div className="flex items-center gap-1.5 text-[10px] text-slate-400 font-medium leading-none mt-1">
+                <span className="text-sky-300 font-semibold truncate">
                   {currentAudio.subject_name || 'Academic Audio'}
                 </span>
-                <span className="text-slate-300">•</span>
-                <span className="font-mono text-slate-500 shrink-0">
+                <span className="text-slate-600">•</span>
+                <span className="font-mono text-slate-400 shrink-0">
                   {formatDuration(safePosition)} / {formatDuration(safeDuration)}
                 </span>
               </div>
@@ -751,7 +752,7 @@ export const MiniPlayer: React.FC<MiniPlayerProps> = ({
                     e.stopPropagation();
                     onCycleSpeed();
                   }}
-                  className="px-2 py-0.5 rounded-lg border border-[#24A1DE]/40 bg-sky-50 hover:bg-sky-100 text-[#24A1DE] font-mono text-[10px] font-bold active:scale-90 transition-all cursor-pointer shadow-2xs"
+                  className="px-2 py-0.5 rounded-lg border border-[#24A1DE]/40 bg-[#24A1DE]/15 hover:bg-[#24A1DE]/25 text-sky-300 font-mono text-[10px] font-bold active:scale-90 transition-all cursor-pointer shadow-2xs"
                   title="Cycle playback speed"
                   aria-label={`Playback speed ${playbackSpeed}x`}
                 >
@@ -765,7 +766,7 @@ export const MiniPlayer: React.FC<MiniPlayerProps> = ({
                   e.stopPropagation();
                   setIsSheetOpen(true);
                 }}
-                className="size-7 rounded-full text-slate-500 hover:text-[#24A1DE] hover:bg-sky-50 flex items-center justify-center active:scale-90 transition-all cursor-pointer relative"
+                className="size-7 rounded-full text-slate-300 hover:text-white hover:bg-white/10 flex items-center justify-center active:scale-90 transition-all cursor-pointer relative"
                 title={`Open ${currentAudio.subject_name || 'subject'} playlist (${activeSubjectQueue.length} notes)`}
                 aria-label="Open playlist queue"
               >
@@ -784,7 +785,7 @@ export const MiniPlayer: React.FC<MiniPlayerProps> = ({
                     e.stopPropagation();
                     onDismiss();
                   }}
-                  className="size-7 rounded-full text-slate-400 hover:text-rose-600 hover:bg-rose-50 flex items-center justify-center active:scale-90 transition-all cursor-pointer"
+                  className="size-7 rounded-full text-slate-400 hover:text-rose-400 hover:bg-rose-500/20 flex items-center justify-center active:scale-90 transition-all cursor-pointer"
                   title="Close player"
                   aria-label="Close and dismiss player"
                 >

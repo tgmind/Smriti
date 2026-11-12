@@ -1,14 +1,17 @@
 import * as React from 'react';
 import {
   ChevronRight,
-  Folder as FolderIcon,
-  FolderOpen as FolderOpenIcon,
-  FileAudio,
-  Hash,
-  Play
+  Play,
+  Pause,
+  Atom,
+  FlaskConical,
+  Dna,
+  Binary,
+  BookOpen,
+  Music2,
+  CheckCircle2
 } from 'lucide-react';
 import { Collapsible, CollapsibleTrigger, CollapsibleContent } from '@/components/ui/collapsible';
-import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { formatDuration } from '@/services/learningEngine';
 import { Subject, AudioItem } from '@/types';
@@ -47,24 +50,35 @@ export function FileTree({
     return map;
   }, [subjects, audioItems]);
 
+  const totalAudios = audioItems.length;
+
   return (
     <div
       data-slot="file-tree"
       className={cn(
-        'w-full space-y-1.5 rounded-3xl bg-white border border-slate-200/80 p-3 shadow-2xs text-xs select-none',
+        'w-full space-y-2.5 rounded-3xl bg-white border border-slate-200/80 p-3 sm:p-4 shadow-2xs select-none',
         className
       )}
     >
-      <div className="flex items-center justify-between px-2 py-1 text-[10px] font-mono font-bold uppercase tracking-wider text-slate-400 border-b border-slate-100 mb-1">
-        <span>Study Catalog Tree</span>
-        <span>Subject / Lesson / Concept</span>
+      {/* Apple Music Style Catalog Header */}
+      <div className="flex items-center justify-between px-1 pb-1 border-b border-slate-100">
+        <div className="flex items-center gap-1.5">
+          <Music2 size={13} className="text-slate-400" />
+          <span className="text-[11px] font-bold uppercase tracking-wider text-slate-700">
+            Catalog By Subject
+          </span>
+        </div>
+        <span className="text-[10px] font-mono text-slate-400">
+          {totalAudios} {totalAudios === 1 ? 'track' : 'tracks'}
+        </span>
       </div>
 
-      <div className="space-y-1">
+      {/* Subject Sections */}
+      <div className="space-y-2">
         {subjects.map((subject) => {
           const subjectAudios = audiosBySubject.get(subject.id) || [];
           return (
-            <SubjectFolderNode
+            <SubjectSection
               key={subject.id}
               subject={subject}
               audios={subjectAudios}
@@ -82,9 +96,9 @@ export function FileTree({
 }
 
 // ---------------------------------------------------------------------------
-// 1. SUBJECT FOLDER (Collapsible)
+// SUBJECT SECTION (Apple Music Artist / Album Style Group)
 // ---------------------------------------------------------------------------
-interface SubjectFolderNodeProps {
+interface SubjectSectionProps {
   subject: Subject;
   audios: AudioItem[];
   onSelectAudio: (audio: AudioItem) => void;
@@ -94,7 +108,7 @@ interface SubjectFolderNodeProps {
   defaultOpen?: boolean;
 }
 
-function SubjectFolderNode({
+function SubjectSection({
   subject,
   audios,
   onSelectAudio,
@@ -102,191 +116,216 @@ function SubjectFolderNode({
   onSelectConcept,
   activeAudioId,
   defaultOpen = true
-}: SubjectFolderNodeProps) {
+}: SubjectSectionProps) {
   const [isOpen, setIsOpen] = React.useState(defaultOpen);
+
+  const getSubjectIcon = (iconName: string) => {
+    switch (iconName) {
+      case 'Atom': return Atom;
+      case 'FlaskConical': return FlaskConical;
+      case 'Dna': return Dna;
+      case 'Binary': return Binary;
+      default: return BookOpen;
+    }
+  };
+
+  const getSubjectBadge = (colorHex: string) => {
+    switch (colorHex) {
+      case '#38bdf8':
+      case '#3b82f6':
+        return {
+          icon: 'bg-sky-50 text-sky-600 border-sky-200/80',
+          count: 'bg-sky-50 text-sky-700 border-sky-200/60'
+        };
+      case '#f59e0b':
+        return {
+          icon: 'bg-amber-50 text-amber-600 border-amber-200/80',
+          count: 'bg-amber-50 text-amber-700 border-amber-200/60'
+        };
+      case '#10b981':
+        return {
+          icon: 'bg-emerald-50 text-emerald-600 border-emerald-200/80',
+          count: 'bg-emerald-50 text-emerald-700 border-emerald-200/60'
+        };
+      case '#a855f7':
+        return {
+          icon: 'bg-purple-50 text-purple-600 border-purple-200/80',
+          count: 'bg-purple-50 text-purple-700 border-purple-200/60'
+        };
+      default:
+        return {
+          icon: 'bg-slate-100 text-slate-700 border-slate-200',
+          count: 'bg-slate-100 text-slate-700 border-slate-200'
+        };
+    }
+  };
+
+  const SubjectIcon = getSubjectIcon(subject.icon_name);
+  const subjectTheme = getSubjectBadge(subject.color_hex);
+  const totalDuration = audios.reduce((acc, curr) => acc + curr.duration_seconds, 0);
 
   return (
     <Collapsible
       open={isOpen}
       onOpenChange={setIsOpen}
-      className="group/folder rounded-2xl transition-colors hover:bg-slate-50/70"
+      className="group/section rounded-2xl border border-slate-200/70 bg-white overflow-hidden transition-all shadow-2xs hover:border-slate-300"
     >
-      <div className="flex items-center justify-between pr-2">
+      {/* Subject Header Row */}
+      <div className="flex items-center justify-between p-2.5 sm:p-3 bg-slate-50/50 hover:bg-slate-50 transition-colors">
         <CollapsibleTrigger
-          className="flex-1 flex items-center gap-2 py-2 px-2.5 rounded-xl text-left font-bold text-slate-900 transition-colors hover:text-blue-700 cursor-pointer"
+          className="flex-1 flex items-center gap-2.5 text-left cursor-pointer min-w-0"
         >
+          <div className={cn('w-9 h-9 rounded-xl flex items-center justify-center shrink-0 border shadow-2xs transition-transform group-hover/section:scale-105', subjectTheme.icon)}>
+            <SubjectIcon size={18} />
+          </div>
+
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-bold text-slate-900 truncate">
+                {subject.name}
+              </span>
+              <span className={cn('text-[10px] font-mono font-semibold px-2 py-0.2 rounded-full border shrink-0', subjectTheme.count)}>
+                {audios.length} {audios.length === 1 ? 'lesson' : 'lessons'}
+              </span>
+            </div>
+            <span className="text-[10px] font-mono text-slate-400 block mt-0.5">
+              {formatDuration(totalDuration)} total
+            </span>
+          </div>
+
           <ChevronRight
             size={14}
             className={cn(
-              'text-slate-400 transition-transform duration-200 shrink-0',
-              isOpen && 'rotate-90 text-blue-600'
+              'text-slate-400 transition-transform duration-200 shrink-0 mr-1',
+              isOpen && 'rotate-90 text-slate-700'
             )}
           />
-          {isOpen ? (
-            <FolderOpenIcon size={16} className="text-amber-500 shrink-0" />
-          ) : (
-            <FolderIcon size={16} className="text-amber-500 shrink-0" />
-          )}
-          <span className="truncate">{subject.name}</span>
-          <span className="text-[10px] font-mono font-bold text-slate-400 bg-slate-100 px-1.5 py-0.2 rounded-full shrink-0">
-            {audios.length}
-          </span>
         </CollapsibleTrigger>
 
         {onSelectSubject && (
-          <Button
-            variant="ghost"
-            size="sm"
+          <button
+            type="button"
             onClick={(e) => {
               e.stopPropagation();
               onSelectSubject(subject.id);
             }}
-            className="text-[10px] font-mono text-slate-400 hover:text-slate-900 h-6 px-1.5 rounded-md"
+            className="text-[11px] font-semibold text-blue-600 hover:text-blue-800 hover:bg-blue-50 px-2 py-1 rounded-lg transition-colors cursor-pointer shrink-0 ml-1.5"
           >
             Open
-          </Button>
+          </button>
         )}
       </div>
 
-      <CollapsibleContent className="pl-6 pr-1 pb-1 space-y-1">
-        {audios.length === 0 ? (
-          <p className="text-[11px] text-slate-400 italic py-1 pl-4">
-            No audio lessons in this subject.
-          </p>
-        ) : (
-          audios.map((audio) => (
-            <LessonNode
-              key={audio.id}
-              audio={audio}
-              onSelectAudio={onSelectAudio}
-              onSelectConcept={onSelectConcept}
-              isActive={activeAudioId === audio.id}
-              defaultExpanded={defaultOpen}
-            />
-          ))
-        )}
+      {/* Apple Music Style Tracklist */}
+      <CollapsibleContent>
+        <div className="border-t border-slate-100 divide-y divide-slate-100/90 bg-white">
+          {audios.length === 0 ? (
+            <div className="py-3 px-4 text-center text-xs text-slate-400 italic">
+              No audio lessons recorded in {subject.name} yet.
+            </div>
+          ) : (
+            audios.map((audio, index) => {
+              const isActive = activeAudioId === audio.id;
+              const trackNum = String(index + 1).padStart(2, '0');
+              const concepts: string[] = audio.key_terms || [];
+
+              return (
+                <div
+                  key={audio.id}
+                  onClick={() => onSelectAudio(audio)}
+                  className={cn(
+                    'group/track flex items-center justify-between gap-3 px-3 py-2.5 transition-colors cursor-pointer',
+                    isActive ? 'bg-blue-50/70' : 'hover:bg-slate-50/80'
+                  )}
+                >
+                  {/* Left: Track Index or Playing Indicator */}
+                  <div className="w-5 text-center shrink-0">
+                    {isActive ? (
+                      <span className="flex items-center justify-center text-blue-600 animate-pulse">
+                        <span className="w-2 h-2 rounded-full bg-blue-600" />
+                      </span>
+                    ) : (
+                      <span className="text-[11px] font-mono text-slate-400 font-medium group-hover/track:text-slate-700">
+                        {trackNum}
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Middle: Title, Offline Badge & Concepts */}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <h4
+                        className={cn(
+                          'text-xs font-semibold truncate',
+                          isActive
+                            ? 'text-blue-900 font-bold'
+                            : 'text-slate-900 group-hover/track:text-blue-600 transition-colors'
+                        )}
+                      >
+                        {audio.title}
+                      </h4>
+                      {audio.is_downloaded_offline && (
+                        <span className="inline-flex items-center gap-0.5 px-1.5 py-0.2 rounded text-[8px] font-mono font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 shrink-0">
+                          <CheckCircle2 size={8} /> OFFLINE
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Apple Music Style Subtitle: Duration + Concepts */}
+                    <div className="flex items-center gap-1.5 text-[10px] text-slate-400 font-mono mt-0.5 truncate">
+                      <span className="shrink-0">{formatDuration(audio.duration_seconds)}</span>
+                      {concepts.length > 0 && (
+                        <>
+                          <span className="text-slate-300">•</span>
+                          <span className="truncate text-slate-500 font-sans">
+                            {concepts.map((concept, cIdx) => (
+                              <span
+                                key={cIdx}
+                                onClick={(e) => {
+                                  if (onSelectConcept) {
+                                    e.stopPropagation();
+                                    onSelectConcept(concept, audio);
+                                  }
+                                }}
+                                className="hover:text-blue-600 hover:underline cursor-pointer"
+                              >
+                                {cIdx > 0 ? ' · ' : ''}
+                                {concept}
+                              </span>
+                            ))}
+                          </span>
+                        </>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Right: Circular Apple Music Play Button */}
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onSelectAudio(audio);
+                    }}
+                    aria-label={`Play ${audio.title}`}
+                    className={cn(
+                      'w-7 h-7 rounded-full flex items-center justify-center shrink-0 transition-transform active:scale-90 shadow-2xs cursor-pointer',
+                      isActive
+                        ? 'bg-amber-500 text-slate-950 ring-2 ring-amber-400/30'
+                        : 'bg-slate-950 hover:bg-slate-800 text-white'
+                    )}
+                  >
+                    {isActive ? (
+                      <Pause size={10} fill="currentColor" />
+                    ) : (
+                      <Play size={10} fill="currentColor" className="translate-x-0.5" />
+                    )}
+                  </button>
+                </div>
+              );
+            })
+          )}
+        </div>
       </CollapsibleContent>
     </Collapsible>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// 2. LESSON / AUDIO NODE (Collapsible or Button)
-// ---------------------------------------------------------------------------
-interface LessonNodeProps {
-  audio: AudioItem;
-  onSelectAudio: (audio: AudioItem) => void;
-  onSelectConcept?: (concept: string, audio?: AudioItem) => void;
-  isActive?: boolean;
-  defaultExpanded?: boolean;
-}
-
-function LessonNode({
-  audio,
-  onSelectAudio,
-  onSelectConcept,
-  isActive = false,
-  defaultExpanded = true
-}: LessonNodeProps) {
-  const [isOpen, setIsOpen] = React.useState(defaultExpanded || isActive);
-  const concepts: string[] = audio.key_terms || [];
-  const hasConcepts = concepts.length > 0;
-
-  return (
-    <div
-      className={cn(
-        'rounded-xl border transition-all duration-150',
-        isActive
-          ? 'bg-blue-50/70 border-blue-200 text-blue-950 shadow-2xs'
-          : 'bg-white border-slate-100 hover:border-slate-200 text-slate-800'
-      )}
-    >
-      <div className="flex items-center justify-between p-1.5 pl-2 gap-2">
-        {/* Toggle concepts trigger if has concepts */}
-        {hasConcepts ? (
-          <button
-            type="button"
-            onClick={() => setIsOpen(!isOpen)}
-            className="p-1 text-slate-400 hover:text-slate-700 transition-transform cursor-pointer shrink-0"
-            title="Expand concepts"
-          >
-            <ChevronRight
-              size={12}
-              className={cn(
-                'transition-transform duration-150',
-                isOpen && 'rotate-90 text-blue-600'
-              )}
-            />
-          </button>
-        ) : (
-          <span className="w-4 shrink-0" />
-        )}
-
-        <FileAudio
-          size={14}
-          className={cn(
-            'shrink-0',
-            isActive ? 'text-blue-600' : 'text-slate-400'
-          )}
-        />
-
-        {/* Title click -> select/open audio */}
-        <div
-          onClick={() => onSelectAudio(audio)}
-          className="flex-1 min-w-0 cursor-pointer group"
-        >
-          <div className="flex items-center gap-1.5 flex-wrap">
-            <h4
-              className={cn(
-                'text-xs font-semibold truncate',
-                isActive
-                  ? 'text-blue-900 font-bold'
-                  : 'text-slate-900 group-hover:text-blue-600 transition-colors'
-              )}
-            >
-              {audio.title}
-            </h4>
-            {audio.is_downloaded_offline && (
-              <span className="px-1 py-0.2 rounded text-[8px] font-mono font-bold bg-emerald-50 text-emerald-700 border border-emerald-200 shrink-0">
-                OFFLINE
-              </span>
-            )}
-          </div>
-          <span className="text-[10px] font-mono text-slate-400 block -mt-0.5">
-            {formatDuration(audio.duration_seconds)}
-          </span>
-        </div>
-
-        {/* Action Button: Play */}
-        <button
-          type="button"
-          onClick={() => onSelectAudio(audio)}
-          aria-label={`Play ${audio.title}`}
-          className="w-7 h-7 rounded-full bg-slate-950 hover:bg-slate-800 text-white flex items-center justify-center shrink-0 transition-all active:scale-90 shadow-2xs cursor-pointer"
-        >
-          <Play size={10} fill="currentColor" className="translate-x-0.5" />
-        </button>
-      </div>
-
-      {/* 3. CONCEPTS LIST (Nested Under Lesson) */}
-      {hasConcepts && isOpen && (
-        <div className="pl-7 pr-2 pb-2 pt-1 border-t border-slate-100 flex flex-wrap gap-1 bg-slate-50/50 rounded-b-xl animate-in fade-in duration-100">
-          <span className="text-[9px] font-mono text-slate-400 uppercase tracking-wider block w-full mb-0.5">
-            Concepts Covered:
-          </span>
-          {concepts.map((concept, idx) => (
-            <button
-              key={idx}
-              type="button"
-              onClick={() => onSelectConcept?.(concept, audio)}
-              className="inline-flex items-center gap-0.5 px-2 py-0.5 rounded-md bg-white border border-slate-200 hover:border-blue-300 hover:bg-blue-50 text-[10px] font-mono text-slate-700 hover:text-blue-800 transition-all cursor-pointer active:scale-95 shadow-2xs"
-            >
-              <Hash size={10} className="text-slate-400" />
-              <span>{concept}</span>
-            </button>
-          ))}
-        </div>
-      )}
-    </div>
   );
 }

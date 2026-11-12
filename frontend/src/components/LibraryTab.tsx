@@ -157,7 +157,7 @@ export const LibraryTab: React.FC<LibraryTabProps> = ({
     switch (colorHex) {
       case '#38bdf8': // Sky blue (Physics)
         return {
-          bg: 'bg-sky-50 text-sky-700',
+          bg: 'bg-gradient-to-br from-sky-50 to-sky-100/80 text-sky-600',
           border: 'border-sky-200/80',
           activeBg: 'bg-sky-500 text-white',
           badge: 'bg-sky-100 text-sky-800 border-sky-200',
@@ -167,7 +167,7 @@ export const LibraryTab: React.FC<LibraryTabProps> = ({
         };
       case '#f59e0b': // Amber (Chemistry)
         return {
-          bg: 'bg-amber-50 text-amber-700',
+          bg: 'bg-gradient-to-br from-amber-50 to-amber-100/80 text-amber-600',
           border: 'border-amber-200/80',
           activeBg: 'bg-amber-500 text-slate-950',
           badge: 'bg-amber-100 text-amber-800 border-amber-200',
@@ -177,7 +177,7 @@ export const LibraryTab: React.FC<LibraryTabProps> = ({
         };
       case '#10b981': // Emerald (Biology)
         return {
-          bg: 'bg-emerald-50 text-emerald-700',
+          bg: 'bg-gradient-to-br from-emerald-50 to-emerald-100/80 text-emerald-600',
           border: 'border-emerald-200/80',
           activeBg: 'bg-emerald-600 text-white',
           badge: 'bg-emerald-100 text-emerald-800 border-emerald-200',
@@ -187,7 +187,7 @@ export const LibraryTab: React.FC<LibraryTabProps> = ({
         };
       case '#a855f7': // Purple (Mathematics)
         return {
-          bg: 'bg-purple-50 text-purple-700',
+          bg: 'bg-gradient-to-br from-purple-50 to-purple-100/80 text-purple-600',
           border: 'border-purple-200/80',
           activeBg: 'bg-purple-600 text-white',
           badge: 'bg-purple-100 text-purple-800 border-purple-200',
@@ -197,7 +197,7 @@ export const LibraryTab: React.FC<LibraryTabProps> = ({
         };
       default:
         return {
-          bg: 'bg-slate-100 text-slate-700',
+          bg: 'bg-gradient-to-br from-slate-50 to-slate-100/80 text-slate-700',
           border: 'border-slate-200',
           activeBg: 'bg-slate-900 text-white',
           badge: 'bg-slate-100 text-slate-800 border-slate-200',
@@ -954,45 +954,48 @@ export const LibraryTab: React.FC<LibraryTabProps> = ({
         </TabsList>
       </Tabs>
 
-      {/* SOFT SAGE CONTAINER FOR SUBJECT FOLDERS & HIERARCHY TREE */}
-      <div className="bg-[#EAF5F0] border border-emerald-150/70 rounded-3xl p-4 space-y-3 shadow-2xs">
+      {/* APPLE MUSIC STYLE SUBJECT LIBRARY CONTAINER */}
+      <div className="bg-slate-50/70 border border-slate-200/80 rounded-3xl p-3.5 sm:p-4 space-y-3 shadow-2xs">
         <div className="flex items-center justify-between px-1">
           <div className="flex items-center gap-1.5">
-            <span className="text-xs font-bold text-slate-900">
-              {layoutMode === 'tree' ? 'Subject & Lesson Hierarchy' : 'Subject Folders'}
+            <span className="text-xs font-bold uppercase tracking-wider text-slate-700">
+              {layoutMode === 'tree' ? 'Catalog Tracklist' : 'Subjects'}
+            </span>
+            <span className="text-[11px] font-mono text-slate-400 font-medium">
+              ({subjects.length})
             </span>
           </div>
 
           {/* View Mode Toggle: Folders vs File Tree */}
-          <div className="flex items-center gap-1 bg-white/90 p-0.5 rounded-xl border border-emerald-200/80 shadow-2xs">
+          <div className="flex items-center gap-0.5 bg-slate-200/60 p-0.5 rounded-xl border border-slate-200/70">
             <button
               type="button"
               onClick={() => setLayoutMode('folders')}
-              className={`px-2 py-0.5 rounded-lg text-[10px] font-mono font-bold transition-all flex items-center gap-1 cursor-pointer ${
+              className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold transition-all flex items-center gap-1.5 cursor-pointer ${
                 layoutMode === 'folders'
-                  ? 'bg-slate-950 text-white shadow-2xs'
-                  : 'text-slate-600 hover:text-slate-900'
+                  ? 'bg-white text-slate-950 shadow-xs'
+                  : 'text-slate-500 hover:text-slate-900'
               }`}
             >
-              <LayoutGrid size={11} />
-              <span>Folders</span>
+              <LayoutGrid size={12} />
+              <span>Cards</span>
             </button>
             <button
               type="button"
               onClick={() => setLayoutMode('tree')}
-              className={`px-2 py-0.5 rounded-lg text-[10px] font-mono font-bold transition-all flex items-center gap-1 cursor-pointer ${
+              className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold transition-all flex items-center gap-1.5 cursor-pointer ${
                 layoutMode === 'tree'
-                  ? 'bg-slate-950 text-white shadow-2xs'
-                  : 'text-slate-600 hover:text-slate-900'
+                  ? 'bg-white text-slate-950 shadow-xs'
+                  : 'text-slate-500 hover:text-slate-900'
               }`}
             >
-              <FolderTree size={11} />
-              <span>File Tree</span>
+              <FolderTree size={12} />
+              <span>Catalog</span>
             </button>
           </div>
         </div>
 
-        {/* View Option 1: File Tree (Subject -> Lesson -> Concept hierarchy) */}
+        {/* View Option 1: File Tree (Apple Music Tracklist hierarchy) */}
         {layoutMode === 'tree' ? (
           <FileTree
             subjects={subjects}
@@ -1003,7 +1006,7 @@ export const LibraryTab: React.FC<LibraryTabProps> = ({
             activeAudioId={playbackState?.currentAudio?.id}
           />
         ) : (
-          /* View Option 2: Clean Subject Folder Cards */
+          /* View Option 2: Clean Minimalist Subject Cards (Apple Music Style) */
           <div className="space-y-2">
             {subjects.map((subject) => {
               const subjectAudios = audiosBySubject.get(subject.id) || [];
@@ -1012,60 +1015,41 @@ export const LibraryTab: React.FC<LibraryTabProps> = ({
               const SubjectIcon = getSubjectIcon(subject.icon_name);
               const subjectTheme = getSubjectTheme(subject.color_hex);
 
-              const subjectTerms = Array.from(
-                new Set(subjectAudios.flatMap(a => a.key_terms || []))
-              ).slice(0, 3);
-
               return (
                 <div
                   key={subject.id}
                   onClick={() => handleOpenSubject(subject.id)}
-                  className="group bg-white hover:bg-slate-50/90 border border-slate-200/80 rounded-2xl p-3.5 flex items-center justify-between gap-3 transition-all cursor-pointer shadow-2xs hover:shadow-xs active:scale-[0.99]"
+                  className="group bg-white hover:bg-slate-50/90 border border-slate-200/80 hover:border-slate-300 rounded-2xl p-3.5 flex items-center justify-between gap-3.5 transition-all cursor-pointer shadow-2xs hover:shadow-xs active:scale-[0.99]"
                 >
-                  {/* Left: Soft Squircle */}
-                  <div className={`w-11 h-11 rounded-2xl ${subjectTheme.bg} flex items-center justify-center shrink-0 shadow-2xs group-hover:scale-105 transition-transform`}>
-                    <SubjectIcon size={20} />
+                  {/* Left: Apple Music Style Squircle Medallion */}
+                  <div className={`w-12 h-12 rounded-2xl ${subjectTheme.bg} flex items-center justify-center shrink-0 shadow-2xs group-hover:scale-105 transition-transform border ${subjectTheme.border}`}>
+                    <SubjectIcon size={22} />
                   </div>
 
-                  {/* Middle: Subject Title & Details */}
+                  {/* Middle: Subject Title & Clean Metadata */}
                   <div className="flex-1 min-w-0">
-                    <h3 className="text-xs font-bold text-slate-950 group-hover:text-blue-600 transition-colors">
-                      {subject.name}
-                    </h3>
-                    <p className="text-[11px] text-slate-500 truncate mt-0.5">
-                      {latestAudio
-                        ? `Latest: ${latestAudio.title}`
-                        : subject.description || 'No audio notes recorded yet'}
+                    <div className="flex items-center gap-2">
+                      <h3 className="text-sm font-bold text-slate-950 group-hover:text-blue-600 transition-colors truncate">
+                        {subject.name}
+                      </h3>
+                    </div>
+                    <p className="text-xs text-slate-500 mt-0.5 truncate font-normal">
+                      {subjectAudios.length > 0
+                        ? `${subjectAudios.length} ${subjectAudios.length === 1 ? 'lesson' : 'lessons'} · ${formatDuration(totalDuration)}`
+                        : 'No recordings yet'}
                     </p>
-
-                    {subjectTerms.length > 0 && (
-                      <div className="flex items-center gap-1 mt-1 overflow-hidden">
-                        {subjectTerms.map(tag => (
-                          <span
-                            key={tag}
-                            className="text-[9px] font-mono text-slate-400 bg-slate-100 px-1.5 py-0.2 rounded"
-                          >
-                            #{tag}
-                          </span>
-                        ))}
-                      </div>
+                    {latestAudio && (
+                      <p className="text-[11px] text-slate-400 truncate mt-0.5">
+                        Recent: <span className="text-slate-600 font-medium">{latestAudio.title}</span>
+                      </p>
                     )}
                   </div>
 
-                  {/* Right: File Count & Chevron */}
-                  <div className="text-right shrink-0 flex items-center gap-2">
-                    <div>
-                      <span className="text-[10px] font-mono font-bold text-slate-700 bg-slate-100 px-2 py-0.5 rounded-full block">
-                        {subjectAudios.length} {subjectAudios.length === 1 ? 'file' : 'files'}
-                      </span>
-                      <span className="text-[9px] font-mono text-slate-400 block mt-0.5">
-                        {formatDuration(totalDuration)}
-                      </span>
+                  {/* Right: Sleek Apple Music Action / Chevron */}
+                  <div className="flex items-center gap-2 shrink-0">
+                    <div className="w-8 h-8 rounded-full bg-slate-50 border border-slate-100 group-hover:bg-slate-950 group-hover:text-white group-hover:border-slate-950 text-slate-400 flex items-center justify-center transition-all shadow-2xs">
+                      <ChevronRight size={15} className="group-hover:translate-x-0.5 transition-transform" />
                     </div>
-                    <ChevronRight
-                      size={16}
-                      className="text-slate-300 group-hover:text-slate-600 group-hover:translate-x-0.5 transition-all"
-                    />
                   </div>
                 </div>
               );

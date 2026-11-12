@@ -1,6 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { renderToString } from 'react-dom/server';
 import { MiniPlayer } from '../MiniPlayer';
+import { Navigation } from '../Navigation';
 import { AudioItem, PlaybackState } from '../../types';
 
 describe('Telegram-Style Compact Player Architecture & UI Design', () => {
@@ -194,5 +195,35 @@ describe('Telegram-Style Compact Player Architecture & UI Design', () => {
     // Verify waveGradFront is present in the SVG definitions preserving the Blue wavy design
     expect(html).toContain('waveGradFront');
     expect(html).toContain('waveGradCompact');
+  });
+
+  it('attaches seamlessly above Navigation in a unified curvy container with rounded-[22px]', () => {
+    const html = renderToString(
+      <Navigation
+        currentTab="home"
+        onSelectTab={vi.fn()}
+        attachedPlayer={
+          <MiniPlayer
+            playbackState={activePlaybackState}
+            audioQueue={mockQueue}
+            onTogglePlay={vi.fn()}
+            onSeek={vi.fn()}
+            onSeekRelative={vi.fn()}
+            onOpenFullScreen={vi.fn()}
+            onCycleSpeed={vi.fn()}
+            onDismiss={vi.fn()}
+          />
+        }
+      />
+    );
+
+    // Verify unified curvy container with rounded-[22px] (not too rounded)
+    expect(html).toContain('rounded-[22px]');
+    expect(html).toContain('border-t border-white/10');
+    // Verify compact player contents are inside
+    expect(html).toContain('percentage to Fraction.mp3');
+    // Verify navigation tabs are inside
+    expect(html).toContain('aria-label="Home"');
+    expect(html).toContain('aria-label="Record Audio Note"');
   });
 });

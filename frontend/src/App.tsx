@@ -592,33 +592,31 @@ export const App: React.FC = () => {
         />
       )}
 
-      {/* Telegram-Style Compact Player Attached Beautifully Above Bottom Navigation Bar */}
-      {!isFullScreenPlayerOpen && playbackState.currentAudio && (
-        <div className="fixed bottom-[74px] sm:bottom-[78px] left-0 right-0 z-30 px-3 max-w-md mx-auto pointer-events-none animate-in slide-in-from-bottom-2 duration-200">
-          <MiniPlayer
-            playbackState={playbackState}
-            audioQueue={audioItems}
-            onTogglePlay={handleTogglePlay}
-            onSeek={handleSeek}
-            onSeekRelative={handleSeekRelative}
-            onOpenFullScreen={() => setIsFullScreenPlayerOpen(true)}
-            onCycleSpeed={handleCycleSpeed}
-            onSetSpeed={handleSetSpeed}
-            onDismiss={handleDismissPlayer}
-            onSelectTrack={handlePlayAudio}
-            onNextTrack={() => handleNextTrack(true)}
-            onPreviousTrack={() => handlePreviousTrack(true)}
-            onToggleRepeat={handleToggleRepeat}
-            onToggleFavorite={handleToggleFavorite}
-            onToggleOffline={handleToggleOffline}
-          />
-        </div>
-      )}
-
-      {/* Bottom Navigation */}
+      {/* Bottom Navigation with Beautifully Attached Telegram-Style Compact Player */}
       <Navigation
         currentTab={currentTab}
         onSelectTab={setCurrentTab}
+        attachedPlayer={
+          !isFullScreenPlayerOpen && playbackState.currentAudio ? (
+            <MiniPlayer
+              playbackState={playbackState}
+              audioQueue={audioItems}
+              onTogglePlay={handleTogglePlay}
+              onSeek={handleSeek}
+              onSeekRelative={handleSeekRelative}
+              onOpenFullScreen={() => setIsFullScreenPlayerOpen(true)}
+              onCycleSpeed={handleCycleSpeed}
+              onSetSpeed={handleSetSpeed}
+              onDismiss={handleDismissPlayer}
+              onSelectTrack={handlePlayAudio}
+              onNextTrack={() => handleNextTrack(true)}
+              onPreviousTrack={() => handlePreviousTrack(true)}
+              onToggleRepeat={handleToggleRepeat}
+              onToggleFavorite={handleToggleFavorite}
+              onToggleOffline={handleToggleOffline}
+            />
+          ) : undefined
+        }
       />
     </div>
   );
