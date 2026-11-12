@@ -14,6 +14,13 @@
       "sourceType": "github",
       "skillPath": "skills/anidoodle/SKILL.md",
       "computedHash": "c21f84b51da3a2f853352df3641c0b9f67381fe8507e1530799e36f54200e863"
+    },
+    "github-ops": {
+      "source": "affaan-m/ECC",
+      "ref": "main",
+      "sourceType": "github",
+      "skillPath": "skills/github-ops/SKILL.md",
+      "computedHash": "a56848f0b4ef06634b132dd807c0b4f0cce3af495743e8540365e39b9b88597d"
     }
   }
 }
