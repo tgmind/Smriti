@@ -123,6 +123,7 @@ export interface StorageOverview {
 }
 
 export interface UserSettings {
+  display_name?: string;
   daily_listening_goal_minutes: number;
   default_playback_speed: number;
   auto_rewind_seconds: number;

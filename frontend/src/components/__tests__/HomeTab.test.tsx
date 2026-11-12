@@ -87,6 +87,13 @@ describe('HomeTab Component - 3 Tabs & Google Drive Attachments Architecture', (
     // 5. Verify Subject Carousel and Continue Listening
     expect(html).toContain('Subject Folders');
     expect(html).toContain('Continue Listening');
+
+    // 6. Verify restored top header with user profile greeting & brand hero
+    expect(html).toContain('Hi, Scholar');
+    expect(html).toContain('Offline-First Vault • Ready to Study');
+    expect(html).toContain('Save With Smriti');
+    expect(html).toContain('Your offline-first personal audio study vault.');
+    expect(html).toContain('Search audio notes, subjects, concepts...');
   });
 
   it('renders Google Drive tab with shadcn Attachment components when transfers occur', () => {

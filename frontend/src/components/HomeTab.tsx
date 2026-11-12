@@ -83,6 +83,7 @@ export const HomeTab: React.FC<HomeTabProps> = ({
   recentAudio,
   subjects = [],
   playbackState,
+  userSettings,
   isDriveConnected = false,
   onConnectDrive,
   onSyncToDrive,
@@ -294,58 +295,79 @@ export const HomeTab: React.FC<HomeTabProps> = ({
 
   return (
     <div className="space-y-4 pb-28 pt-2 px-3">
-      {/* Search & Header Bar */}
-      <div className="space-y-2">
+      {/* Search & Restored User Greeting Header Bar */}
+      <div className="space-y-3 pt-1">
+        {/* Row 1: Profile & Greeting with Notification Bell */}
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-full bg-slate-900 text-white flex items-center justify-center font-bold text-xs shadow-xs">
+          <div className="flex items-center gap-3">
+            {/* Mint Circle Avatar */}
+            <div
+              onClick={onNavigateToAccount}
+              className="size-10.5 rounded-full bg-[#A7F3D0]/60 border border-[#34D399]/40 text-[#065F46] flex items-center justify-center font-bold text-sm shadow-2xs hover:scale-105 active:scale-95 transition-all cursor-pointer"
+              title="View Account Profile"
+            >
               स्म
             </div>
+
+            {/* Greeting & Vault Status */}
             <div>
-              <h1 className="text-sm font-bold text-slate-900 tracking-tight leading-none">
-                SMRITI
-              </h1>
-              <p className="text-[10px] text-slate-500 font-mono mt-0.5">
-                Spaced Active Recall Studio
+              <div className="flex items-center gap-1.5">
+                <span className="text-sm font-bold text-slate-900 tracking-tight">
+                  {`Hi, ${userSettings?.display_name || googleDriveService.getUserProfile()?.name || 'Scholar'}`}
+                </span>
+                <span className="size-2 rounded-full bg-[#10B981] inline-block" />
+              </div>
+              <p className="text-[11px] text-slate-500 font-medium">
+                Offline-First Vault • Ready to Study
               </p>
             </div>
           </div>
 
-          <div className="flex items-center gap-1.5">
-            <button
-              onClick={() => setShowNotificationToast(true)}
-              className="p-2 rounded-xl bg-white border border-slate-200/80 text-slate-600 hover:text-slate-900 hover:bg-slate-50 shadow-2xs transition-all cursor-pointer relative"
-              title="Daily Revision Reminders"
-            >
-              <Bell size={16} />
-              <span className="absolute top-1 right-1 w-2 h-2 rounded-full bg-emerald-500" />
-            </button>
-            <button
-              onClick={onNavigateToAccount}
-              className="p-2 rounded-xl bg-white border border-slate-200/80 text-slate-600 hover:text-slate-900 hover:bg-slate-50 shadow-2xs transition-all cursor-pointer"
-              title="Account & Sovereign Drive Settings"
-            >
-              <SlidersHorizontal size={16} />
-            </button>
-          </div>
+          {/* Notification Bell Button */}
+          <button
+            onClick={() => setShowNotificationToast(true)}
+            className="size-10 rounded-full bg-white border border-slate-200/80 text-slate-700 hover:text-slate-950 hover:bg-slate-50 shadow-2xs transition-all active:scale-90 flex items-center justify-center relative cursor-pointer"
+            title="Daily Revision Reminders"
+          >
+            <Bell size={17} />
+            <span className="absolute top-2 right-2.5 size-2 rounded-full bg-[#10B981]" />
+          </button>
         </div>
 
-        {/* Search Bar */}
-        <div className="relative">
+        {/* Row 2: Hero Brand Title & Tagline */}
+        <div className="pt-0.5 space-y-0.5">
+          <h2 className="text-2xl font-black text-slate-950 tracking-tight leading-tight">
+            Save With Smriti
+          </h2>
+          <p className="text-xs text-slate-500 font-medium">
+            Your offline-first personal audio study vault.
+          </p>
+        </div>
+
+        {/* Row 3: Search Bar with Filters icon */}
+        <div className="relative pt-0.5">
           <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 size-4 text-slate-400" />
           <input
             type="text"
-            placeholder="Search audio notes, subjects, formulas..."
+            placeholder="Search audio notes, subjects, concepts..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-9.5 pr-8 py-2.5 rounded-2xl bg-white border border-slate-200/80 text-xs text-slate-800 placeholder:text-slate-400 shadow-2xs focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-400 transition-all"
+            className="w-full pl-9.5 pr-9 py-2.5 rounded-2xl bg-white border border-slate-200/80 text-xs text-slate-800 placeholder:text-slate-400 shadow-2xs focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-400 transition-all"
           />
-          {searchQuery && (
+          {searchQuery ? (
             <button
               onClick={() => setSearchQuery('')}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-0.5"
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-0.5 cursor-pointer"
             >
               <X size={14} />
+            </button>
+          ) : (
+            <button
+              onClick={onNavigateToAccount}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700 p-0.5 cursor-pointer"
+              title="Filter & Settings"
+            >
+              <SlidersHorizontal size={15} />
             </button>
           )}
         </div>
@@ -609,19 +631,19 @@ export const HomeTab: React.FC<HomeTabProps> = ({
             {/* Tab 1: Most Played */}
             <TabsTrigger
               value="most-played"
-              className="flex items-center justify-center gap-1.5 text-xs rounded-xl"
+              className="flex items-center justify-center gap-1 px-1 text-[11px] rounded-xl font-bold whitespace-nowrap"
             >
               <Flame className="size-3.5 text-amber-500 fill-amber-500 shrink-0" />
-              <span className="font-semibold truncate">Most Played</span>
+              <span>Most Played</span>
             </TabsTrigger>
 
             {/* Tab 2: Favs */}
             <TabsTrigger
               value="favorites"
-              className="flex items-center justify-center gap-1 text-xs rounded-xl"
+              className="flex items-center justify-center gap-1 px-1 text-[11px] rounded-xl font-bold whitespace-nowrap"
             >
               <Star className="size-3.5 text-amber-500 shrink-0" />
-              <span className="font-semibold truncate">Favs</span>
+              <span>Favs</span>
               {favoriteAudio.length > 0 && (
                 <span className="text-[10px] font-mono font-bold px-1.5 py-0.2 rounded-full bg-slate-200/70 text-slate-700">
                   {favoriteAudio.length}
@@ -632,17 +654,17 @@ export const HomeTab: React.FC<HomeTabProps> = ({
             {/* Tab 3: Drive (Default when uploading/downloading) */}
             <TabsTrigger
               value="drive"
-              className="flex items-center justify-center gap-1.5 text-xs rounded-xl relative"
+              className="flex items-center justify-center gap-1 px-1 text-[11px] rounded-xl font-bold whitespace-nowrap relative"
             >
               <Cloud className="size-3.5 text-sky-600 shrink-0" />
-              <span className="font-semibold truncate">Drive</span>
+              <span>Drive</span>
               {hasActiveTransfers ? (
-                <span className="flex h-2 w-2 relative">
+                <span className="flex h-2 w-2 relative shrink-0">
                   <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-sky-400 opacity-75" />
                   <span className="relative inline-flex rounded-full h-2 w-2 bg-sky-500" />
                 </span>
               ) : (
-                <span className="text-[9px] font-mono font-bold px-1.5 py-0.2 rounded-full bg-sky-100 text-sky-700">
+                <span className="text-[9px] font-mono font-bold px-1.5 py-0.2 rounded-full bg-sky-100 text-sky-700 shrink-0">
                   Sync
                 </span>
               )}
