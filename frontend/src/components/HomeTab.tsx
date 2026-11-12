@@ -23,6 +23,7 @@ import {
 } from 'lucide-react';
 import { AudioItem, Subject, UserSettings, PlaybackState } from '../types';
 import { formatDuration } from '../services/learningEngine';
+import { BlueWaveDesign } from './ui/BlueWaveDesign';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   Carousel,
@@ -62,7 +63,7 @@ export const HomeTab: React.FC<HomeTabProps> = ({
   const [showNotificationToast, setShowNotificationToast] = useState(false);
 
   const autoplayPlugin = useRef(
-    Autoplay({ delay: 2800, stopOnInteraction: false, stopOnMouseEnter: true })
+    Autoplay({ delay: 2400, stopOnInteraction: false, stopOnMouseEnter: true })
   );
 
   // Fallback to most recent or first audio note for "Continue Listening"
@@ -270,7 +271,7 @@ export const HomeTab: React.FC<HomeTabProps> = ({
       </div>
 
       {/* Hero Container: Animated Horizontal Moving Subject Carousel */}
-      <div className="bg-[#EEECFE] border border-indigo-150/70 rounded-3xl p-4 space-y-3 shadow-2xs relative overflow-hidden">
+      <div className="bg-[#EEECFE] border border-indigo-150/70 rounded-3xl p-4 sm:p-5 space-y-3.5 shadow-2xs relative overflow-hidden">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <span className="text-xs font-bold text-slate-900">
@@ -289,36 +290,37 @@ export const HomeTab: React.FC<HomeTabProps> = ({
           </button>
         </div>
 
-        {/* Horizontal Moving Animated Subject Carousel (Embla Carousel) */}
+        {/* Horizontal Moving Animated Subject Carousel (Embla Carousel with Bigger Cards) */}
         <div className="relative px-0.5">
           <Carousel
             opts={{
               align: 'start',
               loop: true,
+              dragFree: false
             }}
             plugins={[
               autoplayPlugin.current
             ]}
             className="w-full"
           >
-            <CarouselContent className="-ml-2.5">
+            <CarouselContent className="-ml-3">
               {subjectList.map((subj) => {
                 const Icon = subj.icon;
                 return (
-                  <CarouselItem key={subj.id} className="pl-2.5 basis-[38%] sm:basis-[28%]">
+                  <CarouselItem key={subj.id} className="pl-3 basis-[47%] sm:basis-[33%] md:basis-[25%]">
                     <button
                       type="button"
                       onClick={() => onNavigateToLibrary(subj.id)}
-                      className={`w-full flex flex-col items-center gap-1.5 p-3 rounded-2xl bg-white/95 hover:bg-white border border-white/80 hover:border-indigo-300 transition-all text-center cursor-pointer shadow-xs hover:shadow-md hover:-translate-y-0.5 active:scale-95 group ${subj.activeRing}`}
+                      className={`w-full flex flex-col items-center justify-between p-3.5 py-4 rounded-3xl bg-white/95 hover:bg-white border border-white hover:border-indigo-300 transition-all duration-300 text-center cursor-pointer shadow-xs hover:shadow-md hover:-translate-y-1 active:scale-95 group ${subj.activeRing}`}
                     >
-                      <div className={`size-11 rounded-full ${subj.bg} flex items-center justify-center shadow-2xs transition-transform group-hover:scale-110`}>
-                        <Icon size={20} strokeWidth={2.2} />
+                      <div className={`size-13 rounded-2xl ${subj.bg} flex items-center justify-center shadow-xs transition-transform duration-300 group-hover:scale-110 group-hover:rotate-2`}>
+                        <Icon size={24} strokeWidth={2.2} />
                       </div>
-                      <div className="w-full text-center">
-                        <span className="text-xs font-bold text-slate-900 block truncate leading-tight">
+                      <div className="w-full text-center mt-2.5">
+                        <span className="text-sm font-bold text-slate-900 block truncate leading-tight">
                           {subj.fullName || subj.name}
                         </span>
-                        <span className="text-[10px] text-slate-500 font-mono font-medium block truncate mt-0.5">
+                        <span className="text-[10px] text-slate-500 font-mono font-semibold block truncate mt-1 bg-slate-100/80 py-0.5 px-2 rounded-full border border-slate-200/40">
                           {subj.count}
                         </span>
                       </div>
@@ -331,15 +333,6 @@ export const HomeTab: React.FC<HomeTabProps> = ({
             <CarouselPrevious className="hidden sm:flex -left-2.5 size-7 bg-white/90 shadow-sm" />
             <CarouselNext className="hidden sm:flex -right-2.5 size-7 bg-white/90 shadow-sm" />
           </Carousel>
-        </div>
-
-        <div className="pt-0.5 flex items-center justify-between text-[10px] font-mono text-indigo-900/70 font-semibold px-1">
-          <span>{recentAudio.length} Audio Notes</span>
-          <span className="flex items-center gap-1 text-indigo-900 font-bold">
-            <span className="size-1.5 rounded-full bg-indigo-500 animate-pulse" />
-            Animated Carousel
-          </span>
-          <span>4 Structured Subject Hierarchies</span>
         </div>
       </div>
 
@@ -356,25 +349,25 @@ export const HomeTab: React.FC<HomeTabProps> = ({
         const cardProgressPercent = Math.min(100, Math.max(0, (currentPos / continueDuration) * 100));
 
         return (
-          <div className="bg-gradient-to-br from-slate-900 to-slate-950 text-white rounded-3xl p-4.5 space-y-3 shadow-md border border-slate-800">
+          <div className="bg-gradient-to-br from-white via-sky-50/50 to-blue-50/30 text-slate-900 rounded-3xl p-4.5 space-y-3 shadow-xs border border-sky-200/80 relative overflow-hidden group">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <span className={`w-2 h-2 rounded-full ${isCurrentAudioPlaying ? 'bg-emerald-400 animate-pulse' : 'bg-amber-400'}`} />
-                <span className="text-[11px] font-bold uppercase tracking-wider text-slate-300">
+                <span className={`w-2 h-2 rounded-full ${isCurrentAudioPlaying ? 'bg-[#24A1DE] animate-pulse' : 'bg-amber-400'}`} />
+                <span className="text-[11px] font-bold uppercase tracking-wider text-slate-700">
                   {isCurrentAudioPlaying ? 'Currently Playing' : 'Continue Listening'}
                 </span>
               </div>
-              <span className="text-[10px] font-mono text-slate-400">
+              <span className="text-[10px] font-mono text-slate-500 font-semibold">
                 {formatDuration(continueDuration)}
               </span>
             </div>
 
-            <div className="flex items-center justify-between gap-3">
+            <div className="flex items-center justify-between gap-3 relative z-10">
               <div className="flex-1 min-w-0">
-                <span className="text-[10px] font-mono font-bold uppercase text-emerald-400 block tracking-wider">
+                <span className="text-[10px] font-mono font-bold uppercase text-[#24A1DE] block tracking-wider">
                   {continueAudio.subject_name || 'Academic'}
                 </span>
-                <h3 className="text-xs font-bold text-white truncate mt-0.5">
+                <h3 className="text-xs font-bold text-slate-900 truncate mt-0.5">
                   {continueAudio.title}
                 </h3>
               </div>
@@ -382,10 +375,14 @@ export const HomeTab: React.FC<HomeTabProps> = ({
               <button
                 onClick={() => onPlayAudio(continueAudio)}
                 aria-label={isCurrentAudioPlaying ? `Pause ${continueAudio.title}` : `Play ${continueAudio.title}`}
-                className="w-11 h-11 rounded-full bg-emerald-500 hover:bg-emerald-400 text-slate-950 flex items-center justify-center transition-all active:scale-95 shadow-md shadow-emerald-500/20 shrink-0 cursor-pointer"
+                className="size-11 rounded-full bg-[#24A1DE] hover:bg-[#1f8fca] text-white flex items-center justify-center transition-all active:scale-95 shadow-md shadow-[#24A1DE]/25 shrink-0 cursor-pointer"
               >
                 {isCurrentAudioPlaying ? (
-                  <Pause size={17} fill="currentColor" />
+                  <div className="flex items-end justify-center gap-0.75 h-4 w-4">
+                    <span className="w-0.75 bg-white rounded-full animate-eq-1" />
+                    <span className="w-0.75 bg-white rounded-full animate-eq-2" />
+                    <span className="w-0.75 bg-white rounded-full animate-eq-3" />
+                  </div>
                 ) : (
                   <Play size={17} fill="currentColor" className="translate-x-0.5" />
                 )}
@@ -393,9 +390,9 @@ export const HomeTab: React.FC<HomeTabProps> = ({
             </div>
 
             {/* Interactive, Smooth Scrubbable Seek Bar */}
-            <div className="pt-0.5 space-y-1.5">
+            <div className="pt-0.5 space-y-1.5 relative z-10">
               <div
-                className="relative w-full bg-slate-800 hover:bg-slate-700/80 h-2 rounded-full overflow-hidden cursor-pointer group transition-colors"
+                className="relative w-full bg-slate-200/80 hover:bg-slate-300/80 h-2 rounded-full overflow-hidden cursor-pointer group transition-colors"
                 title="Tap or drag to seek"
                 onClick={(e) => {
                   if (!onSeek) return;
@@ -405,15 +402,18 @@ export const HomeTab: React.FC<HomeTabProps> = ({
                 }}
               >
                 <div
-                  className="bg-gradient-to-r from-emerald-500 to-teal-400 h-full rounded-full transition-all duration-150"
+                  className="bg-gradient-to-r from-sky-400 to-[#24A1DE] h-full rounded-full transition-all duration-150"
                   style={{ width: `${cardProgressPercent}%` }}
                 />
               </div>
-              <div className="flex justify-between text-[10px] font-mono text-slate-400">
+              <div className="flex justify-between text-[10px] font-mono text-slate-500 font-medium">
                 <span>{formatDuration(currentPos)}</span>
                 <span>{formatDuration(continueDuration)}</span>
               </div>
             </div>
+
+            {/* Preserved Signature Blue Wavy Design Accent */}
+            <BlueWaveDesign variant="compact" isPlaying={isCurrentAudioPlaying} className="absolute bottom-0 left-0 right-0 z-0 opacity-50" />
           </div>
         );
       })()}

@@ -1,16 +1,43 @@
 import React, { useState } from 'react';
-import { Play, Pause, X, Atom, Binary, FlaskConical, Dna, Sparkles } from 'lucide-react';
-import { PlaybackState } from '../types';
+import {
+  Play,
+  Pause,
+  X,
+  ChevronDown,
+  SkipBack,
+  SkipForward,
+  Repeat,
+  Repeat1,
+  MoreVertical,
+  ListMusic,
+  Download,
+  Atom,
+  Binary,
+  FlaskConical,
+  Dna,
+  Sparkles
+} from 'lucide-react';
+import { AudioItem, PlaybackState } from '../types';
 import { formatDuration } from '../services/learningEngine';
+import { BlueWaveDesign } from './ui/BlueWaveDesign';
+import { Slider } from './ui/slider';
 
-interface MiniPlayerProps {
+export interface MiniPlayerProps {
   playbackState: PlaybackState;
+  audioQueue?: AudioItem[];
   onTogglePlay: () => void;
   onSeek?: (seconds: number) => void;
   onSeekRelative: (seconds: number) => void;
   onOpenFullScreen: () => void;
   onCycleSpeed?: () => void;
+  onSetSpeed?: (speed: number) => void;
   onDismiss?: () => void;
+  onSelectTrack?: (audio: AudioItem) => void;
+  onNextTrack?: () => void;
+  onPreviousTrack?: () => void;
+  onToggleRepeat?: () => void;
+  onToggleFavorite?: (audioId: string) => void;
+  onToggleOffline?: (audio: AudioItem) => void;
 }
 
 const getSubjectVisual = (subjectName?: string) => {
@@ -18,65 +45,95 @@ const getSubjectVisual = (subjectName?: string) => {
   if (name.includes('phys')) {
     return {
       gradient: 'from-sky-500 via-indigo-500 to-blue-600',
-      shadow: 'shadow-sky-500/25',
+      accentColor: '#0284c7',
       icon: Atom
     };
   }
   if (name.includes('math')) {
     return {
       gradient: 'from-amber-400 via-orange-500 to-amber-600',
-      shadow: 'shadow-amber-500/25',
+      accentColor: '#d97706',
       icon: Binary
     };
   }
   if (name.includes('chem')) {
     return {
       gradient: 'from-rose-400 via-pink-500 to-rose-600',
-      shadow: 'shadow-rose-500/25',
+      accentColor: '#e11d48',
       icon: FlaskConical
     };
   }
   if (name.includes('bio')) {
     return {
       gradient: 'from-emerald-400 via-teal-500 to-emerald-600',
-      shadow: 'shadow-emerald-500/25',
+      accentColor: '#059669',
       icon: Dna
     };
   }
   return {
     gradient: 'from-cyan-500 via-blue-600 to-indigo-600',
-    shadow: 'shadow-blue-500/25',
+    accentColor: '#0284c7',
     icon: Sparkles
   };
 };
 
 export const MiniPlayer: React.FC<MiniPlayerProps> = ({
   playbackState,
+  audioQueue = [],
   onTogglePlay,
   onSeek,
+  onSeekRelative,
   onOpenFullScreen,
   onCycleSpeed,
-  onDismiss
+  onSetSpeed,
+  onDismiss,
+  onSelectTrack,
+  onNextTrack,
+  onPreviousTrack,
+  onToggleRepeat,
+  onToggleFavorite,
+  onToggleOffline
 }) => {
-  const { currentAudio, isPlaying, positionSeconds, durationSeconds, playbackSpeed } = playbackState;
+  const {
+    currentAudio,
+    isPlaying,
+    positionSeconds,
+    durationSeconds,
+    playbackSpeed,
+    isRepeatTrack,
+    isRepeatQueue
+  } = playbackState;
+
+  const [isSheetOpen, setIsSheetOpen] = useState(false);
   const [hoverTime, setHoverTime] = useState<{ x: number; time: string } | null>(null);
+  const [scrubPosition, setScrubPosition] = useState<number | null>(null);
+  const [showOptionsPopup, setShowOptionsPopup] = useState(false);
 
   if (!currentAudio) return null;
 
-  // Safe finite duration and position
-  const safeDuration = (typeof durationSeconds === 'number' && Number.isFinite(durationSeconds) && durationSeconds > 0)
-    ? durationSeconds
-    : (currentAudio.duration_seconds && Number.isFinite(currentAudio.duration_seconds) && currentAudio.duration_seconds > 0)
+  // Safe duration and position calculations
+  const safeDuration =
+    typeof durationSeconds === 'number' && Number.isFinite(durationSeconds) && durationSeconds > 0
+      ? durationSeconds
+      : currentAudio.duration_seconds &&
+        Number.isFinite(currentAudio.duration_seconds) &&
+        currentAudio.duration_seconds > 0
       ? currentAudio.duration_seconds
       : 60;
 
-  const safePosition = (typeof positionSeconds === 'number' && Number.isFinite(positionSeconds) && positionSeconds >= 0)
-    ? positionSeconds
-    : 0;
+  const safePosition =
+    typeof positionSeconds === 'number' && Number.isFinite(positionSeconds) && positionSeconds >= 0
+      ? positionSeconds
+      : 0;
 
-  const progressPercent = Math.min(100, Math.max(0, (safePosition / safeDuration) * 100));
+  const currentDisplayPos = scrubPosition !== null ? scrubPosition : safePosition;
+  const progressPercent = Math.min(100, Math.max(0, (currentDisplayPos / safeDuration) * 100));
+
   const visual = getSubjectVisual(currentAudio.subject_name);
   const SubjectIcon = visual.icon;
+
+  // Use provided queue or fallback to currentAudio
+  const queueList = audioQueue.length > 0 ? audioQueue : [currentAudio];
 
   const handleScrubberMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
     const rect = e.currentTarget.getBoundingClientRect();
@@ -85,68 +142,93 @@ export const MiniPlayer: React.FC<MiniPlayerProps> = ({
     setHoverTime({ x: e.clientX - rect.left, time: formatDuration(targetSec) });
   };
 
+  const handleSeekInternal = (seconds: number) => {
+    if (onSeek) {
+      onSeek(seconds);
+    }
+  };
+
   return (
-    <div className="fixed bottom-[74px] sm:bottom-[80px] left-0 right-0 z-30 px-3 max-w-sm sm:max-w-md mx-auto pointer-events-none animate-in slide-in-from-bottom-3 duration-200">
-      <div className="pointer-events-auto bg-white/95 backdrop-blur-2xl border border-slate-200/90 rounded-2xl sm:rounded-3xl shadow-[0_12px_36px_rgba(0,0,0,0.1)] overflow-hidden transition-all hover:border-slate-300 select-none">
-        {/* Top Interactive Progress Line */}
-        <div
-          className="w-full bg-slate-100 hover:bg-slate-200/80 h-1.5 cursor-pointer relative group transition-colors"
-          title="Tap or drag to seek"
-          onMouseMove={handleScrubberMouseMove}
-          onMouseLeave={() => setHoverTime(null)}
-          onClick={(e) => {
-            if (!onSeek) return;
-            const rect = e.currentTarget.getBoundingClientRect();
-            const pct = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
-            onSeek(pct * safeDuration);
-          }}
-        >
+    <>
+      {/* ─────────────────────────────────────────────────────────────
+          1. TELEGRAM-STYLE COMPACT PLAYER BAR (Sticky / Floating)
+          Matches Telegram's iconic top compact audio bar
+         ───────────────────────────────────────────────────────────── */}
+      <div className="w-full max-w-md mx-auto select-none pointer-events-auto transition-all duration-200">
+        <div className="bg-white/95 backdrop-blur-xl border border-slate-200/90 shadow-[0_4px_20px_rgba(0,0,0,0.06)] rounded-2xl overflow-hidden relative group hover:border-slate-300">
+          {/* Top Interactive Progress Line */}
           <div
-            className="bg-gradient-to-r from-sky-500 to-indigo-500 h-full transition-[width] duration-100 rounded-r-full"
-            style={{ width: `${progressPercent}%` }}
-          />
-
-          {/* Hover Scrub Tooltip */}
-          {hoverTime && (
-            <div
-              className="absolute -top-6 -translate-x-1/2 rounded bg-slate-900 px-1.5 py-0.5 text-[9px] font-mono text-white pointer-events-none z-20 shadow-xs"
-              style={{ left: `${hoverTime.x}px` }}
-            >
-              {hoverTime.time}
-            </div>
-          )}
-
-          {/* Hover thumb */}
-          <div
-            className="absolute top-1/2 -translate-y-1/2 size-2 rounded-full bg-slate-900 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none -translate-x-1/2 shadow-xs"
-            style={{ left: `${progressPercent}%` }}
-          />
-        </div>
-
-        {/* Card Body */}
-        <div className="p-2 sm:p-2.5 px-3 flex items-center justify-between gap-2.5">
-          {/* Circular Vinyl Art & Title Container (Expand on tap) */}
-          <div
-            className="flex-1 min-w-0 flex items-center gap-2.5 cursor-pointer group"
-            onClick={onOpenFullScreen}
+            className="w-full bg-slate-100 hover:bg-slate-200/80 h-1.5 cursor-pointer relative group/scrubber transition-colors"
+            title="Tap or drag to seek"
+            onMouseMove={handleScrubberMouseMove}
+            onMouseLeave={() => setHoverTime(null)}
+            onClick={(e) => {
+              const rect = e.currentTarget.getBoundingClientRect();
+              const pct = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+              handleSeekInternal(pct * safeDuration);
+            }}
           >
-            {/* Circular Subject Disc (Inspired by Reference Image album art) */}
             <div
-              className={`size-10 rounded-full bg-gradient-to-tr ${visual.gradient} shadow-md ${visual.shadow} flex items-center justify-center text-white shrink-0 relative overflow-hidden transition-transform group-hover:scale-105`}
-            >
-              {/* Concentric vinyl groove effect */}
-              <div className="absolute inset-1.5 rounded-full border border-white/20" />
-              <div className="absolute inset-3 rounded-full border border-white/20" />
-              <div className="relative z-10 size-4 rounded-full bg-slate-950/40 backdrop-blur-xs flex items-center justify-center">
-                <SubjectIcon size={10} className="text-white" />
-              </div>
-            </div>
+              className="bg-gradient-to-r from-sky-400 via-[#24A1DE] to-indigo-600 h-full transition-[width] duration-100 rounded-r-full"
+              style={{ width: `${progressPercent}%` }}
+            />
 
-            {/* Title & Subject Info */}
-            <div className="min-w-0 flex-1">
-              <h4 className="text-xs font-bold text-slate-900 truncate leading-snug group-hover:text-blue-600 transition-colors">
-                {currentAudio.title}
-              </h4>
+            {/* Hover Scrub Tooltip */}
+            {hoverTime && (
+              <div
+                className="absolute -top-6 -translate-x-1/2 rounded bg-slate-900 px-1.5 py-0.5 text-[9px] font-mono text-white pointer-events-none z-30 shadow-xs"
+                style={{ left: `${hoverTime.x}px` }}
+              >
+                {hoverTime.time}
+              </div>
+            )}
+
+            {/* Hover thumb */}
+            <div
+              className="absolute top-1/2 -translate-y-1/2 size-2 rounded-full bg-[#24A1DE] opacity-0 group-hover/scrubber:opacity-100 transition-opacity pointer-events-none -translate-x-1/2 shadow-xs"
+              style={{ left: `${progressPercent}%` }}
+            />
+          </div>
+
+          {/* Compact Bar Body (Exact Telegram Architecture & Styling) */}
+          <div className="py-2 px-3 flex items-center justify-between gap-2.5">
+            {/* Left: Telegram-Style Circular Blue Play/Pause Button */}
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onTogglePlay();
+              }}
+              className={`size-9 rounded-full text-white active:scale-90 transition-transform shadow-xs flex items-center justify-center shrink-0 cursor-pointer ${
+                isPlaying
+                  ? 'bg-slate-950 hover:bg-slate-900 shadow-slate-900/20'
+                  : 'bg-[#24A1DE] hover:bg-[#1f8fca] shadow-[#24A1DE]/25'
+              }`}
+              aria-label={isPlaying ? 'Pause' : 'Play'}
+              title={isPlaying ? 'Pause audio' : 'Play audio'}
+            >
+              {isPlaying ? (
+                <div className="flex items-end justify-center gap-0.75 h-3.5 w-3.5">
+                  <span className="w-0.75 bg-white rounded-full animate-eq-1" />
+                  <span className="w-0.75 bg-white rounded-full animate-eq-2" />
+                  <span className="w-0.75 bg-white rounded-full animate-eq-3" />
+                </div>
+              ) : (
+                <Play size={14} fill="currentColor" className="translate-x-0.5 text-white" />
+              )}
+            </button>
+
+            {/* Center: Track Metadata & Title (Tap to expand Telegram sheet) */}
+            <div
+              className="flex-1 min-w-0 cursor-pointer group/title flex flex-col justify-center"
+              onClick={() => setIsSheetOpen(true)}
+              title="Tap to view playlist and full player"
+            >
+              <div className="flex items-center gap-1.5 min-w-0">
+                <h4 className="text-xs font-bold text-slate-900 truncate leading-tight group-hover/title:text-[#24A1DE] transition-colors">
+                  {currentAudio.title}
+                </h4>
+              </div>
+
               <div className="flex items-center gap-1.5 text-[10px] text-slate-500 font-medium leading-none mt-0.5">
                 <span className="text-slate-700 font-semibold truncate">
                   {currentAudio.subject_name || 'Academic Audio'}
@@ -157,58 +239,373 @@ export const MiniPlayer: React.FC<MiniPlayerProps> = ({
                 </span>
               </div>
             </div>
-          </div>
 
-          {/* Right Action Controls */}
-          <div className="flex items-center gap-1 shrink-0">
-            {onCycleSpeed && (
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onCycleSpeed();
-                }}
-                className="px-2 py-0.5 rounded-lg bg-slate-100 hover:bg-slate-200 border border-slate-200/80 text-[10px] font-mono font-bold text-slate-700 active:scale-90 transition-all cursor-pointer shadow-2xs"
-                title="Cycle playback speed"
-                aria-label={`Playback speed ${playbackSpeed}x`}
-              >
-                {playbackSpeed}x
-              </button>
-            )}
-
-            {/* Play / Pause Button */}
-            <button
-              onClick={onTogglePlay}
-              className={`size-9 rounded-full text-white active:scale-90 transition-all shadow-sm cursor-pointer flex items-center justify-center ${
-                isPlaying
-                  ? 'bg-slate-950 hover:bg-slate-900'
-                  : 'bg-blue-600 hover:bg-blue-500 shadow-blue-500/20'
-              }`}
-              aria-label={isPlaying ? 'Pause' : 'Play'}
-            >
-              {isPlaying ? (
-                <Pause size={14} fill="currentColor" />
-              ) : (
-                <Play size={14} fill="currentColor" className="translate-x-0.5" />
+            {/* Right Action Cluster: Telegram Speed Pill + Queue Expand + Dismiss */}
+            <div className="flex items-center gap-1.5 shrink-0">
+              {/* Telegram-style Speed Pill (1X, 1.25X, 1.5X, 2X) */}
+              {onCycleSpeed && (
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onCycleSpeed();
+                  }}
+                  className="px-2 py-0.5 rounded-lg border border-[#24A1DE]/40 bg-sky-50 hover:bg-sky-100 text-[#24A1DE] font-mono text-[10px] font-bold active:scale-90 transition-all cursor-pointer shadow-2xs"
+                  title="Cycle playback speed"
+                  aria-label={`Playback speed ${playbackSpeed}x`}
+                >
+                  {`${playbackSpeed}X`}
+                </button>
               )}
-            </button>
 
-            {/* Dismiss Player Button */}
-            {onDismiss && (
+              {/* Playlist Sheet Expand Button */}
               <button
                 onClick={(e) => {
                   e.stopPropagation();
-                  onDismiss();
+                  setIsSheetOpen(true);
                 }}
-                className="size-7 rounded-full text-slate-400 hover:text-rose-600 hover:bg-rose-50 flex items-center justify-center active:scale-90 transition-all cursor-pointer"
-                title="Close player"
-                aria-label="Close and dismiss player"
+                className="size-7 rounded-full text-slate-500 hover:text-[#24A1DE] hover:bg-sky-50 flex items-center justify-center active:scale-90 transition-all cursor-pointer relative"
+                title="Open playlist queue"
+                aria-label="Open playlist queue"
               >
-                <X size={15} />
+                <ListMusic size={15} />
+                {queueList.length > 1 && (
+                  <span className="absolute -top-0.5 -right-0.5 size-3.5 rounded-full bg-[#24A1DE] text-white text-[8px] font-mono font-bold flex items-center justify-center">
+                    {queueList.length}
+                  </span>
+                )}
               </button>
-            )}
+
+              {/* Dismiss Player Button */}
+              {onDismiss && (
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onDismiss();
+                  }}
+                  className="size-7 rounded-full text-slate-400 hover:text-rose-600 hover:bg-rose-50 flex items-center justify-center active:scale-90 transition-all cursor-pointer"
+                  title="Close player"
+                  aria-label="Close and dismiss player"
+                >
+                  <X size={15} />
+                </button>
+              )}
+            </div>
           </div>
+
+          {/* Preserve the Blue Wavy Design: Subtle bottom micro-wave accent */}
+          <BlueWaveDesign variant="compact" isPlaying={isPlaying} />
         </div>
       </div>
-    </div>
+
+      {/* ─────────────────────────────────────────────────────────────
+          2. TELEGRAM-STYLE EXPANDABLE PLAYLIST & PLAYER SHEET
+          Exact replica of Telegram's Audio Memos Sheet (Images 2 & 3)
+          with the signature Blue wavy design preserved at the bottom!
+         ───────────────────────────────────────────────────────────── */}
+      {isSheetOpen && (
+        <div
+          className="fixed inset-0 z-50 flex flex-col justify-end bg-slate-950/40 backdrop-blur-xs select-none animate-in fade-in duration-200"
+          onClick={() => setIsSheetOpen(false)}
+        >
+          <div
+            className="w-full max-w-md mx-auto bg-white rounded-t-[28px] max-h-[88vh] flex flex-col overflow-hidden shadow-2xl relative border-t border-slate-200/90 animate-in slide-in-from-bottom duration-200"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Grab Handle */}
+            <div
+              className="pt-2.5 pb-1.5 flex justify-center cursor-pointer"
+              onClick={() => setIsSheetOpen(false)}
+            >
+              <div className="w-10 h-1 bg-slate-300 rounded-full" />
+            </div>
+
+            {/* Sheet Header */}
+            <div className="px-5 py-2 flex items-center justify-between border-b border-slate-100">
+              <div className="flex items-center gap-2.5">
+                <div
+                  className={`size-8 rounded-full bg-gradient-to-tr ${visual.gradient} text-white flex items-center justify-center shadow-xs`}
+                >
+                  <SubjectIcon size={14} />
+                </div>
+                <div>
+                  <h3 className="text-xs font-bold text-slate-900 leading-tight">
+                    {currentAudio.subject_name || 'Academic Audio'} Playlist
+                  </h3>
+                  <p className="text-[10px] text-slate-500 font-mono">
+                    {queueList.length} audio notes in queue
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-1">
+                <button
+                  onClick={() => setIsSheetOpen(false)}
+                  className="size-8 rounded-full text-slate-400 hover:text-slate-700 hover:bg-slate-100 flex items-center justify-center transition-all cursor-pointer"
+                  title="Minimize sheet"
+                  aria-label="Minimize sheet"
+                >
+                  <ChevronDown size={18} />
+                </button>
+              </div>
+            </div>
+
+            {/* Middle Section: Scrollable Playlist Queue (Image 2 & 3) */}
+            <div className="flex-1 overflow-y-auto min-h-[180px] max-h-[38vh] divide-y divide-slate-100/80 px-2 py-1">
+              {queueList.map((audio, index) => {
+                const isActive = audio.id === currentAudio.id;
+                return (
+                  <div
+                    key={audio.id || index}
+                    onClick={() => {
+                      if (onSelectTrack) {
+                        onSelectTrack(audio);
+                      } else if (isActive) {
+                        onTogglePlay();
+                      }
+                    }}
+                    className={`flex items-center justify-between gap-3 p-2.5 rounded-2xl cursor-pointer transition-all ${
+                      isActive
+                        ? 'bg-sky-50/80 border-l-4 border-[#24A1DE] text-sky-950 shadow-2xs'
+                        : 'hover:bg-slate-50 text-slate-700'
+                    }`}
+                  >
+                    {/* Telegram Circular Blue Play Button with Download badge */}
+                    <div className="relative shrink-0">
+                      <div
+                        className={`size-10 rounded-full flex items-center justify-center text-white shadow-2xs transition-transform active:scale-95 ${
+                          isActive && isPlaying
+                            ? 'bg-slate-900'
+                            : 'bg-[#24A1DE] hover:bg-[#1f8fca]'
+                        }`}
+                      >
+                        {isActive && isPlaying ? (
+                          <div className="flex items-end justify-center gap-0.75 h-3.5 w-3.5">
+                            <span className="w-0.75 bg-white rounded-full animate-eq-1" />
+                            <span className="w-0.75 bg-white rounded-full animate-eq-2" />
+                            <span className="w-0.75 bg-white rounded-full animate-eq-3" />
+                          </div>
+                        ) : (
+                          <Play size={14} fill="currentColor" className="translate-x-0.5" />
+                        )}
+                      </div>
+
+                      {/* Offline / Download Check Badge */}
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (onToggleOffline) onToggleOffline(audio);
+                        }}
+                        className="absolute -bottom-1 -right-1 size-4 rounded-full bg-white shadow-xs flex items-center justify-center text-[#24A1DE] hover:scale-110 cursor-pointer"
+                        title="Offline Download"
+                      >
+                        <Download size={10} strokeWidth={2.5} />
+                      </button>
+                    </div>
+
+                    {/* Track Title & Artist */}
+                    <div className="flex-1 min-w-0">
+                      <h4
+                        className={`text-xs truncate leading-snug ${
+                          isActive ? 'font-bold text-slate-950' : 'font-semibold text-slate-800'
+                        }`}
+                      >
+                        {audio.title}
+                      </h4>
+                      <p className="text-[10px] text-slate-500 font-mono mt-0.5 truncate">
+                        {audio.subject_name || 'Academic Audio'} •{' '}
+                        {formatDuration(audio.duration_seconds || 60)}
+                      </p>
+                    </div>
+
+                    {/* Options ⋮ */}
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (onToggleFavorite) onToggleFavorite(audio.id);
+                      }}
+                      className="size-8 rounded-full text-slate-400 hover:text-slate-700 hover:bg-slate-200/50 flex items-center justify-center shrink-0"
+                      title="Track options"
+                    >
+                      <MoreVertical size={16} />
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+
+            {/* Bottom Docked Section: Player Controls with PRESERVED BLUE WAVY DESIGN */}
+            <div className="relative pt-3 pb-5 px-5 bg-gradient-to-b from-white via-white to-sky-50/70 border-t border-slate-150 overflow-hidden">
+              {/* Preserved Signature Blue Wavy Design (Image 5 & Reference) */}
+              <BlueWaveDesign
+                variant="full"
+                isPlaying={isPlaying}
+                className="absolute bottom-0 left-0 right-0 h-32 pointer-events-none z-0 opacity-60"
+              />
+
+              <div className="relative z-10 space-y-3">
+                {/* Title & Artist */}
+                <div className="text-center px-2">
+                  <h3 className="text-sm font-bold text-slate-950 truncate leading-snug">
+                    {currentAudio.title}
+                  </h3>
+                  <p className="text-xs text-slate-500 font-medium truncate mt-0.5">
+                    {currentAudio.subject_name || 'Academic Audio'}
+                  </p>
+                </div>
+
+                {/* Scrubber Progress Slider */}
+                <div className="space-y-1">
+                  <Slider
+                    value={currentDisplayPos}
+                    max={safeDuration}
+                    step={1}
+                    onChange={(val: number) => setScrubPosition(val)}
+                    onCommit={(val: number) => {
+                      setScrubPosition(null);
+                      handleSeekInternal(val);
+                    }}
+                    formatTooltip={(val: number) => formatDuration(val)}
+                    className="w-full py-1 cursor-pointer"
+                  />
+                  <div className="flex justify-between items-center text-[11px] font-mono text-slate-500 px-0.5">
+                    <span>{formatDuration(safePosition)}</span>
+                    <span>{formatDuration(safeDuration)}</span>
+                  </div>
+                </div>
+
+                {/* Controls Row (Repeat, Previous, Play/Pause, Next, More) */}
+                <div className="flex items-center justify-between px-2 pt-0.5">
+                  {/* Repeat / Shuffle Toggle */}
+                  <button
+                    onClick={onToggleRepeat}
+                    className={`size-10 rounded-full flex items-center justify-center active:scale-90 transition-all cursor-pointer ${
+                      isRepeatTrack || isRepeatQueue
+                        ? 'text-[#24A1DE] bg-sky-50'
+                        : 'text-slate-400 hover:text-slate-700'
+                    }`}
+                    title={
+                      isRepeatTrack
+                        ? 'Repeat Track'
+                        : isRepeatQueue
+                        ? 'Repeat Queue'
+                        : 'Repeat Off'
+                    }
+                  >
+                    {isRepeatTrack ? (
+                      <Repeat1 size={19} />
+                    ) : isRepeatQueue ? (
+                      <Repeat size={19} />
+                    ) : (
+                      <Repeat size={19} className="opacity-40" />
+                    )}
+                  </button>
+
+                  {/* Previous Track */}
+                  <button
+                    onClick={() => {
+                      if (onPreviousTrack) {
+                        onPreviousTrack();
+                      } else {
+                        onSeekRelative(-10);
+                      }
+                    }}
+                    className="size-11 rounded-full text-slate-700 hover:text-slate-950 hover:bg-slate-100 flex items-center justify-center active:scale-90 transition-all cursor-pointer"
+                    title="Previous Track"
+                    aria-label="Previous Track"
+                  >
+                    <SkipBack size={22} fill="currentColor" />
+                  </button>
+
+                  {/* Hero Play/Pause Button */}
+                  <button
+                    onClick={onTogglePlay}
+                    className={`size-14 rounded-full text-white shadow-lg active:scale-95 transition-all flex items-center justify-center cursor-pointer ${
+                      isPlaying
+                        ? 'bg-slate-950 hover:bg-slate-900 shadow-slate-950/20'
+                        : 'bg-[#24A1DE] hover:bg-[#1f8fca] shadow-[#24A1DE]/30'
+                    }`}
+                    aria-label={isPlaying ? 'Pause' : 'Play'}
+                  >
+                    {isPlaying ? (
+                      <Pause size={22} fill="currentColor" />
+                    ) : (
+                      <Play size={22} fill="currentColor" className="translate-x-0.5" />
+                    )}
+                  </button>
+
+                  {/* Next Track */}
+                  <button
+                    onClick={() => {
+                      if (onNextTrack) {
+                        onNextTrack();
+                      } else {
+                        onSeekRelative(15);
+                      }
+                    }}
+                    className="size-11 rounded-full text-slate-700 hover:text-slate-950 hover:bg-slate-100 flex items-center justify-center active:scale-90 transition-all cursor-pointer"
+                    title="Next Track"
+                    aria-label="Next Track"
+                  >
+                    <SkipForward size={22} fill="currentColor" />
+                  </button>
+
+                  {/* Options Menu Toggle */}
+                  <button
+                    onClick={() => setShowOptionsPopup((prev) => !prev)}
+                    className="size-10 rounded-full text-slate-400 hover:text-slate-700 flex items-center justify-center active:scale-90 transition-all cursor-pointer"
+                    title="Player options"
+                  >
+                    <MoreVertical size={19} />
+                  </button>
+                </div>
+
+                {/* Quick Options Popover (Speed, A-B repeat, Sleep) */}
+                {showOptionsPopup && (
+                  <div className="p-3 bg-white/95 backdrop-blur-md rounded-2xl border border-slate-200/90 shadow-lg text-xs space-y-2 animate-in fade-in duration-150">
+                    <div className="flex items-center justify-between text-slate-700 font-semibold">
+                      <span>Speed Presets</span>
+                      <span className="font-mono text-[#24A1DE] font-bold">{playbackSpeed}x</span>
+                    </div>
+                    <div className="grid grid-cols-4 gap-1.5 font-mono font-bold">
+                      {[1.0, 1.25, 1.5, 2.0].map((spd) => (
+                        <button
+                          key={spd}
+                          onClick={() => {
+                            if (onSetSpeed) onSetSpeed(spd);
+                            setShowOptionsPopup(false);
+                          }}
+                          className={`py-1 rounded-xl text-xs transition-all ${
+                            playbackSpeed === spd
+                              ? 'bg-[#24A1DE] text-white shadow-xs'
+                              : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
+                          }`}
+                        >
+                          {spd}x
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Primary Telegram-Style Pill Action Button (Matches Image 2 & 3) */}
+                <div className="pt-1">
+                  <button
+                    onClick={() => {
+                      setIsSheetOpen(false);
+                      onOpenFullScreen();
+                    }}
+                    className="w-full py-3 rounded-2xl bg-[#24A1DE] hover:bg-[#1f8fca] text-white font-semibold text-xs transition-all active:scale-98 shadow-md shadow-[#24A1DE]/25 flex items-center justify-center gap-2 cursor-pointer"
+                  >
+                    <Sparkles size={16} />
+                    <span>Study Mode • Full Screen Player</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+    </>
   );
 };
