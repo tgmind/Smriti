@@ -37,6 +37,7 @@ import {
   EmptyTitle,
   EmptyDescription
 } from '@/components/ui/empty';
+import { ModalPortal } from '@/components/ui/modal-portal';
 import { bridge } from '../services/bridge';
 
 export interface DownloadsTabProps {
@@ -511,68 +512,70 @@ export const DownloadsTab: React.FC<DownloadsTabProps> = ({
 
       {/* Confirmation Modal Dialog for Delete All Local Downloads */}
       {showConfirmDeleteModal && (
-        <div
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="delete-all-title"
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-xs animate-in fade-in duration-200"
-          onClick={(e) => {
-            if (e.target === e.currentTarget && !isDeleting) {
-              setShowConfirmDeleteModal(false);
-            }
-          }}
-        >
-          <div className="w-full max-w-sm bg-white rounded-3xl p-5 space-y-4 shadow-2xl border border-slate-200 animate-in zoom-in-95 duration-200">
-            <div className="flex items-center gap-3">
-              <div className="size-10 rounded-2xl bg-rose-100 text-rose-600 flex items-center justify-center shrink-0 shadow-2xs">
-                <AlertTriangle size={20} />
+        <ModalPortal>
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="delete-all-title"
+            className="fixed inset-0 z-[70] flex items-center justify-center p-4 sm:p-6 bg-slate-950/75 backdrop-blur-md overflow-y-auto safe-top safe-bottom animate-in fade-in duration-200"
+            onClick={(e) => {
+              if (e.target === e.currentTarget && !isDeleting) {
+                setShowConfirmDeleteModal(false);
+              }
+            }}
+          >
+            <div className="w-full max-w-sm bg-white rounded-3xl p-5 sm:p-6 space-y-4 shadow-2xl border border-slate-200/90 my-auto max-h-[85vh] overflow-y-auto animate-in zoom-in-95 duration-200">
+              <div className="flex items-center gap-3">
+                <div className="size-10 rounded-2xl bg-rose-100 text-rose-600 flex items-center justify-center shrink-0 shadow-2xs">
+                  <AlertTriangle size={20} />
+                </div>
+                <div className="min-w-0">
+                  <h3 id="delete-all-title" className="text-sm font-bold text-slate-900 leading-snug">
+                    Delete All Downloaded Files?
+                  </h3>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    Free up device local storage
+                  </p>
+                </div>
               </div>
-              <div className="min-w-0">
-                <h3 id="delete-all-title" className="text-sm font-bold text-slate-900 leading-snug">
-                  Delete All Downloaded Files?
-                </h3>
-                <p className="text-xs text-slate-500 mt-0.5">
-                  Free up device local storage
-                </p>
+
+              <p className="text-xs text-slate-600 leading-relaxed bg-slate-50 p-3.5 rounded-2xl border border-slate-100">
+                This will remove all <strong className="text-slate-900">{downloadedNotes.length} offline audio files</strong> ({formatBytes(totalDownloadedBytes)}) from your device's local storage.
+                <br /><br />
+                <span className="text-emerald-700 font-medium">✓ Your recordings remain safely backed up in your personal Google Drive and can be re-downloaded at any time.</span>
+              </p>
+
+              <div className="flex items-center gap-2 pt-1">
+                <button
+                  type="button"
+                  disabled={isDeleting}
+                  onClick={() => setShowConfirmDeleteModal(false)}
+                  className="flex-1 py-2.5 px-3 rounded-xl border border-slate-200 text-slate-700 hover:bg-slate-50 text-xs font-semibold active:scale-95 transition-all cursor-pointer"
+                >
+                  Keep Files
+                </button>
+                <button
+                  type="button"
+                  disabled={isDeleting}
+                  onClick={handleConfirmDeleteAll}
+                  className="flex-1 py-2.5 px-3 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-semibold flex items-center justify-center gap-1.5 shadow-sm active:scale-95 transition-all cursor-pointer disabled:opacity-60"
+                >
+                  {isDeleting ? (
+                    <>
+                      <RefreshCw size={13} className="animate-spin" />
+                      <span>Deleting...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Trash2 size={13} />
+                      <span>Delete All</span>
+                    </>
+                  )}
+                </button>
               </div>
-            </div>
-
-            <p className="text-xs text-slate-600 leading-relaxed bg-slate-50 p-3 rounded-2xl border border-slate-100">
-              This will remove all <strong className="text-slate-900">{downloadedNotes.length} offline audio files</strong> ({formatBytes(totalDownloadedBytes)}) from your device's local storage.
-              <br /><br />
-              <span className="text-emerald-700 font-medium">✓ Your recordings remain safely backed up in your personal Google Drive and can be re-downloaded at any time.</span>
-            </p>
-
-            <div className="flex items-center gap-2 pt-1">
-              <button
-                type="button"
-                disabled={isDeleting}
-                onClick={() => setShowConfirmDeleteModal(false)}
-                className="flex-1 py-2 px-3 rounded-xl border border-slate-200 text-slate-700 hover:bg-slate-50 text-xs font-semibold active:scale-95 transition-all cursor-pointer"
-              >
-                Keep Files
-              </button>
-              <button
-                type="button"
-                disabled={isDeleting}
-                onClick={handleConfirmDeleteAll}
-                className="flex-1 py-2 px-3 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-semibold flex items-center justify-center gap-1.5 shadow-sm active:scale-95 transition-all cursor-pointer disabled:opacity-60"
-              >
-                {isDeleting ? (
-                  <>
-                    <RefreshCw size={13} className="animate-spin" />
-                    <span>Deleting...</span>
-                  </>
-                ) : (
-                  <>
-                    <Trash2 size={13} />
-                    <span>Delete All</span>
-                  </>
-                )}
-              </button>
             </div>
           </div>
-        </div>
+        </ModalPortal>
       )}
     </div>
   );

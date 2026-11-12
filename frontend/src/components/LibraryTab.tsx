@@ -48,6 +48,7 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card';
+import { ModalPortal } from '@/components/ui/modal-portal';
 import {
   Breadcrumb,
   BreadcrumbList,
@@ -471,178 +472,180 @@ export const LibraryTab: React.FC<LibraryTabProps> = ({
     const ActiveModalIcon = getSubjectIcon(newFolderIcon);
 
     return (
-      <div
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="create-subject-title"
-        className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-xs animate-in fade-in duration-200"
-        onClick={(e) => {
-          if (e.target === e.currentTarget) {
-            setIsCreateFolderOpen(false);
-          }
-        }}
-      >
-        <Card className="w-full max-w-sm sm:max-w-md bg-white border-slate-200/90 shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
-          <CardHeader className="border-b border-slate-100 pb-3.5">
-            <CardTitle id="create-subject-title" className="text-base font-bold text-slate-900 flex items-center gap-2">
-              <span
-                className="w-7 h-7 rounded-lg flex items-center justify-center text-white shrink-0 shadow-2xs transition-colors"
-                style={{ backgroundColor: newFolderColor }}
-              >
-                <ActiveModalIcon size={15} />
-              </span>
-              <span>New Subject Folder</span>
-            </CardTitle>
-            <CardDescription className="text-xs text-slate-500">
-              Create a subject folder to organize lecture recordings and revisions
-            </CardDescription>
-            <CardAction>
-              <button
-                type="button"
-                onClick={() => setIsCreateFolderOpen(false)}
-                aria-label="Close dialog"
-                className="w-7 h-7 rounded-full text-slate-400 hover:text-slate-700 hover:bg-slate-100 flex items-center justify-center transition-colors cursor-pointer"
-              >
-                <X size={15} />
-              </button>
-            </CardAction>
-          </CardHeader>
-
-          <form onSubmit={handleCreateFolderSubmit}>
-            <CardContent className="space-y-4 pt-4 pb-2">
-              {/* Folder Name */}
-              <div className="space-y-1.5">
-                <label htmlFor="folder-name-input" className="text-xs font-semibold text-slate-700 flex items-center justify-between">
-                  <span>Folder Name <span className="text-rose-500">*</span></span>
-                  <span className="text-[10px] text-slate-400 font-normal">e.g., Organic Chemistry, Mechanics</span>
-                </label>
-                <input
-                  id="folder-name-input"
-                  type="text"
-                  required
-                  value={newFolderName}
-                  onChange={(e) => setNewFolderName(e.target.value)}
-                  placeholder="Enter subject or topic name..."
-                  className="w-full px-3 py-2 text-xs sm:text-sm bg-slate-50/70 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500 transition-all text-slate-900 placeholder:text-slate-400"
-                  autoFocus
-                />
-              </div>
-
-              {/* Description */}
-              <div className="space-y-1.5">
-                <label htmlFor="folder-desc-input" className="text-xs font-semibold text-slate-700">
-                  Description <span className="text-[10px] text-slate-400 font-normal">(optional)</span>
-                </label>
-                <input
-                  id="folder-desc-input"
-                  type="text"
-                  value={newFolderDesc}
-                  onChange={(e) => setNewFolderDesc(e.target.value)}
-                  placeholder="e.g. Chapter 4-8 exam revision notes..."
-                  className="w-full px-3 py-2 text-xs bg-slate-50/70 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500 transition-all text-slate-900 placeholder:text-slate-400"
-                />
-              </div>
-
-              {/* Choose Icon */}
-              <div className="space-y-1.5">
-                <label className="text-xs font-semibold text-slate-700">Choose Icon</label>
-                <div className="grid grid-cols-6 gap-2">
-                  {FOLDER_ICON_OPTIONS.map((item) => {
-                    const IconComp = item.icon;
-                    const isSelected = newFolderIcon === item.name;
-                    return (
-                      <button
-                        key={item.name}
-                        type="button"
-                        onClick={() => setNewFolderIcon(item.name)}
-                        title={item.label}
-                        className={`h-9 rounded-xl flex items-center justify-center border transition-all cursor-pointer ${
-                          isSelected
-                            ? 'border-slate-900 bg-slate-900 text-white shadow-xs scale-105'
-                            : 'border-slate-200 hover:border-slate-300 bg-white text-slate-600 hover:bg-slate-50'
-                        }`}
-                      >
-                        <IconComp size={16} />
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {/* Choose Theme Color */}
-              <div className="space-y-1.5">
-                <label className="text-xs font-semibold text-slate-700">Theme Color</label>
-                <div className="flex items-center gap-2.5">
-                  {FOLDER_COLOR_OPTIONS.map((c) => {
-                    const isSelected = newFolderColor === c.hex;
-                    return (
-                      <button
-                        key={c.hex}
-                        type="button"
-                        onClick={() => setNewFolderColor(c.hex)}
-                        title={c.label}
-                        className={`w-7 h-7 rounded-full transition-all cursor-pointer flex items-center justify-center ${
-                          isSelected
-                            ? 'ring-2 ring-offset-2 ring-slate-900 scale-110 shadow-xs'
-                            : 'hover:scale-105 opacity-80 hover:opacity-100'
-                        }`}
-                        style={{ backgroundColor: c.hex }}
-                      >
-                        {isSelected && <Check size={13} className="text-white drop-shadow-xs" />}
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {/* Live Preview Pill */}
-              <div className="p-2.5 rounded-xl border border-slate-100 bg-slate-50/80 flex items-center gap-2.5">
-                <div
-                  className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 text-white shadow-2xs transition-colors"
+      <ModalPortal>
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="create-subject-title"
+          className="fixed inset-0 z-[70] flex items-center justify-center p-4 sm:p-6 bg-slate-950/75 backdrop-blur-md overflow-y-auto safe-top safe-bottom animate-in fade-in duration-200"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) {
+              setIsCreateFolderOpen(false);
+            }
+          }}
+        >
+          <Card className="w-full max-w-sm sm:max-w-md bg-white border border-slate-200/90 shadow-2xl rounded-3xl overflow-hidden my-auto max-h-[85vh] sm:max-h-[88vh] flex flex-col animate-in zoom-in-95 duration-200">
+            <CardHeader className="border-b border-slate-100 pb-3.5 shrink-0 bg-white">
+              <CardTitle id="create-subject-title" className="text-base font-bold text-slate-900 flex items-center gap-2">
+                <span
+                  className="w-7 h-7 rounded-lg flex items-center justify-center text-white shrink-0 shadow-2xs transition-colors"
                   style={{ backgroundColor: newFolderColor }}
                 >
-                  <ActiveModalIcon size={16} />
-                </div>
-                <div className="min-w-0 flex-1">
-                  <p className="text-xs font-bold text-slate-900 truncate">
-                    {newFolderName.trim() || 'Untitled Subject'}
-                  </p>
-                  <p className="text-[10px] text-slate-500 truncate">
-                    {newFolderDesc.trim() || 'No recordings yet · 0 lessons'}
-                  </p>
-                </div>
-                <span
-                  className="text-[10px] font-semibold px-2 py-0.5 rounded-full shrink-0"
-                  style={{
-                    backgroundColor: `${newFolderColor}20`,
-                    color: newFolderColor
-                  }}
-                >
-                  Preview
+                  <ActiveModalIcon size={15} />
                 </span>
-              </div>
-            </CardContent>
+                <span>New Subject Folder</span>
+              </CardTitle>
+              <CardDescription className="text-xs text-slate-500">
+                Create a subject folder to organize lecture recordings and revisions
+              </CardDescription>
+              <CardAction>
+                <button
+                  type="button"
+                  onClick={() => setIsCreateFolderOpen(false)}
+                  aria-label="Close dialog"
+                  className="w-7 h-7 rounded-full text-slate-400 hover:text-slate-700 hover:bg-slate-100 flex items-center justify-center transition-colors cursor-pointer"
+                >
+                  <X size={15} />
+                </button>
+              </CardAction>
+            </CardHeader>
 
-            <CardFooter className="flex items-center justify-end gap-2 border-t border-slate-100 bg-slate-50/70 p-3.5">
-              <button
-                type="button"
-                onClick={() => setIsCreateFolderOpen(false)}
-                className="px-3.5 py-1.5 text-xs font-medium text-slate-600 hover:text-slate-800 hover:bg-slate-200/60 rounded-xl transition-colors cursor-pointer"
-              >
-                Cancel
-              </button>
-              <button
-                type="submit"
-                disabled={!newFolderName.trim()}
-                className="px-4 py-1.5 text-xs font-semibold text-white bg-slate-950 hover:bg-slate-800 disabled:opacity-40 disabled:cursor-not-allowed rounded-xl shadow-xs transition-all cursor-pointer flex items-center gap-1.5"
-              >
-                <Folder size={13} />
-                <span>Create Folder</span>
-              </button>
-            </CardFooter>
-          </form>
-        </Card>
-      </div>
+            <form onSubmit={handleCreateFolderSubmit} className="flex flex-col flex-1 overflow-hidden min-h-0">
+              <CardContent className="space-y-4 pt-4 pb-3 overflow-y-auto flex-1 min-h-0">
+                {/* Folder Name */}
+                <div className="space-y-1.5">
+                  <label htmlFor="folder-name-input" className="text-xs font-semibold text-slate-700 flex items-center justify-between">
+                    <span>Folder Name <span className="text-rose-500">*</span></span>
+                    <span className="text-[10px] text-slate-400 font-normal">e.g., Organic Chemistry, Mechanics</span>
+                  </label>
+                  <input
+                    id="folder-name-input"
+                    type="text"
+                    required
+                    value={newFolderName}
+                    onChange={(e) => setNewFolderName(e.target.value)}
+                    placeholder="Enter subject or topic name..."
+                    className="w-full px-3 py-2 text-xs sm:text-sm bg-slate-50/70 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500 transition-all text-slate-900 placeholder:text-slate-400"
+                    autoFocus
+                  />
+                </div>
+
+                {/* Description */}
+                <div className="space-y-1.5">
+                  <label htmlFor="folder-desc-input" className="text-xs font-semibold text-slate-700">
+                    Description <span className="text-[10px] text-slate-400 font-normal">(optional)</span>
+                  </label>
+                  <input
+                    id="folder-desc-input"
+                    type="text"
+                    value={newFolderDesc}
+                    onChange={(e) => setNewFolderDesc(e.target.value)}
+                    placeholder="e.g. Chapter 4-8 exam revision notes..."
+                    className="w-full px-3 py-2 text-xs bg-slate-50/70 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500 transition-all text-slate-900 placeholder:text-slate-400"
+                  />
+                </div>
+
+                {/* Choose Icon */}
+                <div className="space-y-1.5">
+                  <label className="text-xs font-semibold text-slate-700">Choose Icon</label>
+                  <div className="grid grid-cols-6 gap-2">
+                    {FOLDER_ICON_OPTIONS.map((item) => {
+                      const IconComp = item.icon;
+                      const isSelected = newFolderIcon === item.name;
+                      return (
+                        <button
+                          key={item.name}
+                          type="button"
+                          onClick={() => setNewFolderIcon(item.name)}
+                          title={item.label}
+                          className={`h-9 rounded-xl flex items-center justify-center border transition-all cursor-pointer ${
+                            isSelected
+                              ? 'border-slate-900 bg-slate-900 text-white shadow-xs scale-105'
+                              : 'border-slate-200 hover:border-slate-300 bg-white text-slate-600 hover:bg-slate-50'
+                          }`}
+                        >
+                          <IconComp size={16} />
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Choose Theme Color */}
+                <div className="space-y-1.5">
+                  <label className="text-xs font-semibold text-slate-700">Theme Color</label>
+                  <div className="flex items-center gap-2.5">
+                    {FOLDER_COLOR_OPTIONS.map((c) => {
+                      const isSelected = newFolderColor === c.hex;
+                      return (
+                        <button
+                          key={c.hex}
+                          type="button"
+                          onClick={() => setNewFolderColor(c.hex)}
+                          title={c.label}
+                          className={`w-7 h-7 rounded-full transition-all cursor-pointer flex items-center justify-center ${
+                            isSelected
+                              ? 'ring-2 ring-offset-2 ring-slate-900 scale-110 shadow-xs'
+                              : 'hover:scale-105 opacity-80 hover:opacity-100'
+                          }`}
+                          style={{ backgroundColor: c.hex }}
+                        >
+                          {isSelected && <Check size={13} className="text-white drop-shadow-xs" />}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Live Preview Pill */}
+                <div className="p-2.5 rounded-xl border border-slate-100 bg-slate-50/80 flex items-center gap-2.5">
+                  <div
+                    className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 text-white shadow-2xs transition-colors"
+                    style={{ backgroundColor: newFolderColor }}
+                  >
+                    <ActiveModalIcon size={16} />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-xs font-bold text-slate-900 truncate">
+                      {newFolderName.trim() || 'Untitled Subject'}
+                    </p>
+                    <p className="text-[10px] text-slate-500 truncate">
+                      {newFolderDesc.trim() || 'No recordings yet · 0 lessons'}
+                    </p>
+                  </div>
+                  <span
+                    className="text-[10px] font-semibold px-2 py-0.5 rounded-full shrink-0"
+                    style={{
+                      backgroundColor: `${newFolderColor}20`,
+                      color: newFolderColor
+                    }}
+                  >
+                    Preview
+                  </span>
+                </div>
+              </CardContent>
+
+              <CardFooter className="flex items-center justify-end gap-2 border-t border-slate-100 bg-slate-50/90 p-3.5 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => setIsCreateFolderOpen(false)}
+                  className="px-3.5 py-2 text-xs font-medium text-slate-600 hover:text-slate-800 hover:bg-slate-200/60 rounded-xl transition-colors cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={!newFolderName.trim()}
+                  className="px-4 py-2 text-xs font-semibold text-white bg-slate-950 hover:bg-slate-800 disabled:opacity-40 disabled:cursor-not-allowed rounded-xl shadow-xs transition-all cursor-pointer flex items-center gap-1.5"
+                >
+                  <Folder size={13} />
+                  <span>Create Folder</span>
+                </button>
+              </CardFooter>
+            </form>
+          </Card>
+        </div>
+      </ModalPortal>
     );
   };
 
@@ -1541,112 +1544,117 @@ export const LibraryTab: React.FC<LibraryTabProps> = ({
 
       {/* Subject Folder Deletion Confirmation Modal Dialog */}
       {subjectToDelete && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-xs animate-in fade-in"
-          onClick={() => !isDeletingSubject && setSubjectToDelete(null)}
-        >
+        <ModalPortal>
           <div
-            className="bg-white rounded-3xl p-5 sm:p-6 w-full max-w-sm shadow-2xl border border-slate-200 space-y-4 animate-in zoom-in-95"
-            onClick={(e) => e.stopPropagation()}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="delete-subject-title"
+            className="fixed inset-0 z-[70] flex items-center justify-center p-4 sm:p-6 bg-slate-950/75 backdrop-blur-md overflow-y-auto safe-top safe-bottom animate-in fade-in duration-200"
+            onClick={() => !isDeletingSubject && setSubjectToDelete(null)}
           >
-            {/* Header */}
-            <div className="flex items-start gap-3.5">
-              <div className="w-11 h-11 rounded-2xl bg-rose-50 border border-rose-200 flex items-center justify-center text-rose-600 shrink-0">
-                <Trash2 size={22} />
-              </div>
-              <div className="flex-1 min-w-0">
-                <h3 className="text-base font-bold text-slate-900 leading-tight">
-                  Delete Subject Folder
-                </h3>
-                <p className="text-xs text-slate-500 mt-0.5 font-medium truncate">
-                  "{subjectToDelete.name}"
-                </p>
-              </div>
-            </div>
-
-            {/* Description & Options */}
-            <div className="bg-slate-50 border border-slate-200/80 rounded-2xl p-3.5 text-xs text-slate-600 space-y-2.5">
-              <p>
-                This will delete the <strong className="text-slate-900">{subjectToDelete.name}</strong> folder from your Smriti Library and Google Drive.
-              </p>
-
-              {(() => {
-                const subAudios = audiosBySubject.get(subjectToDelete.id) || audiosBySubject.get(subjectToDelete.name.toLowerCase()) || [];
-                const count = subAudios.length;
-                if (count > 0) {
-                  return (
-                    <div className="pt-2.5 border-t border-slate-200 space-y-2">
-                      <p className="font-semibold text-slate-800">
-                        This folder contains {count} {count === 1 ? 'recording' : 'recordings'}:
-                      </p>
-                      <div className="space-y-2">
-                        <label className="flex items-start gap-2.5 p-2.5 rounded-xl bg-white border border-slate-200 cursor-pointer hover:bg-slate-50 transition-colors">
-                          <input
-                            type="radio"
-                            name="deleteRecordingsOption"
-                            checked={!deleteRecordingsOption}
-                            onChange={() => setDeleteRecordingsOption(false)}
-                            className="mt-0.5 accent-blue-600 cursor-pointer"
-                          />
-                          <span className="text-[11px] font-medium text-slate-800">
-                            Keep recordings (move to <strong className="text-blue-600">General</strong> folder)
-                          </span>
-                        </label>
-                        <label className="flex items-start gap-2.5 p-2.5 rounded-xl bg-white border border-rose-200 cursor-pointer hover:bg-rose-50/50 transition-colors">
-                          <input
-                            type="radio"
-                            name="deleteRecordingsOption"
-                            checked={deleteRecordingsOption}
-                            onChange={() => setDeleteRecordingsOption(true)}
-                            className="mt-0.5 accent-rose-600 cursor-pointer"
-                          />
-                          <span className="text-[11px] font-medium text-rose-700">
-                            Delete all recordings inside permanently
-                          </span>
-                        </label>
-                      </div>
-                    </div>
-                  );
-                }
-                return (
-                  <p className="text-[11px] text-slate-500 italic">
-                    This folder is empty and will be safely deleted.
+            <div
+              className="bg-white rounded-3xl p-5 sm:p-6 w-full max-w-sm shadow-2xl border border-slate-200/90 space-y-4 my-auto max-h-[85vh] overflow-y-auto animate-in zoom-in-95 duration-200"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {/* Header */}
+              <div className="flex items-start gap-3.5">
+                <div className="w-11 h-11 rounded-2xl bg-rose-50 border border-rose-200 flex items-center justify-center text-rose-600 shrink-0">
+                  <Trash2 size={22} />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <h3 id="delete-subject-title" className="text-base font-bold text-slate-900 leading-tight">
+                    Delete Subject Folder
+                  </h3>
+                  <p className="text-xs text-slate-500 mt-0.5 font-medium truncate">
+                    "{subjectToDelete.name}"
                   </p>
-                );
-              })()}
-            </div>
+                </div>
+              </div>
 
-            {/* Actions */}
-            <div className="flex items-center gap-2.5 pt-1">
-              <button
-                type="button"
-                disabled={isDeletingSubject}
-                onClick={() => setSubjectToDelete(null)}
-                className="flex-1 py-2.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold transition-all cursor-pointer disabled:opacity-50"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                disabled={isDeletingSubject}
-                onClick={handleConfirmDeleteSubject}
-                className="flex-1 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-700 active:scale-95 text-white text-xs font-bold transition-all shadow-sm flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
-              >
-                {isDeletingSubject ? (
-                  <>
-                    <RefreshCw size={13} className="animate-spin" />
-                    <span>Deleting...</span>
-                  </>
-                ) : (
-                  <>
-                    <Trash2 size={13} />
-                    <span>Delete Folder</span>
-                  </>
-                )}
-              </button>
+              {/* Description & Options */}
+              <div className="bg-slate-50 border border-slate-200/80 rounded-2xl p-3.5 text-xs text-slate-600 space-y-2.5">
+                <p>
+                  This will delete the <strong className="text-slate-900">{subjectToDelete.name}</strong> folder from your Smriti Library and Google Drive.
+                </p>
+
+                {(() => {
+                  const subAudios = audiosBySubject.get(subjectToDelete.id) || audiosBySubject.get(subjectToDelete.name.toLowerCase()) || [];
+                  const count = subAudios.length;
+                  if (count > 0) {
+                    return (
+                      <div className="pt-2.5 border-t border-slate-200 space-y-2">
+                        <p className="font-semibold text-slate-800">
+                          This folder contains {count} {count === 1 ? 'recording' : 'recordings'}:
+                        </p>
+                        <div className="space-y-2">
+                          <label className="flex items-start gap-2.5 p-2.5 rounded-xl bg-white border border-slate-200 cursor-pointer hover:bg-slate-50 transition-colors">
+                            <input
+                              type="radio"
+                              name="deleteRecordingsOption"
+                              checked={!deleteRecordingsOption}
+                              onChange={() => setDeleteRecordingsOption(false)}
+                              className="mt-0.5 accent-blue-600 cursor-pointer"
+                            />
+                            <span className="text-[11px] font-medium text-slate-800">
+                              Keep recordings (move to <strong className="text-blue-600">General</strong> folder)
+                            </span>
+                          </label>
+                          <label className="flex items-start gap-2.5 p-2.5 rounded-xl bg-white border border-rose-200 cursor-pointer hover:bg-rose-50/50 transition-colors">
+                            <input
+                              type="radio"
+                              name="deleteRecordingsOption"
+                              checked={deleteRecordingsOption}
+                              onChange={() => setDeleteRecordingsOption(true)}
+                              className="mt-0.5 accent-rose-600 cursor-pointer"
+                            />
+                            <span className="text-[11px] font-medium text-rose-700">
+                              Delete all recordings inside permanently
+                            </span>
+                          </label>
+                        </div>
+                      </div>
+                    );
+                  }
+                  return (
+                    <p className="text-[11px] text-slate-500 italic">
+                      This folder is empty and will be safely deleted.
+                    </p>
+                  );
+                })()}
+              </div>
+
+              {/* Actions */}
+              <div className="flex items-center gap-2.5 pt-1">
+                <button
+                  type="button"
+                  disabled={isDeletingSubject}
+                  onClick={() => setSubjectToDelete(null)}
+                  className="flex-1 py-2.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold transition-all cursor-pointer disabled:opacity-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  disabled={isDeletingSubject}
+                  onClick={handleConfirmDeleteSubject}
+                  className="flex-1 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-700 active:scale-95 text-white text-xs font-bold transition-all shadow-sm flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
+                >
+                  {isDeletingSubject ? (
+                    <>
+                      <RefreshCw size={13} className="animate-spin" />
+                      <span>Deleting...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Trash2 size={13} />
+                      <span>Delete Folder</span>
+                    </>
+                  )}
+                </button>
+              </div>
             </div>
           </div>
-        </div>
+        </ModalPortal>
       )}
 
       {/* Subject Folder Creation Modal Dialog */}

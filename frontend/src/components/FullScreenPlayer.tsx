@@ -29,6 +29,7 @@ import { OrganicSoundwave } from './OrganicSoundwave';
 import { resolveSubjectVisual } from '../utils/subjectVisuals';
 import { bridge } from '../services/bridge';
 import { cn } from '@/lib/utils';
+import { ModalPortal } from '@/components/ui/modal-portal';
 
 export interface FullScreenPlayerProps {
   playbackState: PlaybackState;
@@ -788,22 +789,33 @@ export const FullScreenPlayer: React.FC<FullScreenPlayerProps> = ({
 
       {/* 5. DARK AESTHETIC STUDY TOOLS & OPTIONS MODAL SHEET */}
       {activeModal !== 'none' && (
-        <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-150">
+        <ModalPortal>
           <div
-            className="w-full max-w-sm sm:max-w-md bg-zinc-950/98 backdrop-blur-2xl rounded-3xl border border-zinc-800 shadow-[0_25px_60px_rgba(0,0,0,0.85)] p-4 sm:p-5 space-y-4 max-h-[90dvh] overflow-y-auto animate-in zoom-in-95 duration-150 text-white"
-            onClick={(e) => e.stopPropagation()}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="player-modal-title"
+            className="fixed inset-0 z-[70] bg-black/80 backdrop-blur-md flex items-center justify-center p-4 sm:p-6 overflow-y-auto safe-top safe-bottom animate-in fade-in duration-150"
+            onClick={(e) => {
+              if (e.target === e.currentTarget) {
+                setActiveModal('none');
+              }
+            }}
           >
-            {/* Modal Header */}
-            <div className="flex items-center justify-between pb-2 border-b border-zinc-800/80">
-              <div className="flex items-center gap-2">
-                <div className="size-8 rounded-xl bg-zinc-900 border border-zinc-800 flex items-center justify-center text-white">
-                  {activeModal === 'ab_loop' && <BookmarkCheck size={16} className="text-amber-400" />}
-                  {activeModal === 'sleep' && <Timer size={16} className="text-emerald-400" />}
-                  {activeModal === 'speed' && <SlidersHorizontal size={16} />}
-                  {activeModal === 'tools' && <MoreHorizontal size={16} />}
-                </div>
-                <div>
-                  <h4 className="text-sm font-bold text-white leading-tight">
+            <div
+              className="w-full max-w-sm sm:max-w-md bg-zinc-950/98 backdrop-blur-2xl rounded-3xl border border-zinc-800 shadow-[0_25px_60px_rgba(0,0,0,0.85)] p-4 sm:p-5 space-y-4 my-auto max-h-[85vh] overflow-y-auto animate-in zoom-in-95 duration-150 text-white"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {/* Modal Header */}
+              <div className="flex items-center justify-between pb-2 border-b border-zinc-800/80">
+                <div className="flex items-center gap-2">
+                  <div className="size-8 rounded-xl bg-zinc-900 border border-zinc-800 flex items-center justify-center text-white">
+                    {activeModal === 'ab_loop' && <BookmarkCheck size={16} className="text-amber-400" />}
+                    {activeModal === 'sleep' && <Timer size={16} className="text-emerald-400" />}
+                    {activeModal === 'speed' && <SlidersHorizontal size={16} />}
+                    {activeModal === 'tools' && <MoreHorizontal size={16} />}
+                  </div>
+                  <div>
+                    <h4 id="player-modal-title" className="text-sm font-bold text-white leading-tight">
                     {activeModal === 'ab_loop' && 'A⇄B Repeat Segment'}
                     {activeModal === 'sleep' && 'Sleep Timer'}
                     {activeModal === 'speed' && 'Playback Speed'}
@@ -930,6 +942,7 @@ export const FullScreenPlayer: React.FC<FullScreenPlayerProps> = ({
             )}
           </div>
         </div>
+        </ModalPortal>
       )}
     </div>
   );

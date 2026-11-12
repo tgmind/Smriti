@@ -36,9 +36,9 @@ describe('Google Drive Automatic Cloud Data Retrieval on Connect', () => {
     googleDriveService.disconnect();
   });
 
-  it('includes drive.readonly scope to read existing Google Drive audio files', () => {
-    expect(GOOGLE_DRIVE_SCOPES).toContain('https://www.googleapis.com/auth/drive.readonly');
+  it('strictly adheres to narrow drive.file scope and does not request broad drive.readonly', () => {
     expect(GOOGLE_DRIVE_SCOPES).toContain('https://www.googleapis.com/auth/drive.file');
+    expect(GOOGLE_DRIVE_SCOPES).not.toContain('https://www.googleapis.com/auth/drive.readonly');
   });
 
   it('retrieves cloud notes from smriti_catalog.json on connect', async () => {

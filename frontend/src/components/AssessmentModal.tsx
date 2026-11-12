@@ -10,6 +10,7 @@ import {
   EmptyDescription,
   EmptyContent,
 } from '@/components/ui/empty';
+import { ModalPortal } from '@/components/ui/modal-portal';
 
 interface AssessmentModalProps {
   items: RevisionItem[];
@@ -33,30 +34,32 @@ export const AssessmentModal: React.FC<AssessmentModalProps> = ({
 
   if (items.length === 0) {
     return (
-      <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-md flex items-center justify-center p-4">
-        <Empty className="bg-white border border-slate-200 p-6 rounded-3xl max-w-sm w-full text-center shadow-xl">
-          <EmptyHeader>
-            <EmptyMedia
-              variant="icon"
-              className="w-12 h-12 rounded-full bg-emerald-50 text-emerald-600 border border-emerald-200 mx-auto flex items-center justify-center mb-0.5"
-            >
-              <CheckCircle2 size={28} />
-            </EmptyMedia>
-            <EmptyTitle className="text-base font-bold text-slate-900">All Caught Up!</EmptyTitle>
-            <EmptyDescription className="text-xs text-slate-500 leading-relaxed">
-              No recall assessments are due right now. Continue listening to your audio notes to strengthen retrieval cues.
-            </EmptyDescription>
-          </EmptyHeader>
-          <EmptyContent className="w-full pt-1">
-            <button
-              onClick={onClose}
-              className="w-full py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-semibold text-xs transition-all active:scale-[0.98] cursor-pointer"
-            >
-              Back to Lessons
-            </button>
-          </EmptyContent>
-        </Empty>
-      </div>
+      <ModalPortal>
+        <div className="fixed inset-0 z-[70] bg-slate-950/75 backdrop-blur-md flex items-center justify-center p-4 sm:p-6 overflow-y-auto safe-top safe-bottom animate-in fade-in duration-150">
+          <Empty className="bg-white border border-slate-200/90 p-6 rounded-3xl max-w-sm w-full text-center shadow-2xl my-auto animate-in zoom-in-95 duration-150">
+            <EmptyHeader>
+              <EmptyMedia
+                variant="icon"
+                className="w-12 h-12 rounded-full bg-emerald-50 text-emerald-600 border border-emerald-200 mx-auto flex items-center justify-center mb-0.5"
+              >
+                <CheckCircle2 size={28} />
+              </EmptyMedia>
+              <EmptyTitle className="text-base font-bold text-slate-900">All Caught Up!</EmptyTitle>
+              <EmptyDescription className="text-xs text-slate-500 leading-relaxed">
+                No recall assessments are due right now. Continue listening to your audio notes to strengthen retrieval cues.
+              </EmptyDescription>
+            </EmptyHeader>
+            <EmptyContent className="w-full pt-1">
+              <button
+                onClick={onClose}
+                className="w-full py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-semibold text-xs transition-all active:scale-[0.98] cursor-pointer"
+              >
+                Back to Lessons
+              </button>
+            </EmptyContent>
+          </Empty>
+        </div>
+      </ModalPortal>
     );
   }
 
@@ -84,10 +87,11 @@ export const AssessmentModal: React.FC<AssessmentModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-slate-900/35 backdrop-blur-md flex flex-col justify-between p-4 overflow-y-auto safe-top safe-bottom text-slate-900 animate-in fade-in duration-150">
-      <div className="bg-white border border-slate-200/90 rounded-3xl p-5 shadow-2xl max-w-md mx-auto w-full my-auto space-y-5">
-        {/* Question Step Pills */}
-        <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+    <ModalPortal>
+      <div className="fixed inset-0 z-[70] bg-slate-950/75 backdrop-blur-md flex flex-col justify-between p-4 sm:p-6 overflow-y-auto safe-top safe-bottom text-slate-900 animate-in fade-in duration-150">
+        <div className="bg-white border border-slate-200/90 rounded-3xl p-5 shadow-2xl max-w-md mx-auto w-full my-auto space-y-5 animate-in zoom-in-95 duration-150">
+          {/* Question Step Pills */}
+          <div className="flex items-center justify-between border-b border-slate-100 pb-3">
           <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar">
             {items.map((_, idx) => {
               const isCurrent = idx === currentIndex;
@@ -303,5 +307,6 @@ export const AssessmentModal: React.FC<AssessmentModalProps> = ({
         </div>
       </div>
     </div>
+  </ModalPortal>
   );
 };
