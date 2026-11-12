@@ -1,0 +1,19 @@
+{
+  "version": 2,
+  "skills": {
+    "AudioEditor": {
+      "source": "danielmiessler/LifeOS",
+      "ref": "main",
+      "sourceType": "github",
+      "skillPath": "LifeOS/install/skills/AudioEditor/SKILL.md",
+      "computedHash": "7ac82e438c71f8f939e38769a6d101e48a30d31542309a5cb5308ad105f60165"
+    },
+    "anidoodle": {
+      "source": "alexgreensh/anidoodle",
+      "ref": "main",
+      "sourceType": "github",
+      "skillPath": "skills/anidoodle/SKILL.md",
+      "computedHash": "c21f84b51da3a2f853352df3641c0b9f67381fe8507e1530799e36f54200e863"
+    }
+  }
+}
