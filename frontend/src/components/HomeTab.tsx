@@ -1,4 +1,5 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef } from 'react';
+import Autoplay from 'embla-carousel-autoplay';
 import {
   Play,
   Pause,
@@ -23,6 +24,13 @@ import {
 import { AudioItem, Subject, UserSettings, PlaybackState } from '../types';
 import { formatDuration } from '../services/learningEngine';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import {
+  Carousel,
+  CarouselContent,
+  CarouselItem,
+  CarouselPrevious,
+  CarouselNext
+} from '@/components/ui/carousel';
 
 interface HomeTabProps {
   recentAudio: AudioItem[];
@@ -52,6 +60,10 @@ export const HomeTab: React.FC<HomeTabProps> = ({
   const [filterMode, setFilterMode] = useState<FilterMode>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [showNotificationToast, setShowNotificationToast] = useState(false);
+
+  const autoplayPlugin = useRef(
+    Autoplay({ delay: 2800, stopOnInteraction: false, stopOnMouseEnter: true })
+  );
 
   // Fallback to most recent or first audio note for "Continue Listening"
   const continueAudio = useMemo(() => {
@@ -257,52 +269,77 @@ export const HomeTab: React.FC<HomeTabProps> = ({
         )}
       </div>
 
-      {/* Hero Container: Recent Files & Clickable Subject Folders */}
-      <div className="bg-[#EEECFE] border border-indigo-150/70 rounded-3xl p-4 space-y-3 shadow-2xs">
+      {/* Hero Container: Animated Horizontal Moving Subject Carousel */}
+      <div className="bg-[#EEECFE] border border-indigo-150/70 rounded-3xl p-4 space-y-3 shadow-2xs relative overflow-hidden">
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-1.5">
+          <div className="flex items-center gap-2">
             <span className="text-xs font-bold text-slate-900">
               Subject Folders
+            </span>
+            <span className="px-2 py-0.5 rounded-full bg-indigo-200/60 text-indigo-900 text-[10px] font-mono font-bold">
+              {subjectList.length} Subjects
             </span>
           </div>
           <button
             onClick={() => onNavigateToLibrary()}
-            className="text-[10px] font-mono font-semibold px-2 py-0.5 rounded-full bg-white/80 hover:bg-white text-indigo-900 border border-indigo-200/50 flex items-center gap-0.5 cursor-pointer transition-colors"
+            className="text-[10px] font-mono font-semibold px-2.5 py-1 rounded-full bg-white/90 hover:bg-white text-indigo-900 border border-indigo-200/60 flex items-center gap-1 cursor-pointer transition-all active:scale-95 shadow-2xs"
           >
             <span>View All ({recentAudio.length})</span>
-            <ChevronRight size={10} />
+            <ChevronRight size={11} />
           </button>
         </div>
 
-        {/* 4 Interactive Subject Buttons */}
-        <div className="grid grid-cols-4 gap-2 pt-0.5">
-          {subjectList.map((subj) => {
-            const Icon = subj.icon;
-            return (
-              <button
-                key={subj.id}
-                type="button"
-                onClick={() => onNavigateToLibrary(subj.id)}
-                className={`flex flex-col items-center gap-1.5 p-2 rounded-2xl bg-white/70 hover:bg-white border border-white/80 hover:border-indigo-200 transition-all text-center cursor-pointer shadow-2xs hover:scale-105 active:scale-95 group ${subj.activeRing}`}
-              >
-                <div className={`w-10 h-10 rounded-full ${subj.bg} flex items-center justify-center shadow-2xs transition-transform group-hover:scale-110`}>
-                  <Icon size={18} strokeWidth={2.2} />
-                </div>
-                <span className="text-[11px] font-bold text-slate-900 truncate w-full">
-                  {subj.name}
-                </span>
-                <span className="text-[9px] text-slate-500 font-mono truncate w-full -mt-0.5">
-                  {subj.count}
-                </span>
-              </button>
-            );
-          })}
+        {/* Horizontal Moving Animated Subject Carousel (Embla Carousel) */}
+        <div className="relative px-0.5">
+          <Carousel
+            opts={{
+              align: 'start',
+              loop: true,
+            }}
+            plugins={[
+              autoplayPlugin.current
+            ]}
+            className="w-full"
+          >
+            <CarouselContent className="-ml-2.5">
+              {subjectList.map((subj) => {
+                const Icon = subj.icon;
+                return (
+                  <CarouselItem key={subj.id} className="pl-2.5 basis-[38%] sm:basis-[28%]">
+                    <button
+                      type="button"
+                      onClick={() => onNavigateToLibrary(subj.id)}
+                      className={`w-full flex flex-col items-center gap-1.5 p-3 rounded-2xl bg-white/95 hover:bg-white border border-white/80 hover:border-indigo-300 transition-all text-center cursor-pointer shadow-xs hover:shadow-md hover:-translate-y-0.5 active:scale-95 group ${subj.activeRing}`}
+                    >
+                      <div className={`size-11 rounded-full ${subj.bg} flex items-center justify-center shadow-2xs transition-transform group-hover:scale-110`}>
+                        <Icon size={20} strokeWidth={2.2} />
+                      </div>
+                      <div className="w-full text-center">
+                        <span className="text-xs font-bold text-slate-900 block truncate leading-tight">
+                          {subj.fullName || subj.name}
+                        </span>
+                        <span className="text-[10px] text-slate-500 font-mono font-medium block truncate mt-0.5">
+                          {subj.count}
+                        </span>
+                      </div>
+                    </button>
+                  </CarouselItem>
+                );
+              })}
+            </CarouselContent>
+            {/* Subtle Carousel Navigation Chevrons for desktop/tablet */}
+            <CarouselPrevious className="hidden sm:flex -left-2.5 size-7 bg-white/90 shadow-sm" />
+            <CarouselNext className="hidden sm:flex -right-2.5 size-7 bg-white/90 shadow-sm" />
+          </Carousel>
         </div>
 
-        <div className="pt-0.5 text-center">
-          <span className="text-[10px] font-mono text-indigo-900/70 font-semibold">
-            {recentAudio.length} Audio Notes • 4 Structured Subject Hierarchies
+        <div className="pt-0.5 flex items-center justify-between text-[10px] font-mono text-indigo-900/70 font-semibold px-1">
+          <span>{recentAudio.length} Audio Notes</span>
+          <span className="flex items-center gap-1 text-indigo-900 font-bold">
+            <span className="size-1.5 rounded-full bg-indigo-500 animate-pulse" />
+            Animated Carousel
           </span>
+          <span>4 Structured Subject Hierarchies</span>
         </div>
       </div>
 
