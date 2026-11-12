@@ -45,6 +45,7 @@ describe('Player Reliability, Progress & Google Drive Integration', () => {
         onSeek={vi.fn()}
         onSeekRelative={vi.fn()}
         onOpenFullScreen={vi.fn()}
+        onDismiss={vi.fn()}
       />
     );
 
@@ -55,6 +56,7 @@ describe('Player Reliability, Progress & Google Drive Integration', () => {
     expect(html).toContain('0:11');
     expect(html).toContain('First Audio');
     expect(html).toContain('Physics');
+    expect(html).toContain('aria-label="Close and dismiss player"');
   });
 
   it('FullScreenPlayer scrubber renders accurate progress and timecodes without Infinity:NaN:NaN', () => {
@@ -92,6 +94,7 @@ describe('Player Reliability, Progress & Google Drive Integration', () => {
     expect(html).toContain('0:08'); // 11 - 3 = 8s remaining
     expect(html).toContain('First Audio');
     expect(html).toContain('Study Mode');
+    expect(html).toContain('waveGradFront');
   });
 
   it('googleDriveService.downloadAudio requests file with authorization header', async () => {

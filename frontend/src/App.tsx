@@ -234,6 +234,16 @@ export const App: React.FC = () => {
     }
   };
 
+  const handleDismissPlayer = () => {
+    bridge.pause();
+    setPlaybackState(prev => ({
+      ...prev,
+      currentAudio: null,
+      isPlaying: false,
+      positionSeconds: 0
+    }));
+  };
+
   const handleSeek = (seconds: number) => {
     bridge.seek(seconds);
     setPlaybackState(prev => ({ ...prev, positionSeconds: seconds }));
@@ -476,6 +486,7 @@ export const App: React.FC = () => {
           onSeekRelative={handleSeekRelative}
           onOpenFullScreen={() => setIsFullScreenPlayerOpen(true)}
           onCycleSpeed={handleCycleSpeed}
+          onDismiss={handleDismissPlayer}
         />
       )}
 

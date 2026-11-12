@@ -514,17 +514,17 @@ export const HomeTab: React.FC<HomeTabProps> = ({
                 onClick={() => onPlayAudio(audio)}
                 className="flex-1 min-w-0 cursor-pointer"
               >
-                <div className="flex items-center gap-1.5 mb-1 flex-wrap">
-                  <span className="text-[10px] font-mono font-bold text-slate-600 uppercase">
+                <div className="flex items-center gap-1.5 mb-1 overflow-hidden">
+                  <span className="text-[10px] font-mono font-bold text-slate-700 uppercase shrink-0">
                     {audio.subject_name || 'General'}
                   </span>
                   {audio.is_downloaded_offline && (
-                    <span className="px-1.5 py-0.2 rounded-md bg-emerald-50 text-emerald-700 border border-emerald-200/70 text-[9px] font-bold font-mono flex items-center gap-0.5">
-                      <CheckCircle2 size={8} /> OFFLINE
+                    <span className="px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200/80 text-[9px] font-bold font-mono flex items-center gap-0.5 shrink-0">
+                      <CheckCircle2 size={9} /> OFFLINE
                     </span>
                   )}
                   {audio.audio_enhancement_applied && (
-                    <span className="px-1.5 py-0.2 rounded-md bg-sky-50 text-sky-700 border border-sky-200/70 text-[9px] font-bold font-mono">
+                    <span className="px-1.5 py-0.5 rounded-full bg-sky-50 text-sky-700 border border-sky-200/80 text-[9px] font-bold font-mono shrink-0">
                       DSP
                     </span>
                   )}

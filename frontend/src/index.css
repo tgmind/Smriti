@@ -110,3 +110,51 @@ button, a, input, select {
 .animate-in {
   animation: fadeIn 0.18s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
+
+/* Organic Ambient Wave & Disc Animations */
+@keyframes waveFlowSlow {
+  0% {
+    transform: translateX(0) scaleY(1);
+  }
+  50% {
+    transform: translateX(-15%) scaleY(1.08);
+  }
+  100% {
+    transform: translateX(-30%) scaleY(1);
+  }
+}
+
+@keyframes waveFlowFast {
+  0% {
+    transform: translateX(0) scaleY(1);
+  }
+  50% {
+    transform: translateX(-20%) scaleY(0.94);
+  }
+  100% {
+    transform: translateX(-40%) scaleY(1);
+  }
+}
+
+.animate-wave-slow {
+  animation: waveFlowSlow 12s ease-in-out infinite alternate;
+}
+
+.animate-wave-fast {
+  animation: waveFlowFast 8s ease-in-out infinite alternate;
+}
+
+@keyframes gentleDiscPulse {
+  0%, 100% {
+    transform: scale(1);
+    box-shadow: 0 16px 40px -10px rgba(14, 165, 233, 0.22);
+  }
+  50% {
+    transform: scale(1.025);
+    box-shadow: 0 20px 50px -10px rgba(14, 165, 233, 0.35);
+  }
+}
+
+.animate-disc-pulse {
+  animation: gentleDiscPulse 3.5s ease-in-out infinite;
+}
