@@ -1,7 +1,7 @@
 import React from 'react';
-import { Home, Folder, BarChart3, Mic, User, Play } from 'lucide-react';
+import { Folder, Download, BarChart3, Mic, User, Play } from 'lucide-react';
 
-export type TabType = 'home' | 'library' | 'progress' | 'record' | 'profile';
+export type TabType = 'library' | 'downloads' | 'record' | 'progress' | 'profile' | 'home';
 
 interface NavigationProps {
   currentTab: TabType;
@@ -19,13 +19,13 @@ export const Navigation: React.FC<NavigationProps> = ({
   onTogglePlay
 }) => {
   const leftTabs = [
-    { id: 'home' as TabType, label: 'Home', icon: Home },
-    { id: 'library' as TabType, label: 'Library', icon: Folder }
+    { id: 'library' as TabType, label: 'Library', ariaLabel: 'Home', title: 'Library (Home)', icon: Folder },
+    { id: 'downloads' as TabType, label: 'Downloads', ariaLabel: 'Downloads', title: 'Downloads & Drive Sync', icon: Download }
   ];
 
   const rightTabs = [
-    { id: 'progress' as TabType, label: 'Progress', icon: BarChart3 },
-    { id: 'profile' as TabType, label: 'Account', icon: User }
+    { id: 'progress' as TabType, label: 'Progress', ariaLabel: 'Study Progress', title: 'Study Progress', icon: BarChart3 },
+    { id: 'profile' as TabType, label: 'Account', ariaLabel: 'Account', title: 'Account Profile', icon: User }
   ];
 
   const hasPlayer = Boolean(attachedPlayer);
@@ -52,12 +52,13 @@ export const Navigation: React.FC<NavigationProps> = ({
           <div className="flex items-center gap-1">
             {leftTabs.map((tab) => {
               const Icon = tab.icon;
-              const isActive = currentTab === tab.id;
+              const isActive = currentTab === tab.id || (tab.id === 'library' && currentTab === 'home');
               return (
                 <button
                   key={tab.id}
                   onClick={() => onSelectTab(tab.id)}
-                  aria-label={tab.label}
+                  aria-label={tab.ariaLabel || tab.label}
+                  title={tab.title || tab.label}
                   className={`w-10 h-10 rounded-full flex items-center justify-center transition-all duration-200 cursor-pointer ${
                     isActive
                       ? 'bg-white text-slate-950 shadow-sm scale-105'
@@ -95,6 +96,7 @@ export const Navigation: React.FC<NavigationProps> = ({
             <button
               onClick={() => onSelectTab('record')}
               aria-label="Record Audio Note"
+              title="Record Audio Note"
               className={`w-11 h-11 rounded-full flex items-center justify-center text-white transition-all duration-200 shadow-md active:scale-90 cursor-pointer ${
                 currentTab === 'record'
                   ? 'bg-amber-500 shadow-amber-500/40 ring-4 ring-amber-400/30 scale-105'
@@ -114,7 +116,8 @@ export const Navigation: React.FC<NavigationProps> = ({
                 <button
                   key={tab.id}
                   onClick={() => onSelectTab(tab.id)}
-                  aria-label={tab.label}
+                  aria-label={tab.ariaLabel || tab.label}
+                  title={tab.title || tab.label}
                   className={`w-10 h-10 rounded-full flex items-center justify-center transition-all duration-200 cursor-pointer ${
                     isActive
                       ? 'bg-white text-slate-950 shadow-sm scale-105'

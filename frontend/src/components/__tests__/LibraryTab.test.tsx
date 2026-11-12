@@ -62,9 +62,9 @@ describe('LibraryTab Apple Music Redesign', () => {
     // Recent lesson note preview
     expect(html).toContain('Gauss Law &amp; Electric Flux');
 
-    // Minimal view mode toggles
-    expect(html).toContain('Cards');
-    expect(html).toContain('Catalog');
+    // Direct Subject Folders view (Catalog toggle removed)
+    expect(html).toContain('Subject Folders');
+    expect(html).not.toContain('Catalog');
   });
 
   it('renders drill-down subject view when initialSubjectId is provided', () => {

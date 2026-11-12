@@ -19,8 +19,6 @@ import {
   SlidersHorizontal,
   Cloud,
   RefreshCw,
-  FolderTree,
-  LayoutGrid,
   Scissors,
   Calculator,
   Globe,
@@ -33,12 +31,14 @@ import {
   TrendingUp,
   Lightbulb,
   Languages,
-  Trash2
+  Trash2,
+  Bell,
+  ShieldCheck
 } from 'lucide-react';
-import { AudioItem, Subject, PlaybackState } from '../types';
+import { AudioItem, Subject, PlaybackState, UserSettings } from '../types';
 import { formatDuration } from '../services/learningEngine';
 import { ACADEMIC_ICON_MAP } from '../utils/subjectVisuals';
-import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { googleDriveService } from '../services/googleDrive';
 import {
   Card,
   CardAction,
@@ -71,7 +71,6 @@ import {
   EmptyTitle,
   EmptyDescription
 } from '@/components/ui/empty';
-import { FileTree } from '@/components/ui/file-tree';
 import { AudioTrimmer } from './AudioTrimmer';
 
 export interface LibraryTabProps {
@@ -94,10 +93,11 @@ export interface LibraryTabProps {
   onDeleteSubject?: (subjectId: string, options?: { deleteRecordings?: boolean }) => Promise<void> | void;
   onDeleteAudio?: (audioId: string) => Promise<void> | void;
   initialCreateFolderOpen?: boolean;
+  userSettings?: UserSettings;
+  onNavigateToAccount?: () => void;
 }
 
 type LibraryViewMode = 'topics' | 'subject' | 'note';
-type FilterMode = 'all' | 'favorites' | 'offline' | 'short';
 type SortMode = 'recent' | 'duration' | 'title';
 
 const FOLDER_ICON_OPTIONS = [
@@ -146,8 +146,11 @@ export const LibraryTab: React.FC<LibraryTabProps> = ({
   onCreateSubject,
   onDeleteSubject,
   onDeleteAudio,
-  initialCreateFolderOpen = false
+  initialCreateFolderOpen = false,
+  userSettings,
+  onNavigateToAccount
 }) => {
+  const [showNotificationToast, setShowNotificationToast] = useState(false);
   // 3-Tier Navigation State: Library (topics) -> Subject -> Audio Note
   const [viewMode, setViewMode] = useState<LibraryViewMode>(initialSubjectId ? 'subject' : 'topics');
   const [selectedSubjectId, setSelectedSubjectId] = useState<string | null>(initialSubjectId || null);
@@ -236,10 +239,8 @@ export const LibraryTab: React.FC<LibraryTabProps> = ({
 
   // Filters & Search
   const [searchQuery, setSearchQuery] = useState('');
-  const [filterMode, setFilterMode] = useState<FilterMode>('all');
   const [sortMode, setSortMode] = useState<SortMode>('recent');
   const [selectedTopicTag, setSelectedTopicTag] = useState<string | null>(null);
-  const [layoutMode, setLayoutMode] = useState<'folders' | 'tree'>('folders');
   const [isTrimmingNote, setIsTrimmingNote] = useState(false);
 
   // Selected subject & audio objects
@@ -405,20 +406,6 @@ export const LibraryTab: React.FC<LibraryTabProps> = ({
     return Array.from(map.values());
   }, [subjects, audiosBySubject]);
 
-  // Aggregate stats across all subjects
-  const libraryStats = useMemo(() => {
-    const totalDurationSeconds = audioItems.reduce((acc, curr) => acc + curr.duration_seconds, 0);
-    const totalOffline = audioItems.filter(a => a.is_downloaded_offline).length;
-    const totalFavorites = audioItems.filter(a => a.is_favorite).length;
-    return {
-      totalSubjects: deduplicatedSubjects.length,
-      totalAudios: audioItems.length,
-      totalDurationSeconds,
-      totalOffline,
-      totalFavorites
-    };
-  }, [audioItems, deduplicatedSubjects]);
-
   // Filter and sort audio items for a specific subject (or all if subject is null)
   const getSubjectAudios = (subjectId: string | null) => {
     let items = audioItems;
@@ -430,10 +417,6 @@ export const LibraryTab: React.FC<LibraryTabProps> = ({
         (targetSubName && a.subject_name?.trim().toLowerCase() === targetSubName)
       );
     }
-
-    if (filterMode === 'favorites') items = items.filter(a => a.is_favorite);
-    if (filterMode === 'offline') items = items.filter(a => a.is_downloaded_offline);
-    if (filterMode === 'short') items = items.filter(a => a.duration_seconds <= 300);
 
     if (selectedTopicTag) {
       items = items.filter(a => a.key_terms?.some(t => t.toLowerCase() === selectedTopicTag.toLowerCase()));
@@ -1292,58 +1275,108 @@ export const LibraryTab: React.FC<LibraryTabProps> = ({
 
   return (
     <div className="space-y-4 pb-28 pt-3 px-4 max-w-md mx-auto animate-in">
-      {/* Top Header */}
-      <div className="flex items-center justify-between pt-1">
-        <div>
-          <h1 className="text-2xl font-black text-slate-950 tracking-tight">
-            Library
-          </h1>
-          <p className="text-xs text-slate-500 mt-0.5">
-            Structured subject topics & audio notes.
+      {/* 1. Restored Top Welcome Greeting Header (from Image 1) above Search Bar */}
+      <div className="space-y-3 pt-1">
+        {/* Row 1: Profile & Greeting with Notification Bell */}
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            {/* Mint Circle Avatar */}
+            <div
+              onClick={onNavigateToAccount}
+              className="size-10.5 rounded-full bg-[#A7F3D0]/60 border border-[#34D399]/40 text-[#065F46] flex items-center justify-center font-bold text-sm shadow-2xs hover:scale-105 active:scale-95 transition-all cursor-pointer"
+              title="View Account Profile"
+            >
+              स्म
+            </div>
+
+            {/* Greeting & Vault Status */}
+            <div>
+              <div className="flex items-center gap-1.5">
+                <span className="text-sm font-bold text-slate-900 tracking-tight">
+                  {`Hi, ${userSettings?.display_name || googleDriveService.getUserProfile()?.name || 'Scholar'}`}
+                </span>
+                <span className="size-2 rounded-full bg-[#10B981] inline-block" />
+              </div>
+              <p className="text-[11px] text-slate-500 font-medium">
+                Offline-First Vault • Ready to Study
+              </p>
+            </div>
+          </div>
+
+          {/* Notification Bell Button */}
+          <button
+            onClick={() => setShowNotificationToast(true)}
+            className="size-10 rounded-full bg-white border border-slate-200/80 text-slate-700 hover:text-slate-950 hover:bg-slate-50 shadow-2xs transition-all active:scale-90 flex items-center justify-center relative cursor-pointer"
+            title="Daily Revision Reminders"
+          >
+            <Bell size={17} />
+            <span className="absolute top-2 right-2.5 size-2 rounded-full bg-[#10B981]" />
+          </button>
+        </div>
+
+        {/* Row 2: Hero Brand Title & Tagline */}
+        <div className="pt-0.5 space-y-0.5">
+          <h2 className="text-2xl font-black text-slate-950 tracking-tight leading-tight">
+            Save With Smriti
+          </h2>
+          <p className="text-xs text-slate-500 font-medium">
+            The Vedic tool for learning anything.
           </p>
         </div>
 
-        <button
-          onClick={onGoToRecord}
-          className="py-1.5 px-3 rounded-full bg-slate-950 text-white font-semibold text-xs flex items-center gap-1.5 hover:bg-slate-800 active:scale-95 transition-all shadow-xs cursor-pointer"
-        >
-          <Plus size={15} />
-          <span>New Audio</span>
-        </button>
+        {/* Row 3: Search Bar with Filters icon */}
+        <div className="relative pt-0.5">
+          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 size-4 text-slate-400" />
+          <input
+            type="text"
+            placeholder="Search audio notes, subjects, concepts..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-full pl-9.5 pr-9 py-2.5 rounded-2xl bg-white border border-slate-200/80 text-xs text-slate-800 placeholder:text-slate-400 shadow-2xs focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-400 transition-all"
+          />
+          {searchQuery ? (
+            <button
+              onClick={() => setSearchQuery('')}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-0.5 cursor-pointer"
+            >
+              <X size={14} />
+            </button>
+          ) : (
+            <button
+              onClick={onNavigateToAccount}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700 p-0.5 cursor-pointer"
+              title="Filter & Settings"
+            >
+              <SlidersHorizontal size={15} />
+            </button>
+          )}
+        </div>
       </div>
 
-      {/* Global Search with Filter Sliders */}
-      <div className="relative flex items-center">
-        <div className="absolute left-3.5 text-slate-400 pointer-events-none">
-          <Search size={16} />
-        </div>
-        <input
-          type="text"
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          placeholder="Search subjects, formulas, concepts..."
-          className="w-full pl-10 pr-10 py-2.5 rounded-2xl bg-white border border-slate-200/90 text-xs font-medium text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-400 transition-all shadow-[0_2px_8px_rgba(0,0,0,0.02)]"
-        />
-        {searchQuery ? (
+      {/* Notification Toast Modal */}
+      {showNotificationToast && (
+        <div className="p-3 bg-emerald-50 border border-emerald-200/90 rounded-2xl flex items-start justify-between gap-3 shadow-xs animate-in fade-in duration-200">
+          <div className="flex items-start gap-2.5">
+            <div className="p-1.5 rounded-xl bg-emerald-100 text-emerald-800 shrink-0 mt-0.5">
+              <ShieldCheck size={16} />
+            </div>
+            <div>
+              <h4 className="text-xs font-bold text-emerald-950">Daily Revision Plan Active</h4>
+              <p className="text-[11px] text-emerald-800 mt-0.5 leading-snug">
+                Your spaced intervals are automatically scheduled with high-retention audio repeats.
+              </p>
+            </div>
+          </div>
           <button
-            onClick={() => setSearchQuery('')}
-            className="absolute right-3 text-slate-400 hover:text-slate-700 p-0.5 cursor-pointer"
-            aria-label="Clear search"
+            onClick={() => setShowNotificationToast(false)}
+            className="text-emerald-700 hover:text-emerald-900 p-1 cursor-pointer shrink-0"
           >
             <X size={15} />
           </button>
-        ) : (
-          <button
-            type="button"
-            aria-label="Filter"
-            className="absolute right-3 text-slate-400 hover:text-slate-700 transition-colors cursor-pointer"
-          >
-            <SlidersHorizontal size={15} />
-          </button>
-        )}
-      </div>
+        </div>
+      )}
 
-      {/* Action Chips Row (Upload, Folder, Scan style in Image 1) */}
+      {/* Action Chips Row (Upload, New Topic, Sync Drive) */}
       <div className="grid grid-cols-3 gap-2">
         <button
           onClick={onGoToRecord}
@@ -1376,150 +1409,79 @@ export const LibraryTab: React.FC<LibraryTabProps> = ({
         </button>
       </div>
 
-      {/* Base UI Tabs for Filter Modes */}
-      <Tabs
-        value={filterMode}
-        onValueChange={(val) => setFilterMode(val as FilterMode)}
-        className="w-full space-y-3"
-      >
-        <TabsList className="w-full grid grid-cols-4 p-1 bg-slate-100/90 border border-slate-200/80 rounded-2xl h-10 shadow-2xs">
-          <TabsTrigger value="all" className="flex items-center justify-center gap-1 text-xs rounded-xl">
-            <span>All</span>
-            <span className="text-[10px] font-mono font-bold px-1.5 py-0.2 rounded-full bg-slate-200/70 text-slate-700">
-              {libraryStats.totalAudios}
-            </span>
-          </TabsTrigger>
-
-          <TabsTrigger value="favorites" className="flex items-center justify-center gap-1 text-xs rounded-xl">
-            <Star className="size-3.5 text-amber-500 fill-amber-400" />
-            <span>Favs</span>
-          </TabsTrigger>
-
-          <TabsTrigger value="offline" className="flex items-center justify-center gap-1 text-xs rounded-xl">
-            <CheckCircle2 className="size-3.5 text-emerald-600" />
-            <span>Offline</span>
-          </TabsTrigger>
-
-          <TabsTrigger value="short" className="flex items-center justify-center gap-1 text-xs rounded-xl">
-            <Zap className="size-3.5 text-sky-500 fill-sky-500" />
-            <span>&lt;5m</span>
-          </TabsTrigger>
-        </TabsList>
-      </Tabs>
-
-      {/* MINIMALIST SUBJECT CATALOG CONTAINER */}
+      {/* DIRECT SUBJECT FOLDERS CONTAINER (Tabs "All, favs, Offline, <5m" & Catalog view removed) */}
       <div className="bg-white border border-slate-200/80 rounded-3xl p-3 sm:p-4 space-y-3 shadow-2xs">
         <div className="flex items-center justify-between px-1">
           <div className="flex items-center gap-1.5">
             <span className="text-xs font-bold uppercase tracking-wider text-slate-700">
-              {layoutMode === 'tree' ? 'File Tree' : 'Subjects'}
+              Subject Folders
             </span>
             <span className="text-[11px] font-mono text-slate-400 font-medium">
               {`(${deduplicatedSubjects.length})`}
             </span>
           </div>
-
-          {/* View Mode Toggle: Cards vs Catalog (File Tree) */}
-          <div className="flex items-center gap-0.5 bg-slate-100 p-0.5 rounded-xl border border-slate-200/70">
-            <button
-              type="button"
-              onClick={() => setLayoutMode('folders')}
-              className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold transition-all flex items-center gap-1.5 cursor-pointer ${
-                layoutMode === 'folders'
-                  ? 'bg-white text-slate-950 shadow-xs'
-                  : 'text-slate-500 hover:text-slate-900'
-              }`}
-            >
-              <LayoutGrid size={12} />
-              <span>Cards</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => setLayoutMode('tree')}
-              className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold transition-all flex items-center gap-1.5 cursor-pointer ${
-                layoutMode === 'tree'
-                  ? 'bg-white text-slate-950 shadow-xs'
-                  : 'text-slate-500 hover:text-slate-900'
-              }`}
-            >
-              <FolderTree size={12} />
-              <span>Catalog</span>
-            </button>
-          </div>
         </div>
 
-        {/* View Option 1: File Tree (Minimalist Folder/File Hierarchy) */}
-        {layoutMode === 'tree' ? (
-          <FileTree
-            subjects={deduplicatedSubjects}
-            audioItems={allFilteredAudios}
-            onSelectAudio={handleOpenAudioNote}
-            onSelectSubject={handleOpenSubject}
-            onSelectConcept={(concept) => setSelectedTopicTag(concept)}
-            activeAudioId={playbackState?.currentAudio?.id}
-          />
-        ) : (
-          /* View Option 2: Clean Minimalist Subject Cards */
-          <div className="space-y-2">
-            {deduplicatedSubjects.map((subject) => {
-              const subjectAudios = audiosBySubject.get(subject.id) || audiosBySubject.get(subject.name.toLowerCase()) || [];
-              const totalDuration = subjectAudios.reduce((acc, curr) => acc + curr.duration_seconds, 0);
-              const latestAudio = subjectAudios[0];
-              const SubjectIcon = getSubjectIcon(subject.icon_name);
-              const subjectTheme = getSubjectTheme(subject.color_hex);
+        {/* Clean Minimalist Subject Cards */}
+        <div className="space-y-2">
+          {deduplicatedSubjects.map((subject) => {
+            const subjectAudios = audiosBySubject.get(subject.id) || audiosBySubject.get(subject.name.toLowerCase()) || [];
+            const totalDuration = subjectAudios.reduce((acc, curr) => acc + curr.duration_seconds, 0);
+            const latestAudio = subjectAudios[0];
+            const SubjectIcon = getSubjectIcon(subject.icon_name);
+            const subjectTheme = getSubjectTheme(subject.color_hex);
 
-              return (
-                <div
-                  key={subject.id}
-                  onClick={() => handleOpenSubject(subject.id)}
-                  className="group bg-white hover:bg-slate-50/90 border border-slate-200/80 hover:border-slate-300 rounded-2xl p-3 sm:p-3.5 flex items-center justify-between gap-3 transition-all cursor-pointer shadow-2xs hover:shadow-xs active:scale-[0.99]"
-                >
-                  {/* Left: Minimalist Subject Icon */}
-                  <div className={`w-10 h-10 rounded-2xl ${subjectTheme.bg} flex items-center justify-center shrink-0 shadow-2xs group-hover:scale-105 transition-transform border ${subjectTheme.border}`}>
-                    <SubjectIcon size={20} />
-                  </div>
+            return (
+              <div
+                key={subject.id}
+                onClick={() => handleOpenSubject(subject.id)}
+                className="group bg-white hover:bg-slate-50/90 border border-slate-200/80 hover:border-slate-300 rounded-2xl p-3 sm:p-3.5 flex items-center justify-between gap-3 transition-all cursor-pointer shadow-2xs hover:shadow-xs active:scale-[0.99]"
+              >
+                {/* Left: Minimalist Subject Icon */}
+                <div className={`w-10 h-10 rounded-2xl ${subjectTheme.bg} flex items-center justify-center shrink-0 shadow-2xs group-hover:scale-105 transition-transform border ${subjectTheme.border}`}>
+                  <SubjectIcon size={20} />
+                </div>
 
-                  {/* Middle: Subject Title & Clean Subtitle */}
-                  <div className="flex-1 min-w-0">
-                    <h3 className="text-sm font-bold text-slate-950 group-hover:text-blue-600 transition-colors truncate">
-                      {subject.name}
-                    </h3>
-                    <p className="text-xs text-slate-500 mt-0.5 truncate font-normal">
-                      {subjectAudios.length > 0
-                        ? `${subjectAudios.length} ${subjectAudios.length === 1 ? 'lesson' : 'lessons'} · ${formatDuration(totalDuration)}`
-                        : 'No recordings yet'}
+                {/* Middle: Subject Title & Clean Subtitle */}
+                <div className="flex-1 min-w-0">
+                  <h3 className="text-sm font-bold text-slate-950 group-hover:text-blue-600 transition-colors truncate">
+                    {subject.name}
+                  </h3>
+                  <p className="text-xs text-slate-500 mt-0.5 truncate font-normal">
+                    {subjectAudios.length > 0
+                      ? `${subjectAudios.length} ${subjectAudios.length === 1 ? 'lesson' : 'lessons'} · ${formatDuration(totalDuration)}`
+                      : 'No recordings yet'}
+                  </p>
+                  {latestAudio && (
+                    <p className="text-[11px] text-slate-400 truncate mt-0.5">
+                      Recent: <span className="text-slate-600 font-medium">{latestAudio.title}</span>
                     </p>
-                    {latestAudio && (
-                      <p className="text-[11px] text-slate-400 truncate mt-0.5">
-                        Recent: <span className="text-slate-600 font-medium">{latestAudio.title}</span>
-                      </p>
-                    )}
-                  </div>
+                  )}
+                </div>
 
-                  {/* Right: Actions */}
-                  <div className="flex items-center gap-1 shrink-0">
-                    {onDeleteSubject && (
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setSubjectToDelete(subject);
-                        }}
-                        className="p-1.5 text-slate-300 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-all cursor-pointer"
-                        title={`Delete ${subject.name} folder`}
-                      >
-                        <Trash2 size={15} />
-                      </button>
-                    )}
-                    <div className="text-slate-300 group-hover:text-slate-600 transition-colors">
-                      <ChevronRight size={16} className="group-hover:translate-x-0.5 transition-transform" />
-                    </div>
+                {/* Right: Actions */}
+                <div className="flex items-center gap-1 shrink-0">
+                  {onDeleteSubject && (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setSubjectToDelete(subject);
+                      }}
+                      className="p-1.5 text-slate-300 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-all cursor-pointer"
+                      title={`Delete ${subject.name} folder`}
+                    >
+                      <Trash2 size={15} />
+                    </button>
+                  )}
+                  <div className="text-slate-300 group-hover:text-slate-600 transition-colors">
+                    <ChevronRight size={16} className="group-hover:translate-x-0.5 transition-transform" />
                   </div>
                 </div>
-              );
-            })}
-          </div>
-        )}
+              </div>
+            );
+          })}
+        </div>
       </div>
 
       {/* If Searching: Direct Audio Search Results */}

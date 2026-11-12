@@ -2,8 +2,8 @@ import React, { useState, useEffect, useRef } from 'react';
 import { TabType, Navigation } from './components/Navigation';
 import { MiniPlayer } from './components/MiniPlayer';
 import { FullScreenPlayer } from './components/FullScreenPlayer';
-import { HomeTab } from './components/HomeTab';
 import { LibraryTab } from './components/LibraryTab';
+import { DownloadsTab } from './components/DownloadsTab';
 import { ProgressTab } from './components/ProgressTab';
 import { RecordTab } from './components/RecordTab';
 import { ProfileTab } from './components/ProfileTab';
@@ -27,7 +27,7 @@ import { googleDriveService } from './services/googleDrive';
 import { audioStorage } from './services/audioStorage';
 
 export const App: React.FC = () => {
-  const [currentTab, setCurrentTab] = useState<TabType>('home');
+  const [currentTab, setCurrentTab] = useState<TabType>('library');
   const [audioItems, setAudioItems] = useState<AudioItem[]>(() => {
     // If Google Drive is not connected, enforce strict privacy: 0 audio notes displayed
     if (!googleDriveService.isConnected()) {
@@ -398,6 +398,24 @@ export const App: React.FC = () => {
       prev.map(item => (item.id === audio.id ? { ...item, is_downloaded_offline: nextState } : item))
     );
     setStorageInfo(bridge.getStorageInfo());
+  };
+
+  const handleDeleteAllDownloads = async () => {
+    try {
+      await audioStorage.clearAllAudioBlobs();
+      for (const item of audioItems) {
+        if (item.is_downloaded_offline) {
+          bridge.removeOfflineDownload(item.id);
+        }
+      }
+      setAudioItems(prev =>
+        prev.map(item => ({ ...item, is_downloaded_offline: false }))
+      );
+      setStorageInfo(bridge.getStorageInfo());
+      bridge.triggerHaptic('medium');
+    } catch (err) {
+      console.error('Failed to clear downloaded files:', err);
+    }
   };
 
   const handleCycleSpeed = () => {
@@ -896,31 +914,13 @@ export const App: React.FC = () => {
     <div className="min-h-screen bg-[#F8F9FD] text-slate-900 flex flex-col font-sans select-none">
       {/* Active Tab Screen */}
       <main className={`flex-1 w-full max-w-md mx-auto ${playbackState.currentAudio ? 'pb-36 sm:pb-40' : 'pb-24'}`}>
-        {currentTab === 'home' && (
-          <HomeTab
-            recentAudio={audioItems}
-            subjects={subjects}
-            playbackState={playbackState}
-            userSettings={userSettings}
-            isDriveConnected={isDriveConnected}
-            onConnectDrive={handleConnectDrive}
-            onSyncToDrive={handleSyncItemToDrive}
-            onDownloadFromDrive={handleDownloadItemFromDrive}
-            onToggleOffline={handleToggleOffline}
-            onPlayAudio={handlePlayAudio}
-            onSeek={handleSeek}
-            onGoToRecord={() => setCurrentTab('record')}
-            onNavigateToLibrary={handleNavigateToLibrary}
-            onNavigateToAccount={handleNavigateToAccount}
-          />
-        )}
-
-        {currentTab === 'library' && (
+        {(currentTab === 'library' || currentTab === 'home') && (
           <LibraryTab
             audioItems={audioItems}
             subjects={subjects}
             initialSubjectId={selectedSubjectForLibrary}
             playbackState={playbackState}
+            userSettings={userSettings}
             isDriveConnected={isDriveConnected}
             isSyncingDrive={isSyncingDrive}
             onSyncDrive={handleSyncDrive}
@@ -932,9 +932,27 @@ export const App: React.FC = () => {
             onToggleFavorite={handleToggleFavorite}
             onToggleOffline={handleToggleOffline}
             onGoToRecord={() => setCurrentTab('record')}
+            onNavigateToAccount={handleNavigateToAccount}
             onCreateSubject={handleCreateSubject}
             onDeleteSubject={handleDeleteSubject}
             onDeleteAudio={handleDeleteAudio}
+          />
+        )}
+
+        {currentTab === 'downloads' && (
+          <DownloadsTab
+            audioItems={audioItems}
+            playbackState={playbackState}
+            isDriveConnected={isDriveConnected}
+            isSyncingDrive={isSyncingDrive}
+            onConnectDrive={handleConnectDrive}
+            onSyncDrive={handleSyncDrive}
+            onSyncItemToDrive={handleSyncItemToDrive}
+            onDownloadItemFromDrive={handleDownloadItemFromDrive}
+            onToggleOffline={handleToggleOffline}
+            onDeleteAllDownloads={handleDeleteAllDownloads}
+            onPlayAudio={handlePlayAudio}
+            onNavigateToLibrary={handleNavigateToLibrary}
           />
         )}
 
@@ -948,7 +966,7 @@ export const App: React.FC = () => {
           <RecordTab
             subjects={subjects}
             onSaveAudio={handleSaveAudio}
-            onCancel={() => setCurrentTab('home')}
+            onCancel={() => setCurrentTab('library')}
             isDriveConnected={isDriveConnected}
             onConnectDrive={handleConnectDrive}
           />
