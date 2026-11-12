@@ -769,7 +769,7 @@ export const HomeTab: React.FC<HomeTabProps> = ({
             <div className="flex items-center justify-between px-0.5">
               <span className="text-[11px] font-bold uppercase tracking-wider text-sky-900 flex items-center gap-1.5">
                 <RefreshCw size={12} className="animate-spin text-[#24A1DE]" />
-                Active Transfers ({activeTransfers.length})
+                {`Active Transfers (${activeTransfers.length})`}
               </span>
               <span className="text-[10px] font-mono text-sky-600 font-semibold">Streaming</span>
             </div>
@@ -792,13 +792,15 @@ export const HomeTab: React.FC<HomeTabProps> = ({
                   <AttachmentContent>
                     <AttachmentTitle>{transfer.fileName}</AttachmentTitle>
                     <AttachmentDescription>
-                      {transfer.direction === 'upload'
-                        ? 'Uploading to Drive'
-                        : 'Downloading from Drive'}{' '}
-                      · {transfer.progressPercent}% ·{' '}
-                      {transfer.state === 'processing'
-                        ? 'Finalizing sovereign sync...'
-                        : formatBytes(transfer.fileSizeBytes)}
+                      {`${
+                        transfer.direction === 'upload'
+                          ? 'Uploading to Drive'
+                          : 'Downloading from Drive'
+                      } · ${transfer.progressPercent}% · ${
+                        transfer.state === 'processing'
+                          ? 'Finalizing sovereign sync...'
+                          : formatBytes(transfer.fileSizeBytes)
+                      }`}
                     </AttachmentDescription>
                   </AttachmentContent>
                   <AttachmentActions>
@@ -820,7 +822,7 @@ export const HomeTab: React.FC<HomeTabProps> = ({
         <div className="space-y-2">
           <div className="flex items-center justify-between px-0.5">
             <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
-              Synced Drive Audio Notes ({driveAudioNotes.length})
+              {`Synced Drive Audio Notes (${driveAudioNotes.length})`}
             </span>
             <span className="text-[10px] font-mono text-slate-400">My Drive / Smriti</span>
           </div>
@@ -980,7 +982,7 @@ export const HomeTab: React.FC<HomeTabProps> = ({
                   {isMostPlayed && (
                     <span className="px-1.5 py-0.5 rounded-full bg-amber-50 text-amber-800 border border-amber-200/70 text-[9px] font-bold font-mono flex items-center gap-0.5 shrink-0">
                       <Flame size={9} className="fill-amber-500 text-amber-500" />
-                      {playCount} {playCount === 1 ? 'play' : 'plays'}
+                      {`${playCount} ${playCount === 1 ? 'play' : 'plays'}`}
                     </span>
                   )}
 
