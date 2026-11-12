@@ -39,13 +39,110 @@ export interface GoogleDriveStorageQuota {
   userPhoto?: string;
 }
 
+export interface DriveTransferItem {
+  id: string;
+  audioId?: string;
+  title: string;
+  fileName: string;
+  direction: 'upload' | 'download';
+  state: 'idle' | 'uploading' | 'processing' | 'error' | 'done';
+  progressPercent: number;
+  fileSizeBytes?: number;
+  mimeType?: string;
+  errorMessage?: string;
+  googleDriveFileId?: string;
+  timestamp: number;
+}
+
 class GoogleDriveService {
   private accessToken: string | null = null;
   private rootFolderId: string | null = null;
   private userProfile: GoogleUserProfile | null = null;
+  private transferListeners: Set<(transfers: DriveTransferItem[]) => void> = new Set();
+  private transfers: DriveTransferItem[] = [];
 
   constructor() {
     this.restoreToken();
+    this.restoreTransfers();
+  }
+
+  private restoreTransfers() {
+    if (typeof window === 'undefined') return;
+    try {
+      const saved = localStorage.getItem('smriti_drive_transfers');
+      if (saved) {
+        this.transfers = JSON.parse(saved);
+      }
+    } catch (e) {
+      // ignore
+    }
+  }
+
+  private notifyTransfers() {
+    const list = [...this.transfers];
+    this.transferListeners.forEach((listener) => {
+      try {
+        listener(list);
+      } catch (e) {
+        console.warn('Error in transfer listener', e);
+      }
+    });
+    if (typeof window !== 'undefined') {
+      try {
+        const toSave = this.transfers.filter((t) => t.state === 'done' || t.state === 'error').slice(0, 15);
+        localStorage.setItem('smriti_drive_transfers', JSON.stringify(toSave));
+      } catch (e) {
+        // ignore
+      }
+    }
+  }
+
+  public getTransfers(): DriveTransferItem[] {
+    return [...this.transfers];
+  }
+
+  public getActiveTransfers(): DriveTransferItem[] {
+    return this.transfers.filter((t) => t.state === 'uploading' || t.state === 'processing');
+  }
+
+  public hasActiveTransfers(): boolean {
+    return this.transfers.some((t) => t.state === 'uploading' || t.state === 'processing');
+  }
+
+  public subscribeTransfers(listener: (transfers: DriveTransferItem[]) => void): () => void {
+    this.transferListeners.add(listener);
+    listener([...this.transfers]);
+    return () => {
+      this.transferListeners.delete(listener);
+    };
+  }
+
+  public addTransfer(transfer: DriveTransferItem) {
+    const existingIndex = this.transfers.findIndex((t) => t.id === transfer.id);
+    if (existingIndex >= 0) {
+      this.transfers[existingIndex] = transfer;
+    } else {
+      this.transfers = [transfer, ...this.transfers];
+    }
+    this.notifyTransfers();
+  }
+
+  public updateTransfer(id: string, updates: Partial<DriveTransferItem>) {
+    const existing = this.transfers.find((t) => t.id === id);
+    if (existing) {
+      Object.assign(existing, updates);
+      this.notifyTransfers();
+    }
+  }
+
+  public removeTransfer(id: string) {
+    this.transfers = this.transfers.filter((t) => t.id !== id);
+    this.notifyTransfers();
+  }
+
+  public clearCompletedTransfers() {
+    this.transfers = this.transfers.filter((t) => t.state === 'uploading' || t.state === 'processing');
+    this.notifyTransfers();
   }
 
   private restoreToken() {
@@ -323,6 +420,19 @@ class GoogleDriveService {
       throw new Error('Google Drive not authorized');
     }
 
+    const transferId = `up-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+    this.addTransfer({
+      id: transferId,
+      title: fileName.replace(/\.[^/.]+$/, ''),
+      fileName,
+      direction: 'upload',
+      state: 'uploading',
+      progressPercent: 20,
+      fileSizeBytes: fileBlob.size,
+      mimeType: fileBlob.type || 'audio/mp4',
+      timestamp: Date.now()
+    });
+
     // Default to 'My Recordings' subfolder or root Smriti
     let targetFolderId = folderId;
     if (!targetFolderId) {
@@ -347,49 +457,139 @@ class GoogleDriveService {
     );
     form.append('file', fileBlob);
 
-    const res = await fetch(
-      'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,name,mimeType,size,webContentLink',
-      {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${this.accessToken}`
-        },
-        body: form
+    try {
+      this.updateTransfer(transferId, { state: 'processing', progressPercent: 65 });
+      const res = await fetch(
+        'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,name,mimeType,size,webContentLink',
+        {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${this.accessToken}`
+          },
+          body: form
+        }
+      );
+
+      if (!res.ok) {
+        const err = await res.text();
+        this.updateTransfer(transferId, { state: 'error', errorMessage: err });
+        throw new Error(`Google Drive upload error: ${err}`);
       }
-    );
 
-    if (!res.ok) {
-      const err = await res.text();
-      throw new Error(`Google Drive upload error: ${err}`);
+      const data = await res.json();
+      this.updateTransfer(transferId, {
+        state: 'done',
+        progressPercent: 100,
+        googleDriveFileId: data.id
+      });
+      return data;
+    } catch (err: any) {
+      this.updateTransfer(transferId, {
+        state: 'error',
+        errorMessage: err.message || 'Upload failed'
+      });
+      throw err;
     }
-
-    return await res.json();
   }
 
   /**
    * Downloads a binary audio file directly from Google Drive by fileId.
    * Uses alt=media query parameter to stream binary content with authorization.
    */
-  public async downloadAudio(fileId: string): Promise<Blob> {
+  public async downloadAudio(fileId: string, title?: string): Promise<Blob> {
     if (!this.accessToken) {
       throw new Error('Google Drive not authorized');
     }
 
-    const res = await fetch(
-      `https://www.googleapis.com/drive/v3/files/${encodeURIComponent(fileId)}?alt=media`,
-      {
-        headers: {
-          Authorization: `Bearer ${this.accessToken}`
+    const transferId = `dl-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
+    const effectiveTitle = title || `Google Drive File ${fileId.slice(0, 8)}`;
+    this.addTransfer({
+      id: transferId,
+      title: effectiveTitle,
+      fileName: `${effectiveTitle}.m4a`,
+      direction: 'download',
+      state: 'uploading',
+      progressPercent: 30,
+      googleDriveFileId: fileId,
+      timestamp: Date.now()
+    });
+
+    try {
+      this.updateTransfer(transferId, { state: 'processing', progressPercent: 75 });
+      const res = await fetch(
+        `https://www.googleapis.com/drive/v3/files/${encodeURIComponent(fileId)}?alt=media`,
+        {
+          headers: {
+            Authorization: `Bearer ${this.accessToken}`
+          }
         }
+      );
+
+      if (!res.ok) {
+        const err = await res.text();
+        this.updateTransfer(transferId, { state: 'error', errorMessage: err });
+        throw new Error(`Failed to download audio from Google Drive: ${err}`);
       }
-    );
 
-    if (!res.ok) {
-      const err = await res.text();
-      throw new Error(`Failed to download audio from Google Drive: ${err}`);
+      const blob = await res.blob();
+      this.updateTransfer(transferId, {
+        state: 'done',
+        progressPercent: 100,
+        fileSizeBytes: blob.size
+      });
+      return blob;
+    } catch (err: any) {
+      this.updateTransfer(transferId, {
+        state: 'error',
+        errorMessage: err.message || 'Download failed'
+      });
+      throw err;
     }
+  }
 
-    return await res.blob();
+  /**
+   * Starts a simulated transfer for interactive UI demonstration, test suites, and instant user feedback
+   */
+  public async startSimulatedTransfer(
+    direction: 'upload' | 'download',
+    title: string,
+    fileSizeBytes: number = 3500000,
+    audioId?: string
+  ): Promise<DriveTransferItem> {
+    const id = `${direction === 'upload' ? 'up' : 'dl'}-${Date.now()}-${Math.random().toString(36).slice(2, 5)}`;
+    const transfer: DriveTransferItem = {
+      id,
+      audioId,
+      title,
+      fileName: `${title}.m4a`,
+      direction,
+      state: 'uploading',
+      progressPercent: 20,
+      fileSizeBytes,
+      mimeType: 'audio/mp4',
+      timestamp: Date.now()
+    };
+
+    this.addTransfer(transfer);
+
+    // Simulate animated upload/download stages
+    setTimeout(() => {
+      this.updateTransfer(id, { progressPercent: 60, state: 'uploading' });
+    }, 450);
+
+    setTimeout(() => {
+      this.updateTransfer(id, { progressPercent: 90, state: 'processing' });
+    }, 900);
+
+    setTimeout(() => {
+      this.updateTransfer(id, {
+        progressPercent: 100,
+        state: 'done',
+        googleDriveFileId: `gdrive-${Math.random().toString(36).slice(2, 9)}`
+      });
+    }, 1450);
+
+    return transfer;
   }
 
   /**

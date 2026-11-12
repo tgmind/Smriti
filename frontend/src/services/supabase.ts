@@ -36,6 +36,8 @@ export const DEMO_AUDIO_ITEMS: AudioItem[] = [
     key_terms: ['Gauss Law', 'Displacement Current', 'Curl of E', 'Wave Equation'],
     is_favorite: true,
     is_downloaded_offline: true,
+    play_count: 18,
+    google_drive_file_id: 'gdrive-file-maxwell-001',
     last_listened_at: new Date(Date.now() - 3600000 * 4).toISOString(),
     created_at: new Date(Date.now() - 86400000 * 3).toISOString()
   },
@@ -54,6 +56,8 @@ export const DEMO_AUDIO_ITEMS: AudioItem[] = [
     key_terms: ['Walden Inversion', 'Carbocation', 'Steric Hindrance', 'Leaving Group'],
     is_favorite: false,
     is_downloaded_offline: true,
+    play_count: 11,
+    google_drive_file_id: 'gdrive-file-sn1-sn2-002',
     last_listened_at: new Date(Date.now() - 86400000).toISOString(),
     created_at: new Date(Date.now() - 86400000 * 5).toISOString()
   },
@@ -72,6 +76,8 @@ export const DEMO_AUDIO_ITEMS: AudioItem[] = [
     key_terms: ['NADH', 'Chemiosmosis', 'Cytochrome C', 'Oxidative Phosphorylation'],
     is_favorite: true,
     is_downloaded_offline: false,
+    play_count: 24,
+    google_drive_file_id: 'gdrive-file-krebs-003',
     last_listened_at: new Date(Date.now() - 86400000 * 2).toISOString(),
     created_at: new Date(Date.now() - 86400000 * 7).toISOString()
   },
@@ -90,6 +96,8 @@ export const DEMO_AUDIO_ITEMS: AudioItem[] = [
     key_terms: ['Characteristic Equation', 'Trace', 'Determinant', 'Spectral Theorem'],
     is_favorite: false,
     is_downloaded_offline: true,
+    play_count: 6,
+    google_drive_file_id: 'gdrive-file-eigen-004',
     created_at: new Date(Date.now() - 86400000 * 2).toISOString()
   }
 ];

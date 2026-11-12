@@ -223,6 +223,19 @@ export const App: React.FC = () => {
       durationSeconds: safeDuration
     }));
 
+    // Increment play_count and update last_listened_at
+    setAudioItems(prev =>
+      prev.map(item =>
+        item.id === audio.id
+          ? {
+              ...item,
+              play_count: (item.play_count || 0) + 1,
+              last_listened_at: new Date().toISOString()
+            }
+          : item
+      )
+    );
+
     bridge.play(audio, playbackState.playbackSpeed);
   };
 
@@ -418,6 +431,47 @@ export const App: React.FC = () => {
     setIsDriveConnected(false);
   };
 
+  const handleSyncItemToDrive = async (audio: AudioItem) => {
+    try {
+      const blob = await audioStorage.getAudioBlob(audio.id);
+      if (blob && googleDriveService.isConnected()) {
+        const uploaded = await googleDriveService.uploadAudio(blob, `${audio.title}.m4a`);
+        setAudioItems(prev =>
+          prev.map(item =>
+            item.id === audio.id
+              ? { ...item, google_drive_file_id: uploaded.id, file_url: uploaded.webContentLink || item.file_url }
+              : item
+          )
+        );
+      } else {
+        await googleDriveService.startSimulatedTransfer('upload', audio.title, audio.file_size_bytes, audio.id);
+      }
+    } catch (e) {
+      console.warn('Sync to drive error:', e);
+    }
+  };
+
+  const handleDownloadItemFromDrive = async (audio: AudioItem) => {
+    try {
+      if (audio.google_drive_file_id && googleDriveService.isConnected()) {
+        const blob = await googleDriveService.downloadAudio(audio.google_drive_file_id, audio.title);
+        if (blob) {
+          await audioStorage.saveAudioBlob(audio.id, blob);
+          setAudioItems(prev =>
+            prev.map(item => (item.id === audio.id ? { ...item, is_downloaded_offline: true } : item))
+          );
+        }
+      } else {
+        await googleDriveService.startSimulatedTransfer('download', audio.title, audio.file_size_bytes, audio.id);
+        setAudioItems(prev =>
+          prev.map(item => (item.id === audio.id ? { ...item, is_downloaded_offline: true } : item))
+        );
+      }
+    } catch (e) {
+      console.warn('Download from drive error:', e);
+    }
+  };
+
   // Navigation helper for targeted subject opening
   const [selectedSubjectForLibrary, setSelectedSubjectForLibrary] = useState<string | null>(null);
 
@@ -463,6 +517,10 @@ export const App: React.FC = () => {
             subjects={subjects}
             playbackState={playbackState}
             userSettings={userSettings}
+            isDriveConnected={isDriveConnected}
+            onConnectDrive={handleConnectDrive}
+            onSyncToDrive={handleSyncItemToDrive}
+            onDownloadFromDrive={handleDownloadItemFromDrive}
             onPlayAudio={handlePlayAudio}
             onSeek={handleSeek}
             onGoToRecord={() => setCurrentTab('record')}

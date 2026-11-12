@@ -13,16 +13,16 @@ export const BlueWaveDesign: React.FC<BlueWaveDesignProps> = ({
 }) => {
   if (variant === 'compact') {
     return (
-      <div className={`w-full h-2.5 overflow-hidden pointer-events-none relative ${className}`}>
+      <div className={`w-full h-2 overflow-hidden pointer-events-none relative ${className}`}>
         <svg
-          viewBox="0 0 600 24"
+          viewBox="0 0 1200 30"
           preserveAspectRatio="none"
           className="w-[200%] h-full absolute bottom-0 left-0"
         >
           <defs>
             <linearGradient id="waveGradCompact" x1="0%" y1="0%" x2="100%" y2="0%">
               <stop offset="0%" stopColor="#38bdf8" stopOpacity="0.4" />
-              <stop offset="50%" stopColor="#0284c7" stopOpacity="0.8" />
+              <stop offset="50%" stopColor="#0284c7" stopOpacity="0.75" />
               <stop offset="100%" stopColor="#38bdf8" stopOpacity="0.4" />
             </linearGradient>
             <linearGradient id="waveGradFront" x1="0%" y1="0%" x2="0%" y2="100%">
@@ -33,7 +33,7 @@ export const BlueWaveDesign: React.FC<BlueWaveDesignProps> = ({
           <path
             className={isPlaying ? 'animate-wave-slow' : ''}
             fill="url(#waveGradCompact)"
-            d="M0,12 C75,4 150,20 225,12 C300,4 375,20 450,12 C525,4 600,20 675,12 L675,24 L0,24 Z"
+            d="M0,15 C150,3 300,27 450,15 C600,3 750,27 900,15 C1050,3 1200,27 1350,15 L1350,30 L0,30 Z"
           />
         </svg>
       </div>

@@ -20,6 +20,7 @@ export interface AudioItem {
   key_terms: string[];
   is_favorite: boolean;
   is_downloaded_offline?: boolean;
+  play_count?: number;
   last_listened_at?: string;
   created_at: string;
 }
