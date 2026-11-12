@@ -12,11 +12,15 @@ import {
   MoreVertical,
   ListMusic,
   Download,
+  Star,
+  CheckCircle2,
   Atom,
   Binary,
   FlaskConical,
   Dna,
-  Sparkles
+  Sparkles,
+  Layers,
+  BookOpen
 } from 'lucide-react';
 import { AudioItem, PlaybackState } from '../types';
 import { formatDuration } from '../services/learningEngine';
@@ -26,6 +30,7 @@ import { Slider } from './ui/slider';
 export interface MiniPlayerProps {
   playbackState: PlaybackState;
   audioQueue?: AudioItem[];
+  initialSheetOpen?: boolean;
   onTogglePlay: () => void;
   onSeek?: (seconds: number) => void;
   onSeekRelative: (seconds: number) => void;
@@ -81,6 +86,7 @@ const getSubjectVisual = (subjectName?: string) => {
 export const MiniPlayer: React.FC<MiniPlayerProps> = ({
   playbackState,
   audioQueue = [],
+  initialSheetOpen = false,
   onTogglePlay,
   onSeek,
   onSeekRelative,
@@ -105,7 +111,9 @@ export const MiniPlayer: React.FC<MiniPlayerProps> = ({
     isRepeatQueue
   } = playbackState;
 
-  const [isSheetOpen, setIsSheetOpen] = useState(false);
+  const [isSheetOpen, setIsSheetOpen] = useState(initialSheetOpen);
+  const [queueScope, setQueueScope] = useState<'subject' | 'all'>('subject');
+  const [activeTrackForMenu, setActiveTrackForMenu] = useState<AudioItem | null>(null);
   const [hoverTime, setHoverTime] = useState<{ x: number; time: string } | null>(null);
   const [scrubPosition, setScrubPosition] = useState<number | null>(null);
   const [showOptionsPopup, setShowOptionsPopup] = useState(false);
@@ -114,6 +122,17 @@ export const MiniPlayer: React.FC<MiniPlayerProps> = ({
   useEffect(() => {
     setMounted(true);
   }, []);
+
+  // Lock background scroll when the player sheet modal is expanded
+  useEffect(() => {
+    if (isSheetOpen) {
+      const originalOverflow = document.body.style.overflow;
+      document.body.style.overflow = 'hidden';
+      return () => {
+        document.body.style.overflow = originalOverflow;
+      };
+    }
+  }, [isSheetOpen]);
 
   if (!currentAudio) return null;
 
@@ -138,8 +157,18 @@ export const MiniPlayer: React.FC<MiniPlayerProps> = ({
   const visual = getSubjectVisual(currentAudio.subject_name);
   const SubjectIcon = visual.icon;
 
-  // Use provided queue or fallback to currentAudio
-  const queueList = audioQueue.length > 0 ? audioQueue : [currentAudio];
+  // Telegram-style Subject Architecture: Filter queue by the particular subject
+  const currentSubId = currentAudio.subject_id;
+  const currentSubName = (currentAudio.subject_name || '').toLowerCase();
+
+  const subjectAudioList = audioQueue.filter((a) => {
+    if (currentSubId && a.subject_id === currentSubId) return true;
+    if (currentSubName && a.subject_name && a.subject_name.toLowerCase() === currentSubName) return true;
+    return false;
+  });
+
+  const activeSubjectQueue = subjectAudioList.length > 0 ? subjectAudioList : audioQueue;
+  const displayQueue = queueScope === 'subject' ? activeSubjectQueue : audioQueue;
 
   const handleScrubberMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
     const rect = e.currentTarget.getBoundingClientRect();
@@ -156,19 +185,30 @@ export const MiniPlayer: React.FC<MiniPlayerProps> = ({
 
   /* ─────────────────────────────────────────────────────────────
       SHEET MODAL CONTENT (Rendered via Portal to document.body)
+      - No background blur (clean solid dark overlay)
+      - Background scroll locked
+      - Subject-scoped audio queue like Telegram
+      - Interactive functional three dots track menu
+      - Telegram cyan-blue seek slider
+      - Preserved signature bottom blue wave design
      ───────────────────────────────────────────────────────────── */
   const sheetModalContent = isSheetOpen ? (
     <div
-      className="fixed inset-0 z-50 flex flex-col justify-end bg-slate-950/40 backdrop-blur-xs select-none animate-in fade-in duration-200"
-      onClick={() => setIsSheetOpen(false)}
+      className="fixed inset-0 z-50 flex flex-col justify-end bg-black/60 select-none animate-in fade-in duration-200"
+      onClick={() => {
+        setIsSheetOpen(false);
+        setActiveTrackForMenu(null);
+      }}
+      onWheel={(e) => e.stopPropagation()}
+      onTouchMove={(e) => e.stopPropagation()}
     >
       <div
-        className="w-full max-w-md mx-auto bg-white rounded-t-[32px] h-[85vh] max-h-[85vh] flex flex-col overflow-hidden shadow-2xl relative border-t border-slate-200 animate-in slide-in-from-bottom duration-250"
+        className="w-full max-w-md mx-auto bg-white rounded-t-[32px] h-[86vh] max-h-[86vh] flex flex-col overflow-hidden shadow-2xl relative border-t border-slate-200 animate-in slide-in-from-bottom duration-250"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Grab Handle */}
         <div
-          className="pt-3 pb-2 flex justify-center cursor-pointer"
+          className="pt-3 pb-1.5 flex justify-center cursor-pointer"
           onClick={() => setIsSheetOpen(false)}
         >
           <div className="w-10 h-1.5 bg-slate-300 rounded-full hover:bg-slate-400 transition-colors" />
@@ -178,16 +218,16 @@ export const MiniPlayer: React.FC<MiniPlayerProps> = ({
         <div className="px-5 py-2 flex items-center justify-between border-b border-slate-100">
           <div className="flex items-center gap-2.5">
             <div
-              className={`size-8 rounded-full bg-gradient-to-tr ${visual.gradient} text-white flex items-center justify-center shadow-xs`}
+              className={`size-8.5 rounded-full bg-gradient-to-tr ${visual.gradient} text-white flex items-center justify-center shadow-xs shrink-0`}
             >
-              <SubjectIcon size={14} />
+              <SubjectIcon size={15} />
             </div>
             <div>
               <h3 className="text-xs font-bold text-slate-900 leading-tight">
                 {currentAudio.subject_name || 'Academic Audio'} Playlist
               </h3>
-              <p className="text-[10px] text-slate-500 font-mono">
-                {queueList.length} audio notes in queue
+              <p className="text-[10px] text-slate-500 font-mono mt-0.5">
+                {displayQueue.length} notes in {queueScope === 'subject' ? currentAudio.subject_name || 'this subject' : 'all subjects'}
               </p>
             </div>
           </div>
@@ -204,9 +244,42 @@ export const MiniPlayer: React.FC<MiniPlayerProps> = ({
           </div>
         </div>
 
+        {/* Telegram Scope Selector (Active Subject vs All Vault) */}
+        <div className="px-4 py-2 bg-slate-50/90 border-b border-slate-150/70 flex items-center justify-between gap-2">
+          <div className="flex items-center gap-1.5">
+            <button
+              onClick={() => setQueueScope('subject')}
+              className={`px-3 py-1 rounded-full text-[11px] font-semibold transition-all cursor-pointer flex items-center gap-1.5 ${
+                queueScope === 'subject'
+                  ? 'bg-[#24A1DE] text-white shadow-xs'
+                  : 'bg-white text-slate-600 hover:bg-slate-200/80 border border-slate-200/80'
+              }`}
+            >
+              <BookOpen size={12} />
+              <span>{currentAudio.subject_name || 'Subject'} ({activeSubjectQueue.length})</span>
+            </button>
+
+            <button
+              onClick={() => setQueueScope('all')}
+              className={`px-3 py-1 rounded-full text-[11px] font-semibold transition-all cursor-pointer flex items-center gap-1.5 ${
+                queueScope === 'all'
+                  ? 'bg-[#24A1DE] text-white shadow-xs'
+                  : 'bg-white text-slate-600 hover:bg-slate-200/80 border border-slate-200/80'
+              }`}
+            >
+              <Layers size={12} />
+              <span>All Notes ({audioQueue.length})</span>
+            </button>
+          </div>
+
+          <span className="text-[10px] font-mono text-slate-400 shrink-0">
+            Telegram Queue
+          </span>
+        </div>
+
         {/* Middle Section: Scrollable Playlist Queue (Image 2 & 3) */}
-        <div className="flex-1 overflow-y-auto min-h-[160px] divide-y divide-slate-100/80 px-3 py-1">
-          {queueList.map((audio, index) => {
+        <div className="flex-1 overflow-y-auto divide-y divide-slate-100/80 px-3 py-1 overscroll-contain">
+          {displayQueue.map((audio, index) => {
             const isActive = audio.id === currentAudio.id;
             return (
               <div
@@ -255,7 +328,11 @@ export const MiniPlayer: React.FC<MiniPlayerProps> = ({
                     title={audio.is_downloaded_offline ? 'Downloaded offline' : 'Download offline'}
                     aria-label="Toggle offline download"
                   >
-                    <Download size={10} strokeWidth={2.5} />
+                    {audio.is_downloaded_offline ? (
+                      <CheckCircle2 size={10} className="text-emerald-600" />
+                    ) : (
+                      <Download size={10} strokeWidth={2.5} />
+                    )}
                   </button>
                 </div>
 
@@ -274,14 +351,15 @@ export const MiniPlayer: React.FC<MiniPlayerProps> = ({
                   </p>
                 </div>
 
-                {/* Options ⋮ */}
+                {/* Functional Three Dots Button ⋮ */}
                 <button
                   onClick={(e) => {
                     e.stopPropagation();
-                    if (onToggleFavorite) onToggleFavorite(audio.id);
+                    setActiveTrackForMenu(audio);
                   }}
-                  className="size-8 rounded-full text-slate-400 hover:text-slate-700 hover:bg-slate-200/50 flex items-center justify-center shrink-0 cursor-pointer"
-                  title="Track options"
+                  className="size-8 rounded-full text-slate-400 hover:text-slate-700 hover:bg-slate-200/60 flex items-center justify-center shrink-0 cursor-pointer active:scale-90 transition-transform"
+                  title="Track options & details"
+                  aria-label="Open track menu"
                 >
                   <MoreVertical size={16} />
                 </button>
@@ -310,12 +388,14 @@ export const MiniPlayer: React.FC<MiniPlayerProps> = ({
               </p>
             </div>
 
-            {/* Scrubber Progress Slider */}
+            {/* Scrubber Progress Slider (Clean Telegram Cyan-Blue styling) */}
             <div className="space-y-1">
               <Slider
                 value={currentDisplayPos}
                 max={safeDuration}
                 step={1}
+                rangeClassName="bg-[#24A1DE]"
+                thumbClassName="border-[#24A1DE] focus-visible:ring-[#24A1DE]/25"
                 onChange={(val: number) => setScrubPosition(val)}
                 onCommit={(val: number) => {
                   setScrubPosition(null);
@@ -459,6 +539,113 @@ export const MiniPlayer: React.FC<MiniPlayerProps> = ({
             </div>
           </div>
         </div>
+
+        {/* ─────────────────────────────────────────────────────────────
+            INTERACTIVE TRACK ACTIONS MENU MODAL (Functional Three Dots)
+           ───────────────────────────────────────────────────────────── */}
+        {activeTrackForMenu && (
+          <div
+            className="absolute inset-0 z-30 bg-slate-950/50 flex flex-col justify-end animate-in fade-in duration-150"
+            onClick={() => setActiveTrackForMenu(null)}
+          >
+            <div
+              className="bg-white rounded-t-3xl p-4 space-y-3 shadow-2xl border-t border-slate-200 animate-in slide-in-from-bottom-2 duration-150"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-center justify-between pb-1 border-b border-slate-100">
+                <div className="min-w-0 flex-1 pr-2">
+                  <span className="text-[10px] font-mono font-bold uppercase text-[#24A1DE] tracking-wider block">
+                    {activeTrackForMenu.subject_name || 'Academic'}
+                  </span>
+                  <h4 className="text-xs font-bold text-slate-900 truncate mt-0.5">
+                    {activeTrackForMenu.title}
+                  </h4>
+                </div>
+                <button
+                  onClick={() => setActiveTrackForMenu(null)}
+                  className="size-7 rounded-full text-slate-400 hover:text-slate-700 hover:bg-slate-100 flex items-center justify-center cursor-pointer"
+                >
+                  <X size={15} />
+                </button>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="grid grid-cols-1 gap-1.5 pt-1">
+                {/* 1. Play Immediately */}
+                <button
+                  onClick={() => {
+                    if (onSelectTrack) onSelectTrack(activeTrackForMenu);
+                    setActiveTrackForMenu(null);
+                  }}
+                  className="w-full p-2.5 rounded-xl bg-slate-50 hover:bg-sky-50 text-slate-800 hover:text-[#24A1DE] flex items-center gap-3 text-xs font-semibold transition-colors cursor-pointer"
+                >
+                  <Play size={16} className="text-[#24A1DE]" fill="currentColor" />
+                  <span>Play This Note Now</span>
+                </button>
+
+                {/* 2. Toggle Favorite */}
+                <button
+                  onClick={() => {
+                    if (onToggleFavorite) onToggleFavorite(activeTrackForMenu.id);
+                    setActiveTrackForMenu((prev) =>
+                      prev ? { ...prev, is_favorite: !prev.is_favorite } : null
+                    );
+                  }}
+                  className="w-full p-2.5 rounded-xl bg-slate-50 hover:bg-amber-50 text-slate-800 hover:text-amber-700 flex items-center gap-3 text-xs font-semibold transition-colors cursor-pointer"
+                >
+                  <Star
+                    size={16}
+                    className={activeTrackForMenu.is_favorite ? 'text-amber-500 fill-amber-500' : 'text-slate-400'}
+                  />
+                  <span>
+                    {activeTrackForMenu.is_favorite ? 'Remove from Favorites' : 'Add to Favorites'}
+                  </span>
+                </button>
+
+                {/* 3. Toggle Offline Cache */}
+                <button
+                  onClick={() => {
+                    if (onToggleOffline) onToggleOffline(activeTrackForMenu);
+                    setActiveTrackForMenu((prev) =>
+                      prev ? { ...prev, is_downloaded_offline: !prev.is_downloaded_offline } : null
+                    );
+                  }}
+                  className="w-full p-2.5 rounded-xl bg-slate-50 hover:bg-emerald-50 text-slate-800 hover:text-emerald-700 flex items-center gap-3 text-xs font-semibold transition-colors cursor-pointer"
+                >
+                  {activeTrackForMenu.is_downloaded_offline ? (
+                    <CheckCircle2 size={16} className="text-emerald-600" />
+                  ) : (
+                    <Download size={16} className="text-[#24A1DE]" />
+                  )}
+                  <span>
+                    {activeTrackForMenu.is_downloaded_offline
+                      ? 'Available Offline (Stored in Vault)'
+                      : 'Download Note for 100% Offline Access'}
+                  </span>
+                </button>
+              </div>
+
+              {/* Key Concept Chips if available */}
+              {activeTrackForMenu.key_terms && activeTrackForMenu.key_terms.length > 0 && (
+                <div className="pt-1 border-t border-slate-100">
+                  <span className="text-[10px] text-slate-400 font-mono block mb-1">
+                    Key Concepts:
+                  </span>
+                  <div className="flex flex-wrap gap-1">
+                    {activeTrackForMenu.key_terms.map((term, i) => (
+                      <span
+                        key={i}
+                        className="px-2 py-0.5 rounded-md bg-slate-100 text-slate-600 text-[10px] font-medium"
+                      >
+                        {term}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   ) : null;
@@ -466,11 +653,45 @@ export const MiniPlayer: React.FC<MiniPlayerProps> = ({
   return (
     <>
       {/* ─────────────────────────────────────────────────────────────
-          1. TELEGRAM-STYLE COMPACT PLAYER BAR (Sticky / Floating)
-          Matches Telegram's iconic top compact audio bar (Image 4)
+          1. TELEGRAM-STYLE COMPACT PLAYER BAR
+          Attached beautifully right above the bottom navigation bar
          ───────────────────────────────────────────────────────────── */}
       <div className="w-full max-w-md mx-auto select-none pointer-events-auto transition-all duration-200">
-        <div className="bg-white/95 backdrop-blur-xl border border-slate-200/90 shadow-[0_3px_12px_rgba(0,0,0,0.05)] rounded-2xl overflow-hidden relative group hover:border-slate-300">
+        <div className="bg-white/95 backdrop-blur-xl border border-slate-200/90 shadow-[0_8px_24px_rgba(0,0,0,0.08)] rounded-2xl overflow-hidden relative group hover:border-slate-300">
+          {/* Top Interactive Progress Scrubber Line */}
+          <div
+            className="w-full bg-slate-100 hover:bg-slate-200/80 h-1 cursor-pointer relative group/scrubber transition-colors"
+            title="Tap or drag to seek"
+            onMouseMove={handleScrubberMouseMove}
+            onMouseLeave={() => setHoverTime(null)}
+            onClick={(e) => {
+              const rect = e.currentTarget.getBoundingClientRect();
+              const pct = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+              handleSeekInternal(pct * safeDuration);
+            }}
+          >
+            <div
+              className="bg-[#24A1DE] h-full transition-[width] duration-100"
+              style={{ width: `${progressPercent}%` }}
+            />
+
+            {/* Hover Scrub Tooltip */}
+            {hoverTime && (
+              <div
+                className="absolute -top-6 -translate-x-1/2 rounded bg-slate-900 px-1.5 py-0.5 text-[9px] font-mono text-white pointer-events-none z-30 shadow-xs"
+                style={{ left: `${hoverTime.x}px` }}
+              >
+                {hoverTime.time}
+              </div>
+            )}
+
+            {/* Hover thumb */}
+            <div
+              className="absolute top-1/2 -translate-y-1/2 size-2 rounded-full bg-[#24A1DE] opacity-0 group-hover/scrubber:opacity-100 transition-opacity pointer-events-none -translate-x-1/2 shadow-xs"
+              style={{ left: `${progressPercent}%` }}
+            />
+          </div>
+
           {/* Main Bar Content */}
           <div className="py-2 px-3 flex items-center justify-between gap-2.5">
             {/* Left: Telegram-Style Circular Blue Play/Pause Button */}
@@ -538,20 +759,20 @@ export const MiniPlayer: React.FC<MiniPlayerProps> = ({
                 </button>
               )}
 
-              {/* Playlist Sheet Expand Button */}
+              {/* Playlist Sheet Expand Button with Subject Notes Count */}
               <button
                 onClick={(e) => {
                   e.stopPropagation();
                   setIsSheetOpen(true);
                 }}
                 className="size-7 rounded-full text-slate-500 hover:text-[#24A1DE] hover:bg-sky-50 flex items-center justify-center active:scale-90 transition-all cursor-pointer relative"
-                title="Open playlist queue"
+                title={`Open ${currentAudio.subject_name || 'subject'} playlist (${activeSubjectQueue.length} notes)`}
                 aria-label="Open playlist queue"
               >
                 <ListMusic size={15} />
-                {queueList.length > 1 && (
+                {activeSubjectQueue.length > 1 && (
                   <span className="absolute -top-1 -right-1 size-3.5 rounded-full bg-[#24A1DE] text-white text-[8px] font-mono font-bold flex items-center justify-center">
-                    {queueList.length}
+                    {activeSubjectQueue.length}
                   </span>
                 )}
               </button>
@@ -571,40 +792,6 @@ export const MiniPlayer: React.FC<MiniPlayerProps> = ({
                 </button>
               )}
             </div>
-          </div>
-
-          {/* Interactive Bottom Progress Scrubber Line */}
-          <div
-            className="w-full bg-slate-100 hover:bg-slate-200/80 h-1 cursor-pointer relative group/scrubber transition-colors"
-            title="Tap or drag to seek"
-            onMouseMove={handleScrubberMouseMove}
-            onMouseLeave={() => setHoverTime(null)}
-            onClick={(e) => {
-              const rect = e.currentTarget.getBoundingClientRect();
-              const pct = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
-              handleSeekInternal(pct * safeDuration);
-            }}
-          >
-            <div
-              className="bg-gradient-to-r from-sky-400 via-[#24A1DE] to-indigo-600 h-full transition-[width] duration-100"
-              style={{ width: `${progressPercent}%` }}
-            />
-
-            {/* Hover Scrub Tooltip */}
-            {hoverTime && (
-              <div
-                className="absolute -top-6 -translate-x-1/2 rounded bg-slate-900 px-1.5 py-0.5 text-[9px] font-mono text-white pointer-events-none z-30 shadow-xs"
-                style={{ left: `${hoverTime.x}px` }}
-              >
-                {hoverTime.time}
-              </div>
-            )}
-
-            {/* Hover thumb */}
-            <div
-              className="absolute top-1/2 -translate-y-1/2 size-2 rounded-full bg-[#24A1DE] opacity-0 group-hover/scrubber:opacity-100 transition-opacity pointer-events-none -translate-x-1/2 shadow-xs"
-              style={{ left: `${progressPercent}%` }}
-            />
           </div>
 
           {/* Preserve the Blue Wavy Design: Subtle bottom micro-wave accent */}

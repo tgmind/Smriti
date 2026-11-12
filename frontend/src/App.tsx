@@ -340,22 +340,42 @@ export const App: React.FC = () => {
     handleSetSpeed(nextSpeed);
   };
 
-  const handleNextTrack = () => {
+  const handleNextTrack = (subjectScoped: boolean = true) => {
     if (!playbackState.currentAudio || audioItems.length === 0) return;
-    const currentIndex = audioItems.findIndex(a => a.id === playbackState.currentAudio?.id);
-    const nextIndex = currentIndex >= 0 ? (currentIndex + 1) % audioItems.length : 0;
-    handlePlayAudio(audioItems[nextIndex]);
+    const currentSubId = playbackState.currentAudio.subject_id;
+    const currentSubName = playbackState.currentAudio.subject_name?.toLowerCase();
+    const subjectItems = subjectScoped
+      ? audioItems.filter(
+          a =>
+            (currentSubId && a.subject_id === currentSubId) ||
+            (currentSubName && a.subject_name && a.subject_name.toLowerCase() === currentSubName)
+        )
+      : audioItems;
+    const queue = subjectItems.length > 0 ? subjectItems : audioItems;
+    const currentIndex = queue.findIndex(a => a.id === playbackState.currentAudio?.id);
+    const nextIndex = currentIndex >= 0 ? (currentIndex + 1) % queue.length : 0;
+    handlePlayAudio(queue[nextIndex]);
   };
 
-  const handlePreviousTrack = () => {
+  const handlePreviousTrack = (subjectScoped: boolean = true) => {
     if (!playbackState.currentAudio || audioItems.length === 0) return;
     if (playbackState.positionSeconds > 3) {
       handleSeek(0);
       return;
     }
-    const currentIndex = audioItems.findIndex(a => a.id === playbackState.currentAudio?.id);
-    const prevIndex = currentIndex > 0 ? currentIndex - 1 : audioItems.length - 1;
-    handlePlayAudio(audioItems[prevIndex]);
+    const currentSubId = playbackState.currentAudio.subject_id;
+    const currentSubName = playbackState.currentAudio.subject_name?.toLowerCase();
+    const subjectItems = subjectScoped
+      ? audioItems.filter(
+          a =>
+            (currentSubId && a.subject_id === currentSubId) ||
+            (currentSubName && a.subject_name && a.subject_name.toLowerCase() === currentSubName)
+        )
+      : audioItems;
+    const queue = subjectItems.length > 0 ? subjectItems : audioItems;
+    const currentIndex = queue.findIndex(a => a.id === playbackState.currentAudio?.id);
+    const prevIndex = currentIndex > 0 ? currentIndex - 1 : queue.length - 1;
+    handlePlayAudio(queue[prevIndex]);
   };
 
   // Check Google Drive connection status on mount
@@ -486,31 +506,8 @@ export const App: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-[#F8F9FD] text-slate-900 flex flex-col font-sans select-none">
-      {/* Telegram-Style Compact Player Bar Pinned at Top (Architecture as shown in Telegram Image 4) */}
-      {!isFullScreenPlayerOpen && playbackState.currentAudio && (
-        <div className="sticky top-0 z-40 w-full max-w-md mx-auto px-3 pt-2 pb-1 bg-[#F8F9FD]/90 backdrop-blur-md">
-          <MiniPlayer
-            playbackState={playbackState}
-            audioQueue={audioItems}
-            onTogglePlay={handleTogglePlay}
-            onSeek={handleSeek}
-            onSeekRelative={handleSeekRelative}
-            onOpenFullScreen={() => setIsFullScreenPlayerOpen(true)}
-            onCycleSpeed={handleCycleSpeed}
-            onSetSpeed={handleSetSpeed}
-            onDismiss={handleDismissPlayer}
-            onSelectTrack={handlePlayAudio}
-            onNextTrack={handleNextTrack}
-            onPreviousTrack={handlePreviousTrack}
-            onToggleRepeat={handleToggleRepeat}
-            onToggleFavorite={handleToggleFavorite}
-            onToggleOffline={handleToggleOffline}
-          />
-        </div>
-      )}
-
       {/* Active Tab Screen */}
-      <main className="flex-1 w-full max-w-md mx-auto">
+      <main className={`flex-1 w-full max-w-md mx-auto ${playbackState.currentAudio ? 'pb-36 sm:pb-40' : 'pb-24'}`}>
         {currentTab === 'home' && (
           <HomeTab
             recentAudio={audioItems}
@@ -593,6 +590,29 @@ export const App: React.FC = () => {
           onToggleFavorite={handleToggleFavorite}
           onToggleOffline={handleToggleOffline}
         />
+      )}
+
+      {/* Telegram-Style Compact Player Attached Beautifully Above Bottom Navigation Bar */}
+      {!isFullScreenPlayerOpen && playbackState.currentAudio && (
+        <div className="fixed bottom-[74px] sm:bottom-[78px] left-0 right-0 z-30 px-3 max-w-md mx-auto pointer-events-none animate-in slide-in-from-bottom-2 duration-200">
+          <MiniPlayer
+            playbackState={playbackState}
+            audioQueue={audioItems}
+            onTogglePlay={handleTogglePlay}
+            onSeek={handleSeek}
+            onSeekRelative={handleSeekRelative}
+            onOpenFullScreen={() => setIsFullScreenPlayerOpen(true)}
+            onCycleSpeed={handleCycleSpeed}
+            onSetSpeed={handleSetSpeed}
+            onDismiss={handleDismissPlayer}
+            onSelectTrack={handlePlayAudio}
+            onNextTrack={() => handleNextTrack(true)}
+            onPreviousTrack={() => handlePreviousTrack(true)}
+            onToggleRepeat={handleToggleRepeat}
+            onToggleFavorite={handleToggleFavorite}
+            onToggleOffline={handleToggleOffline}
+          />
+        </div>
       )}
 
       {/* Bottom Navigation */}

@@ -340,7 +340,7 @@ export const HomeTab: React.FC<HomeTabProps> = ({
             Save With Smriti
           </h2>
           <p className="text-xs text-slate-500 font-medium">
-            Your offline-first personal audio study vault.
+            The Vedic tool for learning anything.
           </p>
         </div>
 

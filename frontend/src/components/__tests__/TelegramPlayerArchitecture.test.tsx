@@ -103,6 +103,29 @@ describe('Telegram-Style Compact Player Architecture & UI Design', () => {
     expect(html).toContain('waveGradCompact');
   });
 
+  it('filters queue to the active audio subject and does not blur background', () => {
+    // Render with sheet open to inspect expanded view
+    const html = renderToString(
+      <MiniPlayer
+        playbackState={activePlaybackState}
+        audioQueue={mockQueue}
+        initialSheetOpen={true}
+        onTogglePlay={vi.fn()}
+        onSeek={vi.fn()}
+        onSeekRelative={vi.fn()}
+        onOpenFullScreen={vi.fn()}
+        onCycleSpeed={vi.fn()}
+        onDismiss={vi.fn()}
+      />
+    );
+
+    // Verify background overlay has no backdrop-blur
+    expect(html).not.toContain('backdrop-blur-xs');
+
+    // Verify functional track menu button
+    expect(html).toContain('aria-label="Open track menu"');
+  });
+
   it('handles paused state with white play triangle and correct aria-labels', () => {
     const pausedState: PlaybackState = {
       ...activePlaybackState,

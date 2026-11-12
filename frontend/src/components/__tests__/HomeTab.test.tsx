@@ -92,7 +92,7 @@ describe('HomeTab Component - 3 Tabs & Google Drive Attachments Architecture', (
     expect(html).toContain('Hi, Scholar');
     expect(html).toContain('Offline-First Vault • Ready to Study');
     expect(html).toContain('Save With Smriti');
-    expect(html).toContain('Your offline-first personal audio study vault.');
+    expect(html).toContain('The Vedic tool for learning anything.');
     expect(html).toContain('Search audio notes, subjects, concepts...');
   });
 
