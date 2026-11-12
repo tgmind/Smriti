@@ -87,5 +87,14 @@ describe('Learning & Memory Reinforcement Engine', () => {
       expect(formatDuration(65)).toBe('1:05');
       expect(formatDuration(3665)).toBe('1:01:05');
     });
+
+    it('safely handles non-finite values (Infinity, NaN, negative) without outputting Infinity:NaN:NaN', () => {
+      expect(formatDuration(Infinity)).toBe('0:00');
+      expect(formatDuration(-Infinity)).toBe('0:00');
+      expect(formatDuration(NaN)).toBe('0:00');
+      expect(formatDuration(-15)).toBe('0:00');
+      expect(formatDuration(undefined as any)).toBe('0:00');
+      expect(formatDuration(null as any)).toBe('0:00');
+    });
   });
 });

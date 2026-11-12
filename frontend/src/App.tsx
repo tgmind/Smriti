@@ -96,15 +96,27 @@ export const App: React.FC = () => {
   useEffect(() => {
     const unsubscribe = bridge.subscribe((eventName, data) => {
       if (eventName === 'playbackPositionUpdated') {
-        const pos = data.positionSeconds || 0;
-        const dur = data.durationSeconds || playbackState.durationSeconds;
+        const rawPos = data.positionSeconds;
+        const rawDur = data.durationSeconds;
+
+        const pos = (typeof rawPos === 'number' && Number.isFinite(rawPos) && rawPos >= 0) ? rawPos : 0;
+
+        let dur = playbackState.durationSeconds;
+        if (typeof rawDur === 'number' && Number.isFinite(rawDur) && rawDur > 0) {
+          dur = rawDur;
+        } else if (!dur || !Number.isFinite(dur) || dur <= 0) {
+          dur = (playbackState.currentAudio?.duration_seconds && Number.isFinite(playbackState.currentAudio.duration_seconds) && playbackState.currentAudio.duration_seconds > 0)
+            ? playbackState.currentAudio.duration_seconds
+            : 60;
+        }
 
         setPlaybackState(prev => {
           // Check A-B loop
           if (prev.abLoop?.enabled && pos >= prev.abLoop.endSeconds) {
             bridge.seek(prev.abLoop.startSeconds);
-            return { ...prev, positionSeconds: prev.abLoop.startSeconds };
+            return { ...prev, positionSeconds: prev.abLoop.startSeconds, durationSeconds: dur };
           }
+
           return { ...prev, positionSeconds: pos, durationSeconds: dur };
         });
 
@@ -188,15 +200,25 @@ export const App: React.FC = () => {
 
   // Audio Playback Handlers
   const handlePlayAudio = (audio: AudioItem) => {
+    // If tapping the currently playing audio, toggle pause/resume
+    if (playbackState.currentAudio?.id === audio.id) {
+      handleTogglePlay();
+      return;
+    }
+
     currentSessionListeningSeconds.current = 0;
     completedPlayRecordedForSession.current = false;
+
+    const safeDuration = (audio.duration_seconds && Number.isFinite(audio.duration_seconds) && audio.duration_seconds > 0)
+      ? audio.duration_seconds
+      : 60;
 
     setPlaybackState(prev => ({
       ...prev,
       currentAudio: audio,
       isPlaying: true,
       positionSeconds: 0,
-      durationSeconds: audio.duration_seconds
+      durationSeconds: safeDuration
     }));
 
     bridge.play(audio, playbackState.playbackSpeed);
@@ -389,6 +411,7 @@ export const App: React.FC = () => {
             playbackState={playbackState}
             userSettings={userSettings}
             onPlayAudio={handlePlayAudio}
+            onSeek={handleSeek}
             onGoToRecord={() => setCurrentTab('record')}
             onNavigateToLibrary={handleNavigateToLibrary}
             onNavigateToAccount={handleNavigateToAccount}
@@ -449,6 +472,7 @@ export const App: React.FC = () => {
         <MiniPlayer
           playbackState={playbackState}
           onTogglePlay={handleTogglePlay}
+          onSeek={handleSeek}
           onSeekRelative={handleSeekRelative}
           onOpenFullScreen={() => setIsFullScreenPlayerOpen(true)}
           onCycleSpeed={handleCycleSpeed}

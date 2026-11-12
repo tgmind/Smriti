@@ -1,5 +1,6 @@
 import { AudioItem, StorageOverview } from '../types';
 import { audioStorage } from './audioStorage';
+import { googleDriveService } from './googleDrive';
 
 export type NativeEventCallback = (eventName: string, data: any) => void;
 
@@ -70,10 +71,29 @@ class BridgeManager {
 
     this.browserAudio.addEventListener('timeupdate', () => {
       if (!this.browserAudio) return;
+      const cur = this.browserAudio.currentTime;
+      const dur = this.browserAudio.duration;
+
+      // Strictly guard against Infinity or NaN from Chromium MediaRecorder streams
+      const validDuration = (typeof dur === 'number' && Number.isFinite(dur) && dur > 0)
+        ? dur
+        : undefined;
+
       this.emit('playbackPositionUpdated', {
-        positionSeconds: this.browserAudio.currentTime,
-        durationSeconds: this.browserAudio.duration || 0
+        positionSeconds: (typeof cur === 'number' && Number.isFinite(cur) && cur >= 0) ? cur : 0,
+        durationSeconds: validDuration
       });
+    });
+
+    this.browserAudio.addEventListener('loadedmetadata', () => {
+      if (!this.browserAudio) return;
+      const dur = this.browserAudio.duration;
+      if (typeof dur === 'number' && Number.isFinite(dur) && dur > 0) {
+        this.emit('playbackPositionUpdated', {
+          positionSeconds: this.browserAudio.currentTime || 0,
+          durationSeconds: dur
+        });
+      }
     });
 
     this.browserAudio.addEventListener('play', () => {
@@ -124,7 +144,7 @@ class BridgeManager {
     // 1. Check local IndexedDB storage for offline recorded or downloaded blob
     try {
       const localBlob = await audioStorage.getAudioBlob(audio.id);
-      if (localBlob) {
+      if (localBlob && localBlob.size > 0) {
         const blobUrl = URL.createObjectURL(localBlob);
         this.browserAudio.src = blobUrl;
         this.browserAudio.playbackRate = speed;
@@ -135,7 +155,26 @@ class BridgeManager {
       console.warn('[Bridge] IndexedDB audio fetch check note:', e);
     }
 
-    // 2. Play remote URL if provided
+    // 2. FETCH DIRECTLY FROM SOVEREIGN GOOGLE DRIVE IF NOT IN CACHE
+    if (audio.google_drive_file_id && googleDriveService.isConnected()) {
+      try {
+        this.emit('playbackLoading', { audioId: audio.id, status: 'downloading_from_drive' });
+        const driveBlob = await googleDriveService.downloadAudio(audio.google_drive_file_id);
+        if (driveBlob && driveBlob.size > 0) {
+          // Cache in IndexedDB for immediate offline access
+          await audioStorage.saveAudioBlob(audio.id, driveBlob);
+          const blobUrl = URL.createObjectURL(driveBlob);
+          this.browserAudio.src = blobUrl;
+          this.browserAudio.playbackRate = speed;
+          await this.browserAudio.play();
+          return;
+        }
+      } catch (err) {
+        console.warn('[Bridge] Failed to fetch directly from Google Drive:', err);
+      }
+    }
+
+    // 3. Play remote URL if provided
     if (audio.file_url) {
       try {
         this.browserAudio.src = audio.file_url;
@@ -147,13 +186,13 @@ class BridgeManager {
       }
     }
 
-    // 3. Fallback: Educational Speech Synthesis Narration (Reads study note out loud)
+    // 4. Fallback: Educational Speech Synthesis Narration (Reads study note out loud)
     if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
       this.playSpeechNarration(audio, speed);
       return;
     }
 
-    // 4. Fallback: Clean generative tone
+    // 5. Fallback: Clean generative tone
     this.playTonePreview(audio);
   }
 

@@ -367,6 +367,32 @@ class GoogleDriveService {
   }
 
   /**
+   * Downloads a binary audio file directly from Google Drive by fileId.
+   * Uses alt=media query parameter to stream binary content with authorization.
+   */
+  public async downloadAudio(fileId: string): Promise<Blob> {
+    if (!this.accessToken) {
+      throw new Error('Google Drive not authorized');
+    }
+
+    const res = await fetch(
+      `https://www.googleapis.com/drive/v3/files/${encodeURIComponent(fileId)}?alt=media`,
+      {
+        headers: {
+          Authorization: `Bearer ${this.accessToken}`
+        }
+      }
+    );
+
+    if (!res.ok) {
+      const err = await res.text();
+      throw new Error(`Failed to download audio from Google Drive: ${err}`);
+    }
+
+    return await res.blob();
+  }
+
+  /**
    * Fetch current storage quota of user's Google Drive with complete breakdown
    */
   public async getStorageQuota(): Promise<GoogleDriveStorageQuota> {

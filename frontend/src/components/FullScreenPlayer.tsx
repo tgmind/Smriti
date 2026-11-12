@@ -57,11 +57,24 @@ export const FullScreenPlayer: React.FC<FullScreenPlayerProps> = ({
 
   const [showTimerMenu, setShowTimerMenu] = useState(false);
   const [showABPanel, setShowABPanel] = useState(false);
+  const [scrubPosition, setScrubPosition] = useState<number | null>(null);
 
   if (!currentAudio) return null;
 
-  const totalDuration = durationSeconds || currentAudio.duration_seconds || 1;
-  const progressPercent = Math.min(100, (positionSeconds / totalDuration) * 100);
+  // Strict finite duration and position
+  const safeDuration = (typeof durationSeconds === 'number' && Number.isFinite(durationSeconds) && durationSeconds > 0)
+    ? durationSeconds
+    : (currentAudio.duration_seconds && Number.isFinite(currentAudio.duration_seconds) && currentAudio.duration_seconds > 0)
+      ? currentAudio.duration_seconds
+      : 60;
+
+  const safePosition = (typeof positionSeconds === 'number' && Number.isFinite(positionSeconds) && positionSeconds >= 0)
+    ? positionSeconds
+    : 0;
+
+  const currentDisplayPos = scrubPosition !== null ? scrubPosition : safePosition;
+  const progressPercent = Math.min(100, Math.max(0, (currentDisplayPos / safeDuration) * 100));
+  const remainingSeconds = Math.max(0, safeDuration - currentDisplayPos);
 
   const timerOptions = [
     { label: 'Off', minutes: null },
@@ -82,7 +95,7 @@ export const FullScreenPlayer: React.FC<FullScreenPlayerProps> = ({
       <div className="flex items-center justify-between mb-2">
         <button
           onClick={onClose}
-          className="p-2 rounded-full bg-slate-100 hover:bg-slate-200 border border-slate-200 text-slate-700 active:scale-95 transition-transform"
+          className="p-2 rounded-full bg-slate-100 hover:bg-slate-200 border border-slate-200 text-slate-700 active:scale-95 transition-transform cursor-pointer"
           aria-label="Collapse player"
         >
           <ChevronDown size={20} />
@@ -100,7 +113,7 @@ export const FullScreenPlayer: React.FC<FullScreenPlayerProps> = ({
         <div className="flex items-center gap-1.5">
           <button
             onClick={() => onToggleFavorite(currentAudio.id)}
-            className={`p-2 rounded-full border active:scale-95 transition-colors ${
+            className={`p-2 rounded-full border active:scale-95 transition-colors cursor-pointer ${
               currentAudio.is_favorite
                 ? 'bg-amber-50 border-amber-300 text-amber-600'
                 : 'bg-slate-100 border-slate-200 text-slate-400 hover:text-slate-700'
@@ -112,7 +125,7 @@ export const FullScreenPlayer: React.FC<FullScreenPlayerProps> = ({
 
           <button
             onClick={() => onToggleOffline(currentAudio)}
-            className={`p-2 rounded-full border active:scale-95 transition-colors ${
+            className={`p-2 rounded-full border active:scale-95 transition-colors cursor-pointer ${
               currentAudio.is_downloaded_offline
                 ? 'bg-emerald-50 border-emerald-300 text-emerald-600'
                 : 'bg-slate-100 border-slate-200 text-slate-400 hover:text-slate-700'
@@ -128,8 +141,16 @@ export const FullScreenPlayer: React.FC<FullScreenPlayerProps> = ({
       {/* Visual Identity / Waveform Area */}
       <div className="flex-1 flex flex-col items-center justify-center my-3 max-w-sm mx-auto w-full">
         <div className="relative w-full aspect-square max-h-60 rounded-3xl bg-slate-50 border border-slate-200/80 shadow-[0_2px_12px_rgba(0,0,0,0.03)] p-5 flex flex-col items-center justify-center overflow-hidden">
-          {/* Waveform Bars */}
-          <div className="relative z-10 w-full flex items-center justify-center gap-1.5 h-24 px-2">
+          {/* Interactive Waveform Scrubbing */}
+          <div
+            className="relative z-10 w-full flex items-center justify-center gap-1.5 h-24 px-2 cursor-pointer group"
+            title="Tap waveform to seek"
+            onClick={(e) => {
+              const rect = e.currentTarget.getBoundingClientRect();
+              const pct = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+              onSeek(pct * safeDuration);
+            }}
+          >
             {peaks.map((height, idx) => {
               const barProgress = (idx / peaks.length) * 100;
               const isPast = barProgress <= progressPercent;
@@ -139,8 +160,8 @@ export const FullScreenPlayer: React.FC<FullScreenPlayerProps> = ({
                   key={idx}
                   className={`w-1.5 rounded-full transition-all duration-150 ${
                     isPast
-                      ? 'bg-amber-500'
-                      : 'bg-slate-200'
+                      ? 'bg-emerald-600'
+                      : 'bg-slate-200 group-hover:bg-slate-300'
                   }`}
                   style={{
                     height: `${Math.max(14, (height / 100) * 100)}%`,
@@ -159,7 +180,7 @@ export const FullScreenPlayer: React.FC<FullScreenPlayerProps> = ({
                   key={i}
                   className="px-2.5 py-0.5 rounded-full bg-white border border-slate-200 text-[10px] text-slate-700 font-mono shadow-2xs"
                 >
-                  {term}
+                  #{term}
                 </span>
               ))}
             </div>
@@ -181,21 +202,62 @@ export const FullScreenPlayer: React.FC<FullScreenPlayerProps> = ({
 
       {/* Player Controls & Scrubber */}
       <div className="max-w-md mx-auto w-full space-y-3.5">
-        {/* Scrubber Slider */}
-        <div className="space-y-1">
-          <input
-            type="range"
-            min="0"
-            max={totalDuration}
-            step="0.5"
-            value={positionSeconds}
-            onChange={(e) => onSeek(parseFloat(e.target.value))}
-            className="w-full h-1.5 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-amber-500 focus:outline-none"
-            aria-label="Audio scrubber"
-          />
+        {/* Scrubber Slider with Smooth Live Drag Feedback */}
+        <div className="space-y-1.5">
+          <div className="relative flex items-center">
+            {/* Custom Track Background */}
+            <div className="w-full h-2 bg-slate-200 rounded-full overflow-hidden relative">
+              {/* A-B Loop highlight on track if active */}
+              {abLoop?.enabled && (
+                <div
+                  className="absolute top-0 bottom-0 bg-sky-400/40 rounded-full"
+                  style={{
+                    left: `${(abLoop.startSeconds / safeDuration) * 100}%`,
+                    width: `${Math.max(2, ((abLoop.endSeconds - abLoop.startSeconds) / safeDuration) * 100)}%`
+                  }}
+                />
+              )}
+              {/* Elapsed Fill */}
+              <div
+                className="bg-emerald-500 h-full rounded-full transition-all duration-75"
+                style={{ width: `${progressPercent}%` }}
+              />
+            </div>
+
+            {/* Native Touch/Mouse Slider Overlay */}
+            <input
+              type="range"
+              min="0"
+              max={safeDuration}
+              step="0.25"
+              value={currentDisplayPos}
+              onChange={(e) => setScrubPosition(parseFloat(e.target.value))}
+              onPointerUp={() => {
+                if (scrubPosition !== null) {
+                  onSeek(scrubPosition);
+                  setScrubPosition(null);
+                }
+              }}
+              onMouseUp={() => {
+                if (scrubPosition !== null) {
+                  onSeek(scrubPosition);
+                  setScrubPosition(null);
+                }
+              }}
+              onTouchEnd={() => {
+                if (scrubPosition !== null) {
+                  onSeek(scrubPosition);
+                  setScrubPosition(null);
+                }
+              }}
+              className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+              aria-label="Audio scrubber"
+            />
+          </div>
+
           <div className="flex justify-between text-[11px] font-mono text-slate-500 px-0.5">
-            <span>{formatDuration(positionSeconds)}</span>
-            <span>-{formatDuration(Math.max(0, totalDuration - positionSeconds))}</span>
+            <span>{formatDuration(currentDisplayPos)}</span>
+            <span>-{formatDuration(remainingSeconds)}</span>
           </div>
         </div>
 
@@ -204,7 +266,7 @@ export const FullScreenPlayer: React.FC<FullScreenPlayerProps> = ({
           {/* Rewind 10s */}
           <button
             onClick={() => onSeekRelative(-10)}
-            className="p-2.5 text-slate-500 hover:text-slate-900 active:scale-95 transition-transform"
+            className="p-2.5 text-slate-500 hover:text-slate-900 active:scale-95 transition-transform cursor-pointer"
             aria-label="Rewind 10 seconds"
           >
             <RotateCcw size={20} />
@@ -213,7 +275,7 @@ export const FullScreenPlayer: React.FC<FullScreenPlayerProps> = ({
           {/* Previous Track / Restart */}
           <button
             onClick={() => onSeek(0)}
-            className="p-2.5 text-slate-500 hover:text-slate-900 active:scale-95 transition-transform"
+            className="p-2.5 text-slate-500 hover:text-slate-900 active:scale-95 transition-transform cursor-pointer"
             aria-label="Restart track"
           >
             <SkipBack size={22} />
@@ -222,7 +284,9 @@ export const FullScreenPlayer: React.FC<FullScreenPlayerProps> = ({
           {/* Main Play/Pause Button */}
           <button
             onClick={onTogglePlay}
-            className="p-4.5 rounded-full bg-slate-900 text-white hover:bg-slate-800 shadow-md shadow-slate-900/15 active:scale-95 transition-transform"
+            className={`p-4.5 rounded-full text-white shadow-md active:scale-95 transition-transform cursor-pointer ${
+              isPlaying ? 'bg-emerald-600 hover:bg-emerald-500 shadow-emerald-600/20' : 'bg-slate-900 hover:bg-slate-800 shadow-slate-900/15'
+            }`}
             aria-label={isPlaying ? 'Pause' : 'Play'}
           >
             {isPlaying ? (
@@ -235,7 +299,7 @@ export const FullScreenPlayer: React.FC<FullScreenPlayerProps> = ({
           {/* Fast Forward 30s */}
           <button
             onClick={() => onSeekRelative(30)}
-            className="p-2.5 text-slate-500 hover:text-slate-900 active:scale-95 transition-transform"
+            className="p-2.5 text-slate-500 hover:text-slate-900 active:scale-95 transition-transform cursor-pointer"
             aria-label="Forward 30 seconds"
           >
             <RotateCw size={20} />
@@ -244,9 +308,9 @@ export const FullScreenPlayer: React.FC<FullScreenPlayerProps> = ({
           {/* Repeat Mode */}
           <button
             onClick={onToggleRepeat}
-            className={`p-2.5 active:scale-95 transition-colors ${
+            className={`p-2.5 active:scale-95 transition-colors cursor-pointer ${
               isRepeatTrack
-                ? 'text-amber-600 font-bold'
+                ? 'text-emerald-600 font-bold'
                 : isRepeatQueue
                 ? 'text-sky-600 font-bold'
                 : 'text-slate-400 hover:text-slate-700'
@@ -264,7 +328,7 @@ export const FullScreenPlayer: React.FC<FullScreenPlayerProps> = ({
             <button
               key={delta}
               onClick={() => onSeekRelative(delta)}
-              className="px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 font-mono text-[10px] font-bold active:scale-95 transition-all border border-slate-200/60"
+              className="px-2.5 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 font-mono text-[10px] font-bold active:scale-95 transition-all border border-slate-200/60 cursor-pointer"
             >
               {delta > 0 ? `+${delta}s` : `${delta}s`}
             </button>
@@ -279,7 +343,7 @@ export const FullScreenPlayer: React.FC<FullScreenPlayerProps> = ({
               <button
                 key={spd}
                 onClick={() => onSetSpeed(spd)}
-                className={`flex-1 py-1 rounded-lg text-xs font-mono font-bold transition-all ${
+                className={`flex-1 py-1 rounded-lg text-xs font-mono font-bold transition-all cursor-pointer ${
                   isSelected
                     ? 'bg-slate-900 text-white shadow-2xs'
                     : 'text-slate-600 hover:text-slate-900'
@@ -293,11 +357,10 @@ export const FullScreenPlayer: React.FC<FullScreenPlayerProps> = ({
 
         {/* Secondary Toolstrip: Sleep Timer & A-B Loop */}
         <div className="pt-1.5 border-t border-slate-200 grid grid-cols-2 gap-2">
-
           {/* A-B Loop */}
           <button
             onClick={() => setShowABPanel(!showABPanel)}
-            className={`py-2 px-2 rounded-xl text-xs font-semibold border flex items-center justify-center gap-1 transition-all ${
+            className={`py-2 px-2 rounded-xl text-xs font-semibold border flex items-center justify-center gap-1 transition-all cursor-pointer ${
               abLoop?.enabled
                 ? 'bg-sky-50 border-sky-300 text-sky-800'
                 : 'bg-slate-100 border-slate-200 text-slate-700 hover:bg-slate-200'
@@ -310,7 +373,7 @@ export const FullScreenPlayer: React.FC<FullScreenPlayerProps> = ({
           {/* Sleep Timer */}
           <button
             onClick={() => setShowTimerMenu(!showTimerMenu)}
-            className={`py-2 px-2 rounded-xl text-xs font-semibold border flex items-center justify-center gap-1 transition-all ${
+            className={`py-2 px-2 rounded-xl text-xs font-semibold border flex items-center justify-center gap-1 transition-all cursor-pointer ${
               sleepTimerRemainingSeconds
                 ? 'bg-amber-50 border-amber-300 text-amber-800'
                 : 'bg-slate-100 border-slate-200 text-slate-700 hover:bg-slate-200'
@@ -333,7 +396,7 @@ export const FullScreenPlayer: React.FC<FullScreenPlayerProps> = ({
                   onSetSleepTimer(opt.minutes);
                   setShowTimerMenu(false);
                 }}
-                className="py-1.5 px-2.5 rounded-lg text-xs font-semibold bg-slate-100 text-slate-700 hover:bg-slate-200 transition-colors"
+                className="py-1.5 px-2.5 rounded-lg text-xs font-semibold bg-slate-100 text-slate-700 hover:bg-slate-200 transition-colors cursor-pointer"
               >
                 {opt.label}
               </button>
@@ -354,20 +417,20 @@ export const FullScreenPlayer: React.FC<FullScreenPlayerProps> = ({
             </div>
             <div className="grid grid-cols-3 gap-2">
               <button
-                onClick={() => onToggleABLoop(positionSeconds, abLoop?.endSeconds || totalDuration)}
-                className="py-1.5 rounded-lg bg-slate-100 border border-slate-200 text-xs font-mono text-slate-700 hover:bg-slate-200 active:scale-95"
+                onClick={() => onToggleABLoop(safePosition, abLoop?.endSeconds || safeDuration)}
+                className="py-1.5 rounded-lg bg-slate-100 border border-slate-200 text-xs font-mono text-slate-700 hover:bg-slate-200 active:scale-95 cursor-pointer"
               >
-                Set A ({formatDuration(positionSeconds)})
+                Set A ({formatDuration(safePosition)})
               </button>
               <button
-                onClick={() => onToggleABLoop(abLoop?.startSeconds || 0, positionSeconds)}
-                className="py-1.5 rounded-lg bg-slate-100 border border-slate-200 text-xs font-mono text-slate-700 hover:bg-slate-200 active:scale-95"
+                onClick={() => onToggleABLoop(abLoop?.startSeconds || 0, safePosition)}
+                className="py-1.5 rounded-lg bg-slate-100 border border-slate-200 text-xs font-mono text-slate-700 hover:bg-slate-200 active:scale-95 cursor-pointer"
               >
-                Set B ({formatDuration(positionSeconds)})
+                Set B ({formatDuration(safePosition)})
               </button>
               <button
                 onClick={() => onToggleABLoop(undefined, undefined)}
-                className="py-1.5 rounded-lg bg-rose-50 border border-rose-200 text-rose-700 text-xs font-semibold hover:bg-rose-100 active:scale-95"
+                className="py-1.5 rounded-lg bg-rose-50 border border-rose-200 text-rose-700 text-xs font-semibold hover:bg-rose-100 active:scale-95 cursor-pointer"
               >
                 Clear Loop
               </button>

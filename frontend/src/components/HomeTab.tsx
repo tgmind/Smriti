@@ -31,6 +31,7 @@ interface HomeTabProps {
   userSettings?: UserSettings;
   todayListeningSeconds?: number;
   onPlayAudio: (audio: AudioItem) => void;
+  onSeek?: (seconds: number) => void;
   onGoToRecord: () => void;
   onNavigateToLibrary: (subjectId?: string) => void;
   onNavigateToAccount: () => void;
@@ -43,6 +44,7 @@ export const HomeTab: React.FC<HomeTabProps> = ({
   subjects = [],
   playbackState,
   onPlayAudio,
+  onSeek,
   onGoToRecord,
   onNavigateToLibrary,
   onNavigateToAccount
@@ -305,62 +307,79 @@ export const HomeTab: React.FC<HomeTabProps> = ({
       </div>
 
       {/* Continue Listening: Sleek Minimalist Studio Card */}
-      {continueAudio && (
-        <div className="bg-gradient-to-br from-slate-900 to-slate-950 text-white rounded-3xl p-4.5 space-y-3 shadow-md border border-slate-800">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <span className={`w-2 h-2 rounded-full ${isCurrentAudioPlaying ? 'bg-emerald-400 animate-pulse' : 'bg-amber-400'}`} />
-              <span className="text-[11px] font-bold uppercase tracking-wider text-slate-300">
-                {isCurrentAudioPlaying ? 'Currently Playing' : 'Continue Listening'}
+      {continueAudio && (() => {
+        const continueDuration = (playbackState?.currentAudio?.id === continueAudio.id && playbackState.durationSeconds && Number.isFinite(playbackState.durationSeconds) && playbackState.durationSeconds > 0)
+          ? playbackState.durationSeconds
+          : (continueAudio.duration_seconds && Number.isFinite(continueAudio.duration_seconds) && continueAudio.duration_seconds > 0)
+            ? continueAudio.duration_seconds
+            : 60;
+        const currentPos = (playbackState?.currentAudio?.id === continueAudio.id && typeof playbackState.positionSeconds === 'number' && Number.isFinite(playbackState.positionSeconds))
+          ? playbackState.positionSeconds
+          : 0;
+        const cardProgressPercent = Math.min(100, Math.max(0, (currentPos / continueDuration) * 100));
+
+        return (
+          <div className="bg-gradient-to-br from-slate-900 to-slate-950 text-white rounded-3xl p-4.5 space-y-3 shadow-md border border-slate-800">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <span className={`w-2 h-2 rounded-full ${isCurrentAudioPlaying ? 'bg-emerald-400 animate-pulse' : 'bg-amber-400'}`} />
+                <span className="text-[11px] font-bold uppercase tracking-wider text-slate-300">
+                  {isCurrentAudioPlaying ? 'Currently Playing' : 'Continue Listening'}
+                </span>
+              </div>
+              <span className="text-[10px] font-mono text-slate-400">
+                {formatDuration(continueDuration)}
               </span>
             </div>
-            <span className="text-[10px] font-mono text-slate-400">
-              {formatDuration(continueAudio.duration_seconds)}
-            </span>
-          </div>
 
-          <div className="flex items-center justify-between gap-3">
-            <div className="flex-1 min-w-0">
-              <span className="text-[10px] font-mono font-bold uppercase text-emerald-400 block tracking-wider">
-                {continueAudio.subject_name || 'Academic'}
-              </span>
-              <h3 className="text-xs font-bold text-white truncate mt-0.5">
-                {continueAudio.title}
-              </h3>
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex-1 min-w-0">
+                <span className="text-[10px] font-mono font-bold uppercase text-emerald-400 block tracking-wider">
+                  {continueAudio.subject_name || 'Academic'}
+                </span>
+                <h3 className="text-xs font-bold text-white truncate mt-0.5">
+                  {continueAudio.title}
+                </h3>
+              </div>
+
+              <button
+                onClick={() => onPlayAudio(continueAudio)}
+                aria-label={isCurrentAudioPlaying ? `Pause ${continueAudio.title}` : `Play ${continueAudio.title}`}
+                className="w-11 h-11 rounded-full bg-emerald-500 hover:bg-emerald-400 text-slate-950 flex items-center justify-center transition-all active:scale-95 shadow-md shadow-emerald-500/20 shrink-0 cursor-pointer"
+              >
+                {isCurrentAudioPlaying ? (
+                  <Pause size={17} fill="currentColor" />
+                ) : (
+                  <Play size={17} fill="currentColor" className="translate-x-0.5" />
+                )}
+              </button>
             </div>
 
-            <button
-              onClick={() => onPlayAudio(continueAudio)}
-              aria-label={isCurrentAudioPlaying ? `Pause ${continueAudio.title}` : `Play ${continueAudio.title}`}
-              className="w-11 h-11 rounded-full bg-emerald-500 hover:bg-emerald-400 text-slate-950 flex items-center justify-center transition-all active:scale-95 shadow-md shadow-emerald-500/20 shrink-0 cursor-pointer"
-            >
-              {isCurrentAudioPlaying ? (
-                <Pause size={17} fill="currentColor" />
-              ) : (
-                <Play size={17} fill="currentColor" className="translate-x-0.5" />
-              )}
-            </button>
-          </div>
-
-          {/* Minimalist Progress Track */}
-          {playbackState?.currentAudio?.id === continueAudio.id && (
-            <div className="pt-0.5 space-y-1">
-              <div className="w-full bg-slate-800 h-1.5 rounded-full overflow-hidden">
+            {/* Interactive, Smooth Scrubbable Seek Bar */}
+            <div className="pt-0.5 space-y-1.5">
+              <div
+                className="relative w-full bg-slate-800 hover:bg-slate-700/80 h-2 rounded-full overflow-hidden cursor-pointer group transition-colors"
+                title="Tap or drag to seek"
+                onClick={(e) => {
+                  if (!onSeek) return;
+                  const rect = e.currentTarget.getBoundingClientRect();
+                  const pct = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+                  onSeek(pct * continueDuration);
+                }}
+              >
                 <div
-                  className="bg-emerald-400 h-full rounded-full transition-all duration-200"
-                  style={{
-                    width: `${Math.min(100, Math.max(0, (playbackState.positionSeconds / (playbackState.durationSeconds || 1)) * 100))}%`
-                  }}
+                  className="bg-gradient-to-r from-emerald-500 to-teal-400 h-full rounded-full transition-all duration-150"
+                  style={{ width: `${cardProgressPercent}%` }}
                 />
               </div>
-              <div className="flex justify-between text-[9px] font-mono text-slate-400">
-                <span>{formatDuration(Math.round(playbackState.positionSeconds))}</span>
-                <span>{formatDuration(Math.round(playbackState.durationSeconds))}</span>
+              <div className="flex justify-between text-[10px] font-mono text-slate-400">
+                <span>{formatDuration(currentPos)}</span>
+                <span>{formatDuration(continueDuration)}</span>
               </div>
             </div>
-          )}
-        </div>
-      )}
+          </div>
+        );
+      })()}
 
       {/* Action Chips Row (Correctly mapped to Record, Folders/Library, and Drive/Storage) */}
       <div className="grid grid-cols-3 gap-2">
