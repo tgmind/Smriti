@@ -2,7 +2,7 @@ import { describe, it, expect, vi } from 'vitest';
 import { renderToString } from 'react-dom/server';
 import { Slider } from '../slider';
 import { Badge } from '../badge';
-import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '../card';
+import { Card, CardHeader, CardTitle, CardDescription, CardAction, CardContent, CardFooter } from '../card';
 
 describe('shadcn-ui primitives: Slider, Badge, Card', () => {
   it('renders Slider with correct value and loop range', () => {
@@ -34,18 +34,24 @@ describe('shadcn-ui primitives: Slider, Badge, Card', () => {
 
   it('renders Card with composed children', () => {
     const html = renderToString(
-      <Card className="test-card">
+      <Card className="test-card" size="sm">
         <CardHeader>
           <CardTitle>Session Title</CardTitle>
           <CardDescription>Session Details</CardDescription>
+          <CardAction><button>Close</button></CardAction>
         </CardHeader>
         <CardContent>Audio Details</CardContent>
+        <CardFooter><button>Submit</button></CardFooter>
       </Card>
     );
 
     expect(html).toContain('test-card');
+    expect(html).toContain('data-size="sm"');
+    expect(html).toContain('data-slot="card-action"');
     expect(html).toContain('Session Title');
     expect(html).toContain('Session Details');
+    expect(html).toContain('Close');
     expect(html).toContain('Audio Details');
+    expect(html).toContain('Submit');
   });
 });

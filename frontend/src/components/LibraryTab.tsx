@@ -11,10 +11,6 @@ import {
   Zap,
   X,
   ChevronRight,
-  Atom,
-  FlaskConical,
-  Dna,
-  Binary,
   BookOpen,
   Folder,
   Clock,
@@ -22,13 +18,36 @@ import {
   Check,
   SlidersHorizontal,
   Cloud,
+  RefreshCw,
   FolderTree,
   LayoutGrid,
-  Scissors
+  Scissors,
+  Calculator,
+  Globe,
+  Music,
+  Flame,
+  GraduationCap,
+  Landmark,
+  Scale,
+  Code,
+  TrendingUp,
+  Lightbulb,
+  Languages,
+  Trash2
 } from 'lucide-react';
 import { AudioItem, Subject, PlaybackState } from '../types';
 import { formatDuration } from '../services/learningEngine';
+import { ACADEMIC_ICON_MAP } from '../utils/subjectVisuals';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import {
+  Card,
+  CardAction,
+  CardContent,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from '@/components/ui/card';
 import {
   Breadcrumb,
   BreadcrumbList,
@@ -45,6 +64,13 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
 } from '@/components/ui/dropdown-menu';
+import {
+  Empty,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+  EmptyDescription
+} from '@/components/ui/empty';
 import { FileTree } from '@/components/ui/file-tree';
 import { AudioTrimmer } from './AudioTrimmer';
 
@@ -53,6 +79,10 @@ export interface LibraryTabProps {
   subjects: Subject[];
   initialSubjectId?: string | null;
   playbackState?: PlaybackState;
+  isDriveConnected?: boolean;
+  isSyncingDrive?: boolean;
+  onSyncDrive?: () => void;
+  onConnectDrive?: () => void;
   onTogglePlay?: () => void;
   onSeek?: (seconds: number) => void;
   onSetSpeed?: (speed: number) => void;
@@ -60,29 +90,139 @@ export interface LibraryTabProps {
   onToggleFavorite: (audioId: string) => void;
   onToggleOffline: (audio: AudioItem) => void;
   onGoToRecord: () => void;
+  onCreateSubject?: (newSubject: Subject) => void;
+  onDeleteSubject?: (subjectId: string, options?: { deleteRecordings?: boolean }) => Promise<void> | void;
+  onDeleteAudio?: (audioId: string) => Promise<void> | void;
+  initialCreateFolderOpen?: boolean;
 }
 
 type LibraryViewMode = 'topics' | 'subject' | 'note';
 type FilterMode = 'all' | 'favorites' | 'offline' | 'short';
 type SortMode = 'recent' | 'duration' | 'title';
 
+const FOLDER_ICON_OPTIONS = [
+  { name: 'Folder', label: 'General Folder', icon: Folder },
+  { name: 'BookOpen', label: 'Academic & Reading', icon: BookOpen },
+  { name: 'GraduationCap', label: 'Degree & Study', icon: GraduationCap },
+  { name: 'Landmark', label: 'History & Polity', icon: Landmark },
+  { name: 'Scale', label: 'Law & Justice', icon: Scale },
+  { name: 'TrendingUp', label: 'Economics & Business', icon: TrendingUp },
+  { name: 'Code', label: 'Computer Science & Code', icon: Code },
+  { name: 'Calculator', label: 'Calculus & Stats', icon: Calculator },
+  { name: 'Globe', label: 'Social Sciences & Geo', icon: Globe },
+  { name: 'Languages', label: 'Languages & Linguistics', icon: Languages },
+  { name: 'Lightbulb', label: 'Philosophy & Ideas', icon: Lightbulb },
+  { name: 'Music', label: 'Arts & Audios', icon: Music },
+  { name: 'Flame', label: 'Exam Sprint & High Yield', icon: Flame },
+  { name: 'Sparkles', label: 'Important Summaries', icon: Sparkles },
+  { name: 'Zap', label: 'Rapid Recall', icon: Zap },
+];
+
+const FOLDER_COLOR_OPTIONS = [
+  { hex: '#38bdf8', label: 'Sky' },
+  { hex: '#f59e0b', label: 'Amber' },
+  { hex: '#10b981', label: 'Emerald' },
+  { hex: '#a855f7', label: 'Purple' },
+  { hex: '#f43f5e', label: 'Rose' },
+  { hex: '#6366f1', label: 'Indigo' },
+];
+
 export const LibraryTab: React.FC<LibraryTabProps> = ({
   audioItems,
   subjects,
   initialSubjectId,
   playbackState,
+  isDriveConnected = false,
+  isSyncingDrive = false,
+  onSyncDrive,
+  onConnectDrive,
   onTogglePlay,
   onSeek,
   onSetSpeed,
   onPlayAudio,
   onToggleFavorite,
   onToggleOffline,
-  onGoToRecord
+  onGoToRecord,
+  onCreateSubject,
+  onDeleteSubject,
+  onDeleteAudio,
+  initialCreateFolderOpen = false
 }) => {
   // 3-Tier Navigation State: Library (topics) -> Subject -> Audio Note
   const [viewMode, setViewMode] = useState<LibraryViewMode>(initialSubjectId ? 'subject' : 'topics');
   const [selectedSubjectId, setSelectedSubjectId] = useState<string | null>(initialSubjectId || null);
   const [selectedAudioId, setSelectedAudioId] = useState<string | null>(null);
+
+  // Subject Deletion modal state
+  const [subjectToDelete, setSubjectToDelete] = useState<Subject | null>(null);
+  const [deleteRecordingsOption, setDeleteRecordingsOption] = useState<boolean>(false);
+  const [isDeletingSubject, setIsDeletingSubject] = useState<boolean>(false);
+
+  // Folder creation modal state
+  const [isCreateFolderOpen, setIsCreateFolderOpen] = useState(initialCreateFolderOpen);
+  const [newFolderName, setNewFolderName] = useState('');
+  const [newFolderDesc, setNewFolderDesc] = useState('');
+  const [newFolderIcon, setNewFolderIcon] = useState('Folder');
+  const [newFolderColor, setNewFolderColor] = useState('#38bdf8');
+
+  // Close modal on Escape
+  useEffect(() => {
+    if (!isCreateFolderOpen) return;
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setIsCreateFolderOpen(false);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isCreateFolderOpen]);
+
+  const handleCreateFolderSubmit = (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    const trimmed = newFolderName.trim();
+    if (!trimmed) return;
+
+    const newId = `sub-${Date.now()}`;
+    const newSubject: Subject = {
+      id: newId,
+      name: trimmed,
+      description: newFolderDesc.trim() || `${trimmed} study & lecture notes`,
+      icon_name: newFolderIcon,
+      color_hex: newFolderColor,
+      sort_order: subjects.length + 1,
+      item_count: 0
+    };
+
+    if (onCreateSubject) {
+      onCreateSubject(newSubject);
+    }
+
+    setNewFolderName('');
+    setNewFolderDesc('');
+    setNewFolderIcon('Folder');
+    setNewFolderColor('#38bdf8');
+    setIsCreateFolderOpen(false);
+
+    // Automatically navigate to the new subject folder
+    handleOpenSubject(newId);
+  };
+
+  const handleConfirmDeleteSubject = async () => {
+    if (!subjectToDelete || !onDeleteSubject) return;
+    try {
+      setIsDeletingSubject(true);
+      await onDeleteSubject(subjectToDelete.id, { deleteRecordings: deleteRecordingsOption });
+      if (selectedSubjectId === subjectToDelete.id || selectedSubjectId?.toLowerCase() === subjectToDelete.name.toLowerCase()) {
+        handleBackToTopics();
+      }
+      setSubjectToDelete(null);
+      setDeleteRecordingsOption(false);
+    } catch (e) {
+      console.warn('Failed to delete subject folder:', e);
+    } finally {
+      setIsDeletingSubject(false);
+    }
+  };
 
   // Sync initialSubjectId changes from external navigation (e.g. Home tab cards)
   useEffect(() => {
@@ -141,21 +281,16 @@ export const LibraryTab: React.FC<LibraryTabProps> = ({
     setViewMode('subject');
   };
 
-  // Helper: map icon_name to Lucide icon component
+  // Helper: map icon_name to Lucide icon component (supports all generalized academic icons)
   const getSubjectIcon = (iconName: string) => {
-    switch (iconName) {
-      case 'Atom': return Atom;
-      case 'FlaskConical': return FlaskConical;
-      case 'Dna': return Dna;
-      case 'Binary': return Binary;
-      default: return BookOpen;
-    }
+    return ACADEMIC_ICON_MAP[iconName] || BookOpen;
   };
 
   // Helper: subject theme colors
   const getSubjectTheme = (colorHex: string) => {
-    switch (colorHex) {
+    switch (colorHex?.toLowerCase()) {
       case '#38bdf8': // Sky blue (Physics)
+      case '#0284c7':
         return {
           bg: 'bg-gradient-to-br from-sky-50 to-sky-100/80 text-sky-600',
           border: 'border-sky-200/80',
@@ -166,6 +301,7 @@ export const LibraryTab: React.FC<LibraryTabProps> = ({
           lightBg: 'from-sky-50/70 via-white to-white'
         };
       case '#f59e0b': // Amber (Chemistry)
+      case '#d97706':
         return {
           bg: 'bg-gradient-to-br from-amber-50 to-amber-100/80 text-amber-600',
           border: 'border-amber-200/80',
@@ -176,6 +312,7 @@ export const LibraryTab: React.FC<LibraryTabProps> = ({
           lightBg: 'from-amber-50/70 via-white to-white'
         };
       case '#10b981': // Emerald (Biology)
+      case '#059669':
         return {
           bg: 'bg-gradient-to-br from-emerald-50 to-emerald-100/80 text-emerald-600',
           border: 'border-emerald-200/80',
@@ -186,6 +323,7 @@ export const LibraryTab: React.FC<LibraryTabProps> = ({
           lightBg: 'from-emerald-50/70 via-white to-white'
         };
       case '#a855f7': // Purple (Mathematics)
+      case '#8b5cf6':
         return {
           bg: 'bg-gradient-to-br from-purple-50 to-purple-100/80 text-purple-600',
           border: 'border-purple-200/80',
@@ -194,6 +332,28 @@ export const LibraryTab: React.FC<LibraryTabProps> = ({
           dot: 'bg-purple-500',
           accent: 'text-purple-600',
           lightBg: 'from-purple-50/70 via-white to-white'
+        };
+      case '#f43f5e': // Rose
+      case '#e11d48':
+        return {
+          bg: 'bg-gradient-to-br from-rose-50 to-rose-100/80 text-rose-600',
+          border: 'border-rose-200/80',
+          activeBg: 'bg-rose-500 text-white',
+          badge: 'bg-rose-100 text-rose-800 border-rose-200',
+          dot: 'bg-rose-500',
+          accent: 'text-rose-600',
+          lightBg: 'from-rose-50/70 via-white to-white'
+        };
+      case '#6366f1': // Indigo
+      case '#4f46e5':
+        return {
+          bg: 'bg-gradient-to-br from-indigo-50 to-indigo-100/80 text-indigo-600',
+          border: 'border-indigo-200/80',
+          activeBg: 'bg-indigo-600 text-white',
+          badge: 'bg-indigo-100 text-indigo-800 border-indigo-200',
+          dot: 'bg-indigo-500',
+          accent: 'text-indigo-600',
+          lightBg: 'from-indigo-50/70 via-white to-white'
         };
       default:
         return {
@@ -208,16 +368,42 @@ export const LibraryTab: React.FC<LibraryTabProps> = ({
     }
   };
 
-  // Group audio items by subject ID
+  // Group audio items by subject ID and subject name
   const audiosBySubject = useMemo(() => {
     const map = new Map<string, AudioItem[]>();
     audioItems.forEach(item => {
       const subId = item.subject_id || 'general';
+      const subName = item.subject_name?.trim().toLowerCase();
       if (!map.has(subId)) map.set(subId, []);
       map.get(subId)!.push(item);
+      if (subName && subName !== subId.toLowerCase()) {
+        if (!map.has(subName)) map.set(subName, []);
+        map.get(subName)!.push(item);
+      }
     });
     return map;
   }, [audioItems]);
+
+  // Strictly deduplicate subjects by normalized name to eliminate visual duplicates
+  const deduplicatedSubjects = useMemo(() => {
+    const map = new Map<string, Subject>();
+    for (const s of subjects) {
+      if (!s || !s.name) continue;
+      const key = s.name.trim().toLowerCase();
+      if (!key) continue;
+      if (!map.has(key)) {
+        map.set(key, s);
+      } else {
+        const cur = map.get(key)!;
+        const curItems = (audiosBySubject.get(cur.id) || audiosBySubject.get(key) || []).length;
+        const sItems = (audiosBySubject.get(s.id) || audiosBySubject.get(key) || []).length;
+        if (sItems > curItems) {
+          map.set(key, s);
+        }
+      }
+    }
+    return Array.from(map.values());
+  }, [subjects, audiosBySubject]);
 
   // Aggregate stats across all subjects
   const libraryStats = useMemo(() => {
@@ -225,19 +411,24 @@ export const LibraryTab: React.FC<LibraryTabProps> = ({
     const totalOffline = audioItems.filter(a => a.is_downloaded_offline).length;
     const totalFavorites = audioItems.filter(a => a.is_favorite).length;
     return {
-      totalSubjects: subjects.length,
+      totalSubjects: deduplicatedSubjects.length,
       totalAudios: audioItems.length,
       totalDurationSeconds,
       totalOffline,
       totalFavorites
     };
-  }, [audioItems, subjects]);
+  }, [audioItems, deduplicatedSubjects]);
 
   // Filter and sort audio items for a specific subject (or all if subject is null)
   const getSubjectAudios = (subjectId: string | null) => {
     let items = audioItems;
     if (subjectId) {
-      items = items.filter(a => a.subject_id === subjectId);
+      const targetSub = subjects.find(s => s.id === subjectId);
+      const targetSubName = targetSub?.name?.trim().toLowerCase();
+      items = items.filter(
+        a => a.subject_id === subjectId ||
+        (targetSubName && a.subject_name?.trim().toLowerCase() === targetSubName)
+      );
     }
 
     if (filterMode === 'favorites') items = items.filter(a => a.is_favorite);
@@ -288,6 +479,188 @@ export const LibraryTab: React.FC<LibraryTabProps> = ({
   // Is an audio currently playing in the active session
   const isAudioPlaying = (audioId: string) => {
     return playbackState?.currentAudio?.id === audioId && playbackState.isPlaying;
+  };
+
+  // Create Subject Folder Modal Dialog using modern shadcn Card
+  const renderCreateFolderModal = () => {
+    if (!isCreateFolderOpen) return null;
+
+    const ActiveModalIcon = getSubjectIcon(newFolderIcon);
+
+    return (
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="create-subject-title"
+        className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-xs animate-in fade-in duration-200"
+        onClick={(e) => {
+          if (e.target === e.currentTarget) {
+            setIsCreateFolderOpen(false);
+          }
+        }}
+      >
+        <Card className="w-full max-w-sm sm:max-w-md bg-white border-slate-200/90 shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
+          <CardHeader className="border-b border-slate-100 pb-3.5">
+            <CardTitle id="create-subject-title" className="text-base font-bold text-slate-900 flex items-center gap-2">
+              <span
+                className="w-7 h-7 rounded-lg flex items-center justify-center text-white shrink-0 shadow-2xs transition-colors"
+                style={{ backgroundColor: newFolderColor }}
+              >
+                <ActiveModalIcon size={15} />
+              </span>
+              <span>New Subject Folder</span>
+            </CardTitle>
+            <CardDescription className="text-xs text-slate-500">
+              Create a subject folder to organize lecture recordings and revisions
+            </CardDescription>
+            <CardAction>
+              <button
+                type="button"
+                onClick={() => setIsCreateFolderOpen(false)}
+                aria-label="Close dialog"
+                className="w-7 h-7 rounded-full text-slate-400 hover:text-slate-700 hover:bg-slate-100 flex items-center justify-center transition-colors cursor-pointer"
+              >
+                <X size={15} />
+              </button>
+            </CardAction>
+          </CardHeader>
+
+          <form onSubmit={handleCreateFolderSubmit}>
+            <CardContent className="space-y-4 pt-4 pb-2">
+              {/* Folder Name */}
+              <div className="space-y-1.5">
+                <label htmlFor="folder-name-input" className="text-xs font-semibold text-slate-700 flex items-center justify-between">
+                  <span>Folder Name <span className="text-rose-500">*</span></span>
+                  <span className="text-[10px] text-slate-400 font-normal">e.g., Organic Chemistry, Mechanics</span>
+                </label>
+                <input
+                  id="folder-name-input"
+                  type="text"
+                  required
+                  value={newFolderName}
+                  onChange={(e) => setNewFolderName(e.target.value)}
+                  placeholder="Enter subject or topic name..."
+                  className="w-full px-3 py-2 text-xs sm:text-sm bg-slate-50/70 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500 transition-all text-slate-900 placeholder:text-slate-400"
+                  autoFocus
+                />
+              </div>
+
+              {/* Description */}
+              <div className="space-y-1.5">
+                <label htmlFor="folder-desc-input" className="text-xs font-semibold text-slate-700">
+                  Description <span className="text-[10px] text-slate-400 font-normal">(optional)</span>
+                </label>
+                <input
+                  id="folder-desc-input"
+                  type="text"
+                  value={newFolderDesc}
+                  onChange={(e) => setNewFolderDesc(e.target.value)}
+                  placeholder="e.g. Chapter 4-8 exam revision notes..."
+                  className="w-full px-3 py-2 text-xs bg-slate-50/70 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500 transition-all text-slate-900 placeholder:text-slate-400"
+                />
+              </div>
+
+              {/* Choose Icon */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold text-slate-700">Choose Icon</label>
+                <div className="grid grid-cols-6 gap-2">
+                  {FOLDER_ICON_OPTIONS.map((item) => {
+                    const IconComp = item.icon;
+                    const isSelected = newFolderIcon === item.name;
+                    return (
+                      <button
+                        key={item.name}
+                        type="button"
+                        onClick={() => setNewFolderIcon(item.name)}
+                        title={item.label}
+                        className={`h-9 rounded-xl flex items-center justify-center border transition-all cursor-pointer ${
+                          isSelected
+                            ? 'border-slate-900 bg-slate-900 text-white shadow-xs scale-105'
+                            : 'border-slate-200 hover:border-slate-300 bg-white text-slate-600 hover:bg-slate-50'
+                        }`}
+                      >
+                        <IconComp size={16} />
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Choose Theme Color */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold text-slate-700">Theme Color</label>
+                <div className="flex items-center gap-2.5">
+                  {FOLDER_COLOR_OPTIONS.map((c) => {
+                    const isSelected = newFolderColor === c.hex;
+                    return (
+                      <button
+                        key={c.hex}
+                        type="button"
+                        onClick={() => setNewFolderColor(c.hex)}
+                        title={c.label}
+                        className={`w-7 h-7 rounded-full transition-all cursor-pointer flex items-center justify-center ${
+                          isSelected
+                            ? 'ring-2 ring-offset-2 ring-slate-900 scale-110 shadow-xs'
+                            : 'hover:scale-105 opacity-80 hover:opacity-100'
+                        }`}
+                        style={{ backgroundColor: c.hex }}
+                      >
+                        {isSelected && <Check size={13} className="text-white drop-shadow-xs" />}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Live Preview Pill */}
+              <div className="p-2.5 rounded-xl border border-slate-100 bg-slate-50/80 flex items-center gap-2.5">
+                <div
+                  className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 text-white shadow-2xs transition-colors"
+                  style={{ backgroundColor: newFolderColor }}
+                >
+                  <ActiveModalIcon size={16} />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="text-xs font-bold text-slate-900 truncate">
+                    {newFolderName.trim() || 'Untitled Subject'}
+                  </p>
+                  <p className="text-[10px] text-slate-500 truncate">
+                    {newFolderDesc.trim() || 'No recordings yet · 0 lessons'}
+                  </p>
+                </div>
+                <span
+                  className="text-[10px] font-semibold px-2 py-0.5 rounded-full shrink-0"
+                  style={{
+                    backgroundColor: `${newFolderColor}20`,
+                    color: newFolderColor
+                  }}
+                >
+                  Preview
+                </span>
+              </div>
+            </CardContent>
+
+            <CardFooter className="flex items-center justify-end gap-2 border-t border-slate-100 bg-slate-50/70 p-3.5">
+              <button
+                type="button"
+                onClick={() => setIsCreateFolderOpen(false)}
+                className="px-3.5 py-1.5 text-xs font-medium text-slate-600 hover:text-slate-800 hover:bg-slate-200/60 rounded-xl transition-colors cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={!newFolderName.trim()}
+                className="px-4 py-1.5 text-xs font-semibold text-white bg-slate-950 hover:bg-slate-800 disabled:opacity-40 disabled:cursor-not-allowed rounded-xl shadow-xs transition-all cursor-pointer flex items-center gap-1.5"
+              >
+                <Folder size={13} />
+                <span>Create Folder</span>
+              </button>
+            </CardFooter>
+          </form>
+        </Card>
+      </div>
+    );
   };
 
   // =========================================================================
@@ -585,7 +958,7 @@ export const LibraryTab: React.FC<LibraryTabProps> = ({
               <DropdownMenuContent>
                 <DropdownMenuLabel>Jump to Subject</DropdownMenuLabel>
                 <DropdownMenuSeparator />
-                {subjects.map(s => (
+                {deduplicatedSubjects.map(s => (
                   <DropdownMenuItem
                     key={s.id}
                     onClick={() => handleOpenSubject(s.id)}
@@ -594,8 +967,28 @@ export const LibraryTab: React.FC<LibraryTabProps> = ({
                     {s.name}
                   </DropdownMenuItem>
                 ))}
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  onClick={() => setIsCreateFolderOpen(true)}
+                  className="text-blue-600 font-semibold flex items-center gap-1.5 cursor-pointer"
+                >
+                  <Plus size={12} />
+                  <span>New Subject Folder</span>
+                </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
+
+            {onDeleteSubject && (
+              <button
+                type="button"
+                onClick={() => setSubjectToDelete(selectedSubject)}
+                className="py-1 px-2.5 rounded-full bg-rose-50 border border-rose-200 text-rose-700 hover:bg-rose-100 font-semibold text-[11px] flex items-center gap-1 transition-all active:scale-95 shadow-2xs cursor-pointer"
+                title={`Delete ${selectedSubject.name} folder`}
+              >
+                <Trash2 size={12} />
+                <span>Delete</span>
+              </button>
+            )}
 
             <button
               onClick={onGoToRecord}
@@ -730,15 +1123,22 @@ export const LibraryTab: React.FC<LibraryTabProps> = ({
         {/* Audio Files List for Selected Subject */}
         <div className="space-y-2.5">
           {subjectAudios.length === 0 ? (
-            <div className="bg-white border border-slate-200 rounded-2xl p-7 text-center space-y-2 shadow-2xs">
-              <div className="w-10 h-10 rounded-full bg-slate-100 text-slate-400 mx-auto flex items-center justify-center">
-                <FileAudio size={20} />
-              </div>
-              <p className="text-xs font-bold text-slate-800">No audio notes match criteria</p>
-              <p className="text-[11px] text-slate-500">
-                Clear active filters or record a new lesson for {selectedSubject.name}.
-              </p>
-            </div>
+            <Empty className="bg-white border border-slate-200 rounded-2xl p-7 text-center shadow-2xs">
+              <EmptyHeader>
+                <EmptyMedia
+                  variant="icon"
+                  className="w-10 h-10 rounded-full bg-slate-100 text-slate-400 mx-auto flex items-center justify-center mb-0.5"
+                >
+                  <FileAudio size={20} />
+                </EmptyMedia>
+                <EmptyTitle className="text-xs font-bold text-slate-800">
+                  No audio notes match criteria
+                </EmptyTitle>
+                <EmptyDescription className="text-[11px] text-slate-500">
+                  Clear active filters or record a new lesson for {selectedSubject.name}.
+                </EmptyDescription>
+              </EmptyHeader>
+            </Empty>
           ) : (
             subjectAudios.map((audio) => {
               const isPlaying = isAudioPlaying(audio.id);
@@ -754,13 +1154,17 @@ export const LibraryTab: React.FC<LibraryTabProps> = ({
                       className="flex-1 min-w-0 cursor-pointer"
                     >
                       <div className="flex items-center gap-1.5 mb-1.5 flex-wrap">
-                        {audio.is_downloaded_offline && (
-                          <span className="px-1.5 py-0.2 rounded-md bg-emerald-50 text-emerald-700 border border-emerald-200/80 text-[9px] font-bold font-mono">
-                            OFFLINE
+                        {audio.is_downloaded_offline ? (
+                          <span className="px-1.5 py-0.5 rounded-md bg-emerald-50 text-emerald-700 border border-emerald-200/80 text-[9px] font-bold font-mono inline-flex items-center gap-1">
+                            <CheckCircle2 size={9} /> OFFLINE READY
+                          </span>
+                        ) : (
+                          <span className="px-1.5 py-0.5 rounded-md bg-sky-50 text-sky-700 border border-sky-200/80 text-[9px] font-medium font-mono inline-flex items-center gap-1">
+                            <Cloud size={9} /> IN DRIVE
                           </span>
                         )}
                         {audio.audio_enhancement_applied && (
-                          <span className="px-1.5 py-0.2 rounded-md bg-sky-50 text-sky-700 border border-sky-200/80 text-[9px] font-bold font-mono flex items-center gap-0.5">
+                          <span className="px-1.5 py-0.5 rounded-md bg-sky-50 text-sky-700 border border-sky-200/80 text-[9px] font-bold font-mono flex items-center gap-0.5">
                             <Sparkles size={8} /> DSP
                           </span>
                         )}
@@ -777,7 +1181,7 @@ export const LibraryTab: React.FC<LibraryTabProps> = ({
                       )}
                     </div>
 
-                    {/* Quick Play & Action Buttons */}
+                    {/* Quick Play, Download & Favorite Action Buttons */}
                     <div className="flex items-center gap-1.5 shrink-0">
                       <button
                         onClick={() => onToggleFavorite(audio.id)}
@@ -789,6 +1193,31 @@ export const LibraryTab: React.FC<LibraryTabProps> = ({
                         title="Toggle Favorite"
                       >
                         <Star size={13} fill={audio.is_favorite ? 'currentColor' : 'none'} />
+                      </button>
+
+                      {/* Small Download Arrow Button or Downloaded Checked Symbol */}
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onToggleOffline(audio);
+                        }}
+                        className={`size-8 rounded-lg border flex items-center justify-center transition-all active:scale-90 shadow-2xs cursor-pointer ${
+                          audio.is_downloaded_offline
+                            ? 'bg-emerald-50 border-emerald-300 text-emerald-600 hover:bg-emerald-100'
+                            : 'bg-white border-slate-200 text-slate-400 hover:text-sky-600 hover:border-sky-300 hover:bg-sky-50'
+                        }`}
+                        title={
+                          audio.is_downloaded_offline
+                            ? 'Downloaded offline (tap to remove)'
+                            : 'Download from Google Drive for fast local playback'
+                        }
+                        aria-label={audio.is_downloaded_offline ? 'Downloaded offline' : `Download ${audio.title}`}
+                      >
+                        {audio.is_downloaded_offline ? (
+                          <CheckCircle2 size={13} strokeWidth={2.4} />
+                        ) : (
+                          <Download size={13} strokeWidth={2.2} />
+                        )}
                       </button>
 
                       <button
@@ -821,19 +1250,37 @@ export const LibraryTab: React.FC<LibraryTabProps> = ({
                       {formatDuration(audio.duration_seconds)}
                     </span>
 
-                    <button
-                      onClick={() => handleOpenAudioNote(audio)}
-                      className="text-slate-700 hover:text-slate-950 font-bold flex items-center gap-0.5 text-xs cursor-pointer"
-                    >
-                      <span>View Note</span>
-                      <ChevronRight size={14} />
-                    </button>
+                    <div className="flex items-center gap-2">
+                      {onDeleteAudio && (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (window.confirm(`Delete audio note "${audio.title}"?`)) {
+                              onDeleteAudio(audio.id);
+                            }
+                          }}
+                          className="p-1 text-slate-300 hover:text-rose-600 transition-colors cursor-pointer"
+                          title="Delete audio note"
+                        >
+                          <Trash2 size={13} />
+                        </button>
+                      )}
+                      <button
+                        onClick={() => handleOpenAudioNote(audio)}
+                        className="text-slate-700 hover:text-slate-950 font-bold flex items-center gap-0.5 text-xs cursor-pointer"
+                      >
+                        <span>View Note</span>
+                        <ChevronRight size={14} />
+                      </button>
+                    </div>
                   </div>
                 </div>
               );
             })
           )}
         </div>
+        {renderCreateFolderModal()}
       </div>
     );
   }
@@ -907,7 +1354,7 @@ export const LibraryTab: React.FC<LibraryTabProps> = ({
         </button>
 
         <button
-          onClick={onGoToRecord}
+          onClick={() => setIsCreateFolderOpen(true)}
           className="bg-[#FFEFEF] hover:bg-[#FFE5E5] text-rose-800 border border-rose-200/70 p-2.5 rounded-2xl flex items-center justify-center gap-1.5 text-xs font-semibold active:scale-95 transition-all shadow-2xs cursor-pointer"
         >
           <Folder size={15} className="text-rose-700" />
@@ -915,11 +1362,17 @@ export const LibraryTab: React.FC<LibraryTabProps> = ({
         </button>
 
         <button
-          onClick={onGoToRecord}
-          className="bg-[#EEF6FF] hover:bg-[#E0EEFF] text-sky-800 border border-sky-200/70 p-2.5 rounded-2xl flex items-center justify-center gap-1.5 text-xs font-semibold active:scale-95 transition-all shadow-2xs cursor-pointer"
+          onClick={onSyncDrive || onConnectDrive || onGoToRecord}
+          disabled={isSyncingDrive}
+          title={isDriveConnected ? "Sync and refresh cloud notes from Google Drive" : "Connect Google Drive"}
+          className="bg-[#EEF6FF] hover:bg-[#E0EEFF] text-sky-800 border border-sky-200/70 p-2.5 rounded-2xl flex items-center justify-center gap-1.5 text-xs font-semibold active:scale-95 transition-all shadow-2xs cursor-pointer disabled:opacity-60"
         >
-          <Cloud size={15} className="text-sky-700" />
-          <span>Drive</span>
+          {isSyncingDrive ? (
+            <RefreshCw size={15} className="text-sky-700 animate-spin" />
+          ) : (
+            <Cloud size={15} className="text-sky-700" />
+          )}
+          <span>{isSyncingDrive ? 'Syncing...' : isDriveConnected ? 'Sync Drive' : 'Drive'}</span>
         </button>
       </div>
 
@@ -962,7 +1415,7 @@ export const LibraryTab: React.FC<LibraryTabProps> = ({
               {layoutMode === 'tree' ? 'File Tree' : 'Subjects'}
             </span>
             <span className="text-[11px] font-mono text-slate-400 font-medium">
-              ({subjects.length})
+              {`(${deduplicatedSubjects.length})`}
             </span>
           </div>
 
@@ -998,7 +1451,7 @@ export const LibraryTab: React.FC<LibraryTabProps> = ({
         {/* View Option 1: File Tree (Minimalist Folder/File Hierarchy) */}
         {layoutMode === 'tree' ? (
           <FileTree
-            subjects={subjects}
+            subjects={deduplicatedSubjects}
             audioItems={allFilteredAudios}
             onSelectAudio={handleOpenAudioNote}
             onSelectSubject={handleOpenSubject}
@@ -1008,8 +1461,8 @@ export const LibraryTab: React.FC<LibraryTabProps> = ({
         ) : (
           /* View Option 2: Clean Minimalist Subject Cards */
           <div className="space-y-2">
-            {subjects.map((subject) => {
-              const subjectAudios = audiosBySubject.get(subject.id) || [];
+            {deduplicatedSubjects.map((subject) => {
+              const subjectAudios = audiosBySubject.get(subject.id) || audiosBySubject.get(subject.name.toLowerCase()) || [];
               const totalDuration = subjectAudios.reduce((acc, curr) => acc + curr.duration_seconds, 0);
               const latestAudio = subjectAudios[0];
               const SubjectIcon = getSubjectIcon(subject.icon_name);
@@ -1043,9 +1496,24 @@ export const LibraryTab: React.FC<LibraryTabProps> = ({
                     )}
                   </div>
 
-                  {/* Right: Subtle Chevron */}
-                  <div className="flex items-center shrink-0 text-slate-300 group-hover:text-slate-600 transition-colors">
-                    <ChevronRight size={16} className="group-hover:translate-x-0.5 transition-transform" />
+                  {/* Right: Actions */}
+                  <div className="flex items-center gap-1 shrink-0">
+                    {onDeleteSubject && (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setSubjectToDelete(subject);
+                        }}
+                        className="p-1.5 text-slate-300 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-all cursor-pointer"
+                        title={`Delete ${subject.name} folder`}
+                      >
+                        <Trash2 size={15} />
+                      </button>
+                    )}
+                    <div className="text-slate-300 group-hover:text-slate-600 transition-colors">
+                      <ChevronRight size={16} className="group-hover:translate-x-0.5 transition-transform" />
+                    </div>
                   </div>
                 </div>
               );
@@ -1065,9 +1533,22 @@ export const LibraryTab: React.FC<LibraryTabProps> = ({
 
           <div className="space-y-2">
             {allFilteredAudios.length === 0 ? (
-              <div className="bg-white border border-slate-200 rounded-2xl p-4 text-center text-xs text-slate-500">
-                No individual notes matched "{searchQuery}"
-              </div>
+              <Empty className="bg-white border border-slate-200 rounded-2xl p-5 text-center shadow-2xs">
+                <EmptyHeader>
+                  <EmptyMedia
+                    variant="icon"
+                    className="w-9 h-9 rounded-full bg-slate-100 text-slate-400 mx-auto flex items-center justify-center mb-0.5"
+                  >
+                    <Search size={18} />
+                  </EmptyMedia>
+                  <EmptyTitle className="text-xs font-bold text-slate-800">
+                    No individual notes matched "{searchQuery}"
+                  </EmptyTitle>
+                  <EmptyDescription className="text-[11px] text-slate-500">
+                    Try searching with another keyword or explore your subject folders.
+                  </EmptyDescription>
+                </EmptyHeader>
+              </Empty>
             ) : (
               allFilteredAudios.map(audio => (
                 <div
@@ -1095,6 +1576,119 @@ export const LibraryTab: React.FC<LibraryTabProps> = ({
           </div>
         </div>
       )}
+
+      {/* Subject Folder Deletion Confirmation Modal Dialog */}
+      {subjectToDelete && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-xs animate-in fade-in"
+          onClick={() => !isDeletingSubject && setSubjectToDelete(null)}
+        >
+          <div
+            className="bg-white rounded-3xl p-5 sm:p-6 w-full max-w-sm shadow-2xl border border-slate-200 space-y-4 animate-in zoom-in-95"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div className="flex items-start gap-3.5">
+              <div className="w-11 h-11 rounded-2xl bg-rose-50 border border-rose-200 flex items-center justify-center text-rose-600 shrink-0">
+                <Trash2 size={22} />
+              </div>
+              <div className="flex-1 min-w-0">
+                <h3 className="text-base font-bold text-slate-900 leading-tight">
+                  Delete Subject Folder
+                </h3>
+                <p className="text-xs text-slate-500 mt-0.5 font-medium truncate">
+                  "{subjectToDelete.name}"
+                </p>
+              </div>
+            </div>
+
+            {/* Description & Options */}
+            <div className="bg-slate-50 border border-slate-200/80 rounded-2xl p-3.5 text-xs text-slate-600 space-y-2.5">
+              <p>
+                This will delete the <strong className="text-slate-900">{subjectToDelete.name}</strong> folder from your Smriti Library and Google Drive.
+              </p>
+
+              {(() => {
+                const subAudios = audiosBySubject.get(subjectToDelete.id) || audiosBySubject.get(subjectToDelete.name.toLowerCase()) || [];
+                const count = subAudios.length;
+                if (count > 0) {
+                  return (
+                    <div className="pt-2.5 border-t border-slate-200 space-y-2">
+                      <p className="font-semibold text-slate-800">
+                        This folder contains {count} {count === 1 ? 'recording' : 'recordings'}:
+                      </p>
+                      <div className="space-y-2">
+                        <label className="flex items-start gap-2.5 p-2.5 rounded-xl bg-white border border-slate-200 cursor-pointer hover:bg-slate-50 transition-colors">
+                          <input
+                            type="radio"
+                            name="deleteRecordingsOption"
+                            checked={!deleteRecordingsOption}
+                            onChange={() => setDeleteRecordingsOption(false)}
+                            className="mt-0.5 accent-blue-600 cursor-pointer"
+                          />
+                          <span className="text-[11px] font-medium text-slate-800">
+                            Keep recordings (move to <strong className="text-blue-600">General</strong> folder)
+                          </span>
+                        </label>
+                        <label className="flex items-start gap-2.5 p-2.5 rounded-xl bg-white border border-rose-200 cursor-pointer hover:bg-rose-50/50 transition-colors">
+                          <input
+                            type="radio"
+                            name="deleteRecordingsOption"
+                            checked={deleteRecordingsOption}
+                            onChange={() => setDeleteRecordingsOption(true)}
+                            className="mt-0.5 accent-rose-600 cursor-pointer"
+                          />
+                          <span className="text-[11px] font-medium text-rose-700">
+                            Delete all recordings inside permanently
+                          </span>
+                        </label>
+                      </div>
+                    </div>
+                  );
+                }
+                return (
+                  <p className="text-[11px] text-slate-500 italic">
+                    This folder is empty and will be safely deleted.
+                  </p>
+                );
+              })()}
+            </div>
+
+            {/* Actions */}
+            <div className="flex items-center gap-2.5 pt-1">
+              <button
+                type="button"
+                disabled={isDeletingSubject}
+                onClick={() => setSubjectToDelete(null)}
+                className="flex-1 py-2.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold transition-all cursor-pointer disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={isDeletingSubject}
+                onClick={handleConfirmDeleteSubject}
+                className="flex-1 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-700 active:scale-95 text-white text-xs font-bold transition-all shadow-sm flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
+              >
+                {isDeletingSubject ? (
+                  <>
+                    <RefreshCw size={13} className="animate-spin" />
+                    <span>Deleting...</span>
+                  </>
+                ) : (
+                  <>
+                    <Trash2 size={13} />
+                    <span>Delete Folder</span>
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Subject Folder Creation Modal Dialog */}
+      {renderCreateFolderModal()}
     </div>
   );
 };

@@ -11,10 +11,6 @@ import {
   SlidersHorizontal,
   Bell,
   Folder,
-  Atom,
-  FlaskConical,
-  Dna,
-  Binary,
   Cloud,
   CheckCircle2,
   ChevronRight,
@@ -27,12 +23,13 @@ import {
 } from 'lucide-react';
 import { AudioItem, Subject, UserSettings, PlaybackState } from '../types';
 import { formatDuration } from '../services/learningEngine';
+import { DEFAULT_SUBJECTS } from '../services/supabase';
+import { resolveSubjectVisual, type SubjectVisualTheme } from '../utils/subjectVisuals';
 import {
   googleDriveService,
   DriveTransferItem,
   GoogleDriveStorageQuota
 } from '../services/googleDrive';
-import { LineArtAudioVisualizer } from './ui/LineArtAudioVisualizer';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   Carousel,
@@ -51,6 +48,14 @@ import {
   AttachmentAction,
   AttachmentTrigger
 } from '@/components/ui/attachment';
+import {
+  Empty,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+  EmptyDescription,
+  EmptyContent
+} from '@/components/ui/empty';
 
 interface HomeTabProps {
   recentAudio: AudioItem[];
@@ -59,9 +64,11 @@ interface HomeTabProps {
   userSettings?: UserSettings;
   todayListeningSeconds?: number;
   isDriveConnected?: boolean;
+  initialTab?: HomeTabFilterMode;
   onConnectDrive?: () => void;
   onSyncToDrive?: (audio: AudioItem) => void;
   onDownloadFromDrive?: (audio: AudioItem) => void;
+  onToggleOffline?: (audio: AudioItem) => void;
   onPlayAudio: (audio: AudioItem) => void;
   onSeek?: (seconds: number) => void;
   onGoToRecord: () => void;
@@ -85,9 +92,11 @@ export const HomeTab: React.FC<HomeTabProps> = ({
   playbackState,
   userSettings,
   isDriveConnected = false,
+  initialTab,
   onConnectDrive,
   onSyncToDrive,
   onDownloadFromDrive,
+  onToggleOffline,
   onPlayAudio,
   onSeek,
   onGoToRecord,
@@ -107,13 +116,17 @@ export const HomeTab: React.FC<HomeTabProps> = ({
     const unsub = googleDriveService.subscribeTransfers((newTransfers) => {
       setTransfers(newTransfers);
     });
-    // Fetch storage quota
-    googleDriveService
-      .getStorageQuota()
-      .then(setStorageQuota)
-      .catch(() => {});
+    // Fetch storage quota only if drive is connected
+    if (googleDriveService.isConnected()) {
+      googleDriveService
+        .getStorageQuota()
+        .then(setStorageQuota)
+        .catch(() => {});
+    } else {
+      setStorageQuota(null);
+    }
     return () => unsub();
-  }, []);
+  }, [isDriveConnected]);
 
   const activeTransfers = useMemo(
     () => transfers.filter((t) => t.state === 'uploading' || t.state === 'processing'),
@@ -133,7 +146,7 @@ export const HomeTab: React.FC<HomeTabProps> = ({
   }, [hasActiveTransfers]);
 
   const activeTab: HomeTabFilterMode =
-    userSelectedTab ?? (hasActiveTransfers ? 'drive' : 'most-played');
+    userSelectedTab ?? initialTab ?? (hasActiveTransfers ? 'drive' : 'most-played');
 
   const autoplayPlugin = useRef(
     Autoplay({ delay: 2400, stopOnInteraction: false, stopOnMouseEnter: true })
@@ -182,82 +195,53 @@ export const HomeTab: React.FC<HomeTabProps> = ({
     return filteredBySearch.filter((a) => !!a.is_favorite);
   }, [filteredBySearch]);
 
-  // Tab 3: Drive Audio Notes (items that have drive IDs or are in cloud)
+  // Tab 3: Drive Audio Notes - ONLY show audio files that are downloaded locally to mobile storage
   const driveAudioNotes = useMemo(() => {
-    return filteredBySearch.filter((a) => a.google_drive_file_id || a.source_type === 'imported');
+    return filteredBySearch.filter((a) => Boolean(a.is_downloaded_offline));
   }, [filteredBySearch]);
 
-  // Subject Visuals & Dynamic Counts
+  // Subject Visuals & Dynamic Counts - Generalized beyond PCMB to support any subject folder
   const subjectList = useMemo(() => {
-    const defaultMeta = [
-      { id: 'sub-1', name: 'Physics', icon: Atom, bg: 'bg-violet-100 text-violet-700', activeRing: 'hover:ring-violet-300' },
-      { id: 'sub-2', name: 'Chemistry', icon: FlaskConical, bg: 'bg-rose-100 text-rose-700', activeRing: 'hover:ring-rose-300' },
-      { id: 'sub-3', name: 'Biology', icon: Dna, bg: 'bg-emerald-100 text-emerald-700', activeRing: 'hover:ring-emerald-300' },
-      { id: 'sub-4', name: 'Mathematics', icon: Binary, bg: 'bg-amber-100 text-amber-700', activeRing: 'hover:ring-amber-300' }
-    ];
+    const activeSubjects = subjects && subjects.length > 0 ? subjects : DEFAULT_SUBJECTS;
 
-    return defaultMeta.map((meta) => {
-      const existing = subjects.find(
-        (s) => s.id === meta.id || s.name.toLowerCase() === meta.name.toLowerCase()
-      );
+    return activeSubjects.map((subj) => {
+      const visual = resolveSubjectVisual({
+        subjectId: subj.id,
+        subjectName: subj.name,
+        iconName: subj.icon_name,
+        colorHex: subj.color_hex,
+        subjects
+      });
+
       const count = recentAudio.filter(
         (a) =>
-          a.subject_id === meta.id ||
-          a.subject_name?.toLowerCase().includes(meta.name.toLowerCase().slice(0, 4))
+          a.subject_id === subj.id ||
+          (a.subject_name && a.subject_name.toLowerCase().trim() === subj.name.toLowerCase().trim())
       ).length;
 
       return {
-        id: existing?.id || meta.id,
-        name: meta.name === 'Mathematics' ? 'Math' : meta.name,
-        fullName: meta.name,
-        icon: meta.icon,
-        bg: meta.bg,
-        activeRing: meta.activeRing,
+        id: subj.id,
+        name: subj.name,
+        fullName: subj.name,
+        icon: visual.icon,
+        monogram: visual.monogram,
+        visual,
+        bg: visual.bg,
+        border: visual.border,
+        badgeBg: visual.badgeBg,
+        activeRing: visual.activeRing,
         count: `${count} note${count === 1 ? '' : 's'}`
       };
     });
   }, [subjects, recentAudio]);
 
-  const getSubjectVisual = (subjectName?: string) => {
-    const s = (subjectName || '').toLowerCase();
-    if (s.includes('physic')) {
-      return {
-        bg: 'bg-violet-100 text-violet-700',
-        cardBg: 'bg-violet-50/70',
-        icon: Atom,
-        label: 'Physics'
-      };
-    }
-    if (s.includes('chem')) {
-      return {
-        bg: 'bg-rose-100 text-rose-700',
-        cardBg: 'bg-rose-50/70',
-        icon: FlaskConical,
-        label: 'Chemistry'
-      };
-    }
-    if (s.includes('bio')) {
-      return {
-        bg: 'bg-emerald-100 text-emerald-700',
-        cardBg: 'bg-emerald-50/70',
-        icon: Dna,
-        label: 'Biology'
-      };
-    }
-    if (s.includes('math')) {
-      return {
-        bg: 'bg-amber-100 text-amber-700',
-        cardBg: 'bg-amber-50/70',
-        icon: Binary,
-        label: 'Mathematics'
-      };
-    }
-    return {
-      bg: 'bg-sky-100 text-sky-700',
-      cardBg: 'bg-sky-50/70',
-      icon: Sparkles,
-      label: 'Academic'
-    };
+  // Master Subject Visual resolver for audio items and cards
+  const getSubjectVisual = (subjectName?: string, subjectId?: string): SubjectVisualTheme => {
+    return resolveSubjectVisual({
+      subjectId,
+      subjectName,
+      subjects
+    });
   };
 
   const handleTriggerSyncAll = () => {
@@ -458,7 +442,7 @@ export const HomeTab: React.FC<HomeTabProps> = ({
         </div>
       </div>
 
-      {/* Continue Listening: Spotify / YouTube Music Style Premium Dark Studio Card */}
+      {/* Continue Listening: Restored Classic Dark Studio Card with Animated Curvy Waves */}
       {continueAudio &&
         (() => {
           const continueDuration =
@@ -483,103 +467,71 @@ export const HomeTab: React.FC<HomeTabProps> = ({
             Math.max(0, (currentPos / continueDuration) * 100)
           );
 
-          const subjectVisual = getSubjectVisual(continueAudio.subject_name);
-          const SubjectIcon = subjectVisual.icon;
-
           return (
-            <div
-              className={`relative overflow-hidden rounded-3xl p-4.5 sm:p-5 space-y-4 border transition-all duration-300 group shadow-xl ${
-                isCurrentAudioPlaying
-                  ? 'bg-gradient-to-br from-slate-950 via-[#0a0f1d] to-[#04070e] text-white border-sky-500/35 shadow-[0_16px_40px_-8px_rgba(0,0,0,0.8),0_0_24px_rgba(36,161,222,0.15)] ring-1 ring-sky-400/20'
-                  : 'bg-gradient-to-br from-slate-950 via-[#0a0f1d] to-[#04070e] text-white border-white/[0.08] hover:border-white/[0.14] shadow-[0_12px_32px_-6px_rgba(0,0,0,0.6)]'
-              }`}
-            >
-              {/* Dynamic Atmospheric Backlight Glow */}
-              <div className="pointer-events-none absolute -top-12 -right-12 size-48 rounded-full bg-gradient-to-bl from-sky-500/15 via-blue-600/5 to-transparent blur-3xl opacity-70" />
-              <div className="pointer-events-none absolute -bottom-10 -left-10 size-44 rounded-full bg-gradient-to-tr from-indigo-500/10 via-purple-600/5 to-transparent blur-2xl opacity-60" />
+            <div className="bg-gradient-to-br from-slate-900 to-slate-950 text-white rounded-3xl p-4.5 space-y-3 shadow-md border border-slate-800 relative overflow-hidden group">
+              {/* Preserved Curvy and Wavy Background Animated Artwork */}
+              <div
+                className="absolute inset-0 pointer-events-none overflow-hidden select-none opacity-20 z-0"
+                aria-hidden="true"
+              >
+                <svg
+                  viewBox="0 0 1200 240"
+                  preserveAspectRatio="none"
+                  className={`w-[200%] h-full absolute bottom-0 left-0 ${
+                    isCurrentAudioPlaying ? 'animate-wave-slow' : 'animate-wave-slow opacity-60'
+                  }`}
+                >
+                  <defs>
+                    <linearGradient id="waveEmeraldGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+                      <stop offset="0%" stopColor="#10b981" stopOpacity="0.3" />
+                      <stop offset="50%" stopColor="#14b8a6" stopOpacity="0.7" />
+                      <stop offset="100%" stopColor="#06b6d4" stopOpacity="0.3" />
+                    </linearGradient>
+                    <linearGradient id="waveEmeraldBack" x1="0%" y1="0%" x2="100%" y2="0%">
+                      <stop offset="0%" stopColor="#059669" stopOpacity="0.2" />
+                      <stop offset="50%" stopColor="#0d9488" stopOpacity="0.45" />
+                      <stop offset="100%" stopColor="#0891b2" stopOpacity="0.2" />
+                    </linearGradient>
+                  </defs>
+                  <path
+                    fill="url(#waveEmeraldBack)"
+                    d="M0,135 C180,95 360,175 540,125 C720,75 900,155 1080,115 C1260,75 1440,155 1620,105 L1620,240 L0,240 Z"
+                  />
+                  <path
+                    fill="url(#waveEmeraldGrad)"
+                    d="M0,165 C160,125 320,195 480,155 C640,115 800,185 960,145 C1120,105 1280,175 1440,135 L1440,240 L0,240 Z"
+                  />
+                </svg>
+              </div>
 
-              {/* Background Flowing Line-Art Soundwave Contours (Zero dashed noise, pure liquid silk) */}
-              <LineArtAudioVisualizer
-                variant="background"
-                subjectName={continueAudio.subject_name}
-                isPlaying={isCurrentAudioPlaying}
-              />
-
-              {/* Card Header: Live Status Indicator & State Pill */}
+              {/* Card Header: Live Indicator & Total Duration */}
               <div className="flex items-center justify-between relative z-10">
                 <div className="flex items-center gap-2">
                   <span
-                    className={`size-2 rounded-full transition-colors ${
-                      isCurrentAudioPlaying
-                        ? 'bg-[#24A1DE] animate-pulse ring-4 ring-sky-400/25'
-                        : 'bg-amber-400'
+                    className={`w-2 h-2 rounded-full ${
+                      isCurrentAudioPlaying ? 'bg-emerald-400 animate-pulse' : 'bg-amber-400'
                     }`}
                   />
-                  <span className="text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400 font-sans">
+                  <span className="text-[11px] font-bold uppercase tracking-wider text-slate-300">
                     {isCurrentAudioPlaying ? 'Currently Playing' : 'Continue Listening'}
                   </span>
                 </div>
-                {isCurrentAudioPlaying ? (
-                  <div className="flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-sky-500/15 border border-sky-400/25 text-sky-300 text-[10px] font-medium tracking-wide shadow-xs">
-                    <span className="flex items-end gap-0.5 h-2.5">
-                      <span className="w-0.5 bg-sky-400 rounded-full animate-eq-1" />
-                      <span className="w-0.5 bg-sky-300 rounded-full animate-eq-2" />
-                      <span className="w-0.5 bg-sky-400 rounded-full animate-eq-3" />
-                    </span>
-                    <span>Playing</span>
-                  </div>
-                ) : (
-                  <span className="text-[10px] font-medium tracking-wide text-slate-400/80">
-                    {cardProgressPercent > 0
-                      ? `${Math.round(cardProgressPercent)}% completed`
-                      : 'Tap to listen'}
-                  </span>
-                )}
+                <span className="text-[10px] font-mono text-slate-400 font-semibold">
+                  {formatDuration(continueDuration)}
+                </span>
               </div>
 
-              {/* Card Body: Aesthetic Vinyl Turntable + Track Metadata + Hero Play Action */}
-              <div className="flex items-center gap-3.5 relative z-10">
-                {/* Artwork: High-Craft Vinyl Record with Grooves, Sheen & Tonearm */}
-                <div
-                  className="size-16 sm:size-17 rounded-2xl bg-[#080b12] border border-white/[0.12] p-1.5 shadow-[0_8px_20px_rgba(0,0,0,0.6)] flex items-center justify-center shrink-0 relative overflow-hidden group-hover:border-sky-400/40 transition-all duration-300"
-                  title="Acoustic Turntable Visualizer"
-                >
-                  <LineArtAudioVisualizer
-                    variant="turntable"
-                    subjectName={continueAudio.subject_name}
-                    isPlaying={isCurrentAudioPlaying}
-                    className="w-full h-full"
-                  />
-                </div>
-
-                {/* Track Details & Subject Badge */}
+              {/* Card Body: Subject, Title & Classic Emerald Play Button */}
+              <div className="flex items-center justify-between gap-3 relative z-10">
                 <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 mb-1">
-                    <span className="text-[10px] font-bold uppercase tracking-[0.14em] text-sky-400/90 flex items-center gap-1">
-                      <SubjectIcon size={11} strokeWidth={2.4} />
-                      {continueAudio.subject_name || subjectVisual.label}
-                    </span>
-                    {continueAudio.is_favorite && (
-                      <Star size={11} className="text-amber-400 fill-amber-400" />
-                    )}
-                    {continueAudio.play_count && continueAudio.play_count > 0 ? (
-                      <span className="text-[10px] text-slate-400 font-sans">
-                        • {continueAudio.play_count} plays
-                      </span>
-                    ) : null}
-                  </div>
-                  <h3
-                    className="text-[15px] sm:text-base font-semibold text-white truncate tracking-tight leading-snug group-hover:text-sky-200 transition-colors"
-                    title={continueAudio.title}
-                  >
+                  <span className="text-[10px] font-mono font-bold uppercase text-emerald-400 block tracking-wider">
+                    {continueAudio.subject_name || 'Academic'}
+                  </span>
+                  <h3 className="text-xs sm:text-sm font-bold text-white truncate mt-0.5">
                     {continueAudio.title}
                   </h3>
-                  <p className="text-[11px] text-slate-400 font-sans truncate mt-0.5">
-                    High Fidelity • Audio Study Vault
-                  </p>
                 </div>
 
-                {/* Spotify-Style Hero Circular Play/Pause Button */}
                 <button
                   onClick={() => onPlayAudio(continueAudio)}
                   aria-label={
@@ -587,21 +539,21 @@ export const HomeTab: React.FC<HomeTabProps> = ({
                       ? `Pause ${continueAudio.title}`
                       : `Play ${continueAudio.title}`
                   }
-                  className="size-11 sm:size-12 rounded-full bg-gradient-to-br from-sky-400 to-[#24A1DE] hover:from-sky-300 hover:to-sky-500 active:scale-92 text-white flex items-center justify-center transition-all duration-200 shadow-[0_4px_16px_rgba(36,161,222,0.35)] shrink-0 cursor-pointer ring-1 ring-white/20"
+                  className="w-11 h-11 rounded-full bg-emerald-500 hover:bg-emerald-400 text-slate-950 flex items-center justify-center transition-all active:scale-95 shadow-md shadow-emerald-500/20 shrink-0 cursor-pointer"
                 >
                   {isCurrentAudioPlaying ? (
-                    <Pause size={18} fill="currentColor" />
+                    <Pause size={17} fill="currentColor" />
                   ) : (
-                    <Play size={18} fill="currentColor" className="translate-x-0.5" />
+                    <Play size={17} fill="currentColor" className="translate-x-0.5" />
                   )}
                 </button>
               </div>
 
-              {/* Interactive Scrubbable Dark Seek Bar */}
-              <div className="space-y-1.5 relative z-10 pt-0.5">
+              {/* Interactive Scrubbable Seek Bar */}
+              <div className="pt-0.5 space-y-1.5 relative z-10">
                 <div
-                  className="relative w-full py-1.5 cursor-pointer group/seek select-none"
-                  title="Tap or scrub to seek"
+                  className="relative w-full bg-slate-800 hover:bg-slate-700/80 h-2 rounded-full overflow-hidden cursor-pointer group transition-colors"
+                  title="Tap or drag to seek"
                   onClick={(e) => {
                     if (!onSeek) return;
                     const rect = e.currentTarget.getBoundingClientRect();
@@ -609,24 +561,13 @@ export const HomeTab: React.FC<HomeTabProps> = ({
                     onSeek(pct * continueDuration);
                   }}
                 >
-                  {/* Dark Track */}
-                  <div className="relative h-1.5 sm:h-2 w-full bg-white/10 group-hover/seek:bg-white/20 rounded-full transition-colors">
-                    {/* Glowing Luminous Fill */}
-                    <div
-                      className="bg-gradient-to-r from-sky-400 via-[#24A1DE] to-cyan-300 h-full rounded-full transition-[width] duration-150 relative shadow-[0_0_8px_rgba(56,189,248,0.4)]"
-                      style={{ width: `${cardProgressPercent}%` }}
-                    >
-                      {/* Scrubber thumb handle at active position */}
-                      <div className="absolute right-0 top-1/2 -translate-y-1/2 translate-x-1/2 size-3.5 bg-white rounded-full shadow-[0_2px_6px_rgba(0,0,0,0.5)] transition-transform duration-150 group-hover/seek:scale-125" />
-                    </div>
-                  </div>
+                  <div
+                    className="bg-gradient-to-r from-emerald-500 to-teal-400 h-full rounded-full transition-all duration-150"
+                    style={{ width: `${cardProgressPercent}%` }}
+                  />
                 </div>
-
-                {/* Timestamps */}
-                <div className="flex justify-between items-center text-[10px] font-mono text-slate-400 font-medium">
-                  <span className={isCurrentAudioPlaying ? 'text-sky-300 font-semibold' : ''}>
-                    {formatDuration(currentPos)}
-                  </span>
+                <div className="flex justify-between text-[10px] font-mono text-slate-400 font-medium">
+                  <span>{formatDuration(currentPos)}</span>
                   <span>{formatDuration(continueDuration)}</span>
                 </div>
               </div>
@@ -636,24 +577,29 @@ export const HomeTab: React.FC<HomeTabProps> = ({
 
       {/* Empty State: When no audio note has been recorded/imported yet */}
       {!continueAudio && (
-        <div className="bg-white border border-slate-200/80 rounded-3xl p-5 text-center space-y-2.5 shadow-2xs">
-          <div className="size-11 rounded-2xl bg-sky-50 text-[#24A1DE] flex items-center justify-center mx-auto shadow-2xs">
-            <Mic size={20} />
-          </div>
-          <div>
-            <h3 className="text-sm font-bold text-slate-900">No Audio Notes Yet</h3>
-            <p className="text-xs text-slate-500 mt-0.5 max-w-xs mx-auto">
+        <Empty className="bg-white border border-slate-200/80 rounded-3xl p-5 text-center shadow-2xs">
+          <EmptyHeader>
+            <EmptyMedia
+              variant="icon"
+              className="size-11 rounded-2xl bg-sky-50 text-[#24A1DE] flex items-center justify-center mx-auto shadow-2xs mb-0.5"
+            >
+              <Mic size={20} />
+            </EmptyMedia>
+            <EmptyTitle>No Audio Notes Yet</EmptyTitle>
+            <EmptyDescription>
               Record a lecture note or import audio to start your personalized study session.
-            </p>
-          </div>
-          <button
-            onClick={onGoToRecord}
-            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-full bg-slate-950 hover:bg-slate-800 text-white text-xs font-semibold active:scale-95 transition-all shadow-xs cursor-pointer"
-          >
-            <Mic size={14} />
-            <span>Record First Lesson</span>
-          </button>
-        </div>
+            </EmptyDescription>
+          </EmptyHeader>
+          <EmptyContent>
+            <button
+              onClick={onGoToRecord}
+              className="inline-flex items-center gap-1.5 px-4 py-2 rounded-full bg-slate-950 hover:bg-slate-800 text-white text-xs font-semibold active:scale-95 transition-all shadow-xs cursor-pointer"
+            >
+              <Mic size={14} />
+              <span>Record First Lesson</span>
+            </button>
+          </EmptyContent>
+        </Empty>
       )}
 
       {/* Action Chips Row (Record, Folders, Drive) */}
@@ -826,8 +772,8 @@ export const HomeTab: React.FC<HomeTabProps> = ({
             </div>
           </div>
 
-          {/* Storage Quota Progress */}
-          {storageQuota && (
+          {/* Storage Quota Progress (only when connected and quota available) */}
+          {isConnected && storageQuota && (
             <div className="space-y-1">
               <div className="flex justify-between items-center text-[10px] font-mono text-slate-600">
                 <span>Drive Storage</span>
@@ -925,30 +871,36 @@ export const HomeTab: React.FC<HomeTabProps> = ({
           </div>
         )}
 
-        {/* SYNCED DRIVE FILES LIST: Built with shadcn Attachment component */}
+        {/* DOWNLOADED DRIVE FILES LIST: Built with shadcn Attachment component */}
         <div className="space-y-2">
           <div className="flex items-center justify-between px-0.5">
             <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
-              {`Synced Drive Audio Notes (${driveAudioNotes.length})`}
+              {`Downloaded Drive Audio Notes (${driveAudioNotes.length})`}
             </span>
             <span className="text-[10px] font-mono text-slate-400">My Drive / Smriti</span>
           </div>
 
           {driveAudioNotes.length === 0 ? (
-            <div className="bg-white border border-slate-200/80 rounded-2xl p-6 text-center space-y-2 shadow-2xs">
-              <div className="size-10 rounded-full bg-sky-50 text-[#24A1DE] mx-auto flex items-center justify-center">
-                <HardDrive size={18} />
-              </div>
-              <p className="text-xs font-semibold text-slate-800">No synced cloud notes yet</p>
-              <p className="text-[11px] text-slate-500">
-                Tap 'Sync to Drive' to backup your recorded lecture notes directly to your personal
-                storage.
-              </p>
-            </div>
+            <Empty className="bg-white border border-slate-200/80 rounded-2xl p-6 text-center shadow-2xs">
+              <EmptyHeader>
+                <EmptyMedia
+                  variant="icon"
+                  className="size-10 rounded-full bg-sky-50 text-[#24A1DE] mx-auto flex items-center justify-center mb-0.5"
+                >
+                  <HardDrive size={18} />
+                </EmptyMedia>
+                <EmptyTitle className="text-xs font-semibold text-slate-800">
+                  No downloaded notes yet
+                </EmptyTitle>
+                <EmptyDescription className="text-[11px] text-slate-500">
+                  All notes remain safe in Google Drive. Tap the download arrow on any audio in your Subject Folders or Home to download it for fast local playback.
+                </EmptyDescription>
+              </EmptyHeader>
+            </Empty>
           ) : (
             <div className="space-y-2">
               {driveAudioNotes.map((audio) => {
-                const visual = getSubjectVisual(audio.subject_name);
+                const visual = getSubjectVisual(audio.subject_name, audio.subject_id);
                 const Icon = visual.icon;
                 const isPlayingThis = Boolean(
                   playbackState?.isPlaying && playbackState?.currentAudio?.id === audio.id
@@ -963,14 +915,14 @@ export const HomeTab: React.FC<HomeTabProps> = ({
                       isPlayingThis ? 'border-[#24A1DE] ring-1 ring-[#24A1DE]/20 bg-sky-50/20' : ''
                     }`}
                   >
-                    <AttachmentMedia variant="icon" className={visual.bg}>
+                    <AttachmentMedia variant="icon" className={`${visual.bg} border border-current/10`}>
                       <Icon size={18} strokeWidth={2.2} />
                     </AttachmentMedia>
 
                     <AttachmentContent>
                       <AttachmentTitle>{audio.title}.m4a</AttachmentTitle>
                       <AttachmentDescription>
-                        {audio.subject_name || 'Academic'} · {formatBytes(audio.file_size_bytes)} ·{' '}
+                        {audio.subject_name || visual.label} · {formatBytes(audio.file_size_bytes)} ·{' '}
                         {audio.is_downloaded_offline ? 'Offline Ready' : 'In Drive'}
                       </AttachmentDescription>
                     </AttachmentContent>
@@ -1031,22 +983,29 @@ export const HomeTab: React.FC<HomeTabProps> = ({
   function renderLessonList(items: AudioItem[], emptyMsg: string, isMostPlayed: boolean = false) {
     if (items.length === 0) {
       return (
-        <div className="bg-white border border-slate-200/80 rounded-3xl p-7 text-center shadow-2xs">
-          <div className="w-10 h-10 rounded-full bg-slate-100 text-slate-400 mx-auto flex items-center justify-center mb-2.5">
-            <Sparkles size={18} />
-          </div>
-          <p className="text-xs font-semibold text-slate-800">{emptyMsg}</p>
-          <p className="text-[11px] text-slate-500 mt-1">
-            Tap 'Most Played' or 'Drive' to explore your study content.
-          </p>
-        </div>
+        <Empty className="bg-white border border-slate-200/80 rounded-3xl p-7 text-center shadow-2xs">
+          <EmptyHeader>
+            <EmptyMedia
+              variant="icon"
+              className="w-10 h-10 rounded-full bg-slate-100 text-slate-400 mx-auto flex items-center justify-center mb-0.5"
+            >
+              <Sparkles size={18} />
+            </EmptyMedia>
+            <EmptyTitle className="text-xs font-semibold text-slate-800">
+              {emptyMsg}
+            </EmptyTitle>
+            <EmptyDescription className="text-[11px] text-slate-500 mt-1">
+              Tap 'Most Played' or 'Drive' to explore your study content.
+            </EmptyDescription>
+          </EmptyHeader>
+        </Empty>
       );
     }
 
     return (
       <div className="space-y-2">
         {items.map((audio, index) => {
-          const visual = getSubjectVisual(audio.subject_name);
+          const visual = getSubjectVisual(audio.subject_name, audio.subject_id);
           const Icon = visual.icon;
           const isPlayingThis = Boolean(
             playbackState?.isPlaying && playbackState?.currentAudio?.id === audio.id
@@ -1056,69 +1015,113 @@ export const HomeTab: React.FC<HomeTabProps> = ({
           return (
             <div
               key={audio.id}
-              className={`group bg-white border p-3 rounded-2xl flex items-center justify-between gap-3 transition-all duration-200 shadow-2xs hover:shadow-xs ${
+              className={`group bg-white border p-3.5 rounded-2xl flex items-center justify-between gap-3.5 transition-all duration-200 shadow-2xs hover:shadow-xs ${
                 isPlayingThis
                   ? 'border-emerald-500 ring-2 ring-emerald-500/10'
                   : 'border-slate-200/80 hover:border-slate-300'
               }`}
             >
-              {/* Left Squircle Icon */}
+              {/* Left Squircle Icon / Medallion */}
               <div
                 onClick={() => onPlayAudio(audio)}
-                className={`w-11 h-11 rounded-2xl ${visual.bg} flex items-center justify-center shrink-0 cursor-pointer shadow-2xs group-hover:scale-105 transition-transform`}
+                className={`size-12 rounded-2xl ${visual.bg} border border-current/10 flex items-center justify-center shrink-0 cursor-pointer shadow-2xs group-hover:scale-105 transition-transform duration-200`}
+                title={`${visual.label} (${visual.monogram})`}
               >
-                <Icon size={19} strokeWidth={2.2} />
+                <Icon size={20} strokeWidth={2.2} />
               </div>
 
               {/* Title & Metadata */}
               <div onClick={() => onPlayAudio(audio)} className="flex-1 min-w-0 cursor-pointer">
-                <div className="flex items-center gap-1.5 mb-1 overflow-hidden">
-                  <span className="text-[10px] font-mono font-bold text-slate-700 uppercase shrink-0">
-                    {audio.subject_name || 'General'}
+                {/* Category & Play Count Row */}
+                <div className="flex items-center gap-1.5 mb-1 flex-wrap">
+                  <span
+                    className={`text-[10px] font-mono font-bold uppercase tracking-wider px-2 py-0.5 rounded-md ${visual.badgeBg} shrink-0`}
+                  >
+                    {audio.subject_name || visual.label}
                   </span>
 
                   {/* Most Played Rank & Count Pill */}
                   {isMostPlayed && (
-                    <span className="px-1.5 py-0.5 rounded-full bg-amber-50 text-amber-800 border border-amber-200/70 text-[9px] font-bold font-mono flex items-center gap-0.5 shrink-0">
-                      <Flame size={9} className="fill-amber-500 text-amber-500" />
+                    <span className="px-1.5 py-0.5 rounded-full bg-amber-50 text-amber-800 border border-amber-200/70 text-[9px] font-bold font-mono inline-flex items-center gap-1 shrink-0">
+                      <Flame size={10} className="fill-amber-500 text-amber-500" />
                       {`${playCount} ${playCount === 1 ? 'play' : 'plays'}`}
                     </span>
                   )}
+                </div>
 
-                  {audio.is_downloaded_offline && (
-                    <span className="px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200/80 text-[9px] font-bold font-mono flex items-center gap-0.5 shrink-0">
-                      <CheckCircle2 size={9} /> OFFLINE
+                {/* Primary Audio Title */}
+                <h4 className="text-xs sm:text-sm font-bold text-slate-900 truncate group-hover:text-blue-600 transition-colors leading-snug">
+                  {audio.title}
+                </h4>
+
+                {/* Status Badges Sub-row (Offline Ready / In Drive, DSP) */}
+                <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
+                  {audio.is_downloaded_offline ? (
+                    <span className="px-1.5 py-0.5 rounded-md bg-emerald-50 text-emerald-700 border border-emerald-200/80 text-[9px] font-bold font-mono inline-flex items-center gap-1 shrink-0">
+                      <CheckCircle2 size={10} /> OFFLINE READY
+                    </span>
+                  ) : (
+                    <span className="px-1.5 py-0.5 rounded-md bg-sky-50 text-sky-700 border border-sky-200/80 text-[9px] font-medium font-mono inline-flex items-center gap-1 shrink-0">
+                      <Cloud size={9} /> IN DRIVE
                     </span>
                   )}
                   {audio.audio_enhancement_applied && (
-                    <span className="px-1.5 py-0.5 rounded-full bg-sky-50 text-sky-700 border border-sky-200/80 text-[9px] font-bold font-mono shrink-0">
+                    <span className="px-1.5 py-0.5 rounded-md bg-sky-50 text-sky-700 border border-sky-200/80 text-[9px] font-bold font-mono shrink-0">
                       DSP
                     </span>
                   )}
                 </div>
-                <h4 className="text-xs font-bold text-slate-900 truncate group-hover:text-blue-600 transition-colors">
-                  {audio.title}
-                </h4>
               </div>
 
-              {/* Duration & Play Button */}
-              <div className="flex items-center gap-2 shrink-0">
-                <span className="text-[11px] text-slate-400 font-mono font-medium">
+              {/* Duration & Play / Download Buttons */}
+              <div className="flex items-center gap-2 shrink-0 pl-1">
+                <span className="text-[11px] text-slate-500 font-mono font-medium">
                   {formatDuration(audio.duration_seconds)}
                 </span>
+
+                {/* Individual Download Arrow Button or Downloaded Checked Symbol */}
+                {audio.is_downloaded_offline ? (
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      const toggle = onToggleOffline || onDownloadFromDrive;
+                      if (toggle) toggle(audio);
+                    }}
+                    className="size-7 rounded-full bg-emerald-50 text-emerald-600 border border-emerald-200/80 flex items-center justify-center shadow-2xs hover:bg-emerald-100 transition-all cursor-pointer"
+                    title="Downloaded offline (tap to remove)"
+                    aria-label={`Downloaded ${audio.title}`}
+                  >
+                    <CheckCircle2 size={13} strokeWidth={2.4} />
+                  </button>
+                ) : (
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      const toggle = onToggleOffline || onDownloadFromDrive;
+                      if (toggle) toggle(audio);
+                    }}
+                    className="size-7 rounded-full border border-slate-200/90 bg-slate-50 hover:bg-sky-50 hover:border-sky-300 text-slate-500 hover:text-sky-600 flex items-center justify-center transition-all active:scale-90 shadow-2xs cursor-pointer"
+                    title="Download from Google Drive for fast local playback"
+                    aria-label={`Download ${audio.title}`}
+                  >
+                    <Download size={13} strokeWidth={2.2} />
+                  </button>
+                )}
+
+                {/* Play Button */}
                 <button
                   onClick={() => onPlayAudio(audio)}
-                  className={`w-8 h-8 rounded-full flex items-center justify-center transition-all active:scale-90 shadow-2xs hover:scale-105 cursor-pointer ${
+                  className={`size-8.5 rounded-full flex items-center justify-center transition-all active:scale-90 shadow-2xs hover:scale-105 cursor-pointer ${
                     isPlayingThis
-                      ? 'bg-emerald-600 text-white'
+                      ? 'bg-emerald-600 text-white ring-4 ring-emerald-500/20'
                       : 'bg-slate-950 hover:bg-slate-800 text-white'
                   }`}
                   aria-label={isPlayingThis ? `Pause ${audio.title}` : `Play ${audio.title}`}
                 >
                   {isPlayingThis ? (
-                    <Pause size={12} fill="currentColor" />
+                    <Pause size={13} fill="currentColor" />
                   ) : (
-                    <Play size={12} fill="currentColor" className="translate-x-0.5" />
+                    <Play size={13} fill="currentColor" className="translate-x-0.5" />
                   )}
                 </button>
               </div>

@@ -1,8 +1,13 @@
 package com.smriti.app.bridge
 
 import android.content.Context
+import android.os.Build
 import android.os.Handler
 import android.os.Looper
+import android.os.VibrationEffect
+import android.os.Vibrator
+import android.os.VibratorManager
+import android.view.HapticFeedbackConstants
 import android.webkit.JavascriptInterface
 import android.webkit.WebView
 import androidx.media3.common.MediaItem
@@ -126,6 +131,54 @@ class SmritiWebBridge(
     }
 
     @JavascriptInterface
+    fun triggerHapticFeedback(patternType: String) {
+        mainHandler.post {
+            try {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                    val vibratorManager = context.getSystemService(Context.VIBRATOR_MANAGER_SERVICE) as? VibratorManager
+                    val vibrator = vibratorManager?.defaultVibrator
+                    if (vibrator != null && vibrator.hasVibrator()) {
+                        val duration = when (patternType) {
+                            "heavy" -> 35L
+                            "medium" -> 22L
+                            "double" -> 15L
+                            else -> 12L
+                        }
+                        val amplitude = when (patternType) {
+                            "heavy" -> 255
+                            "medium" -> 180
+                            else -> 120
+                        }
+                        vibrator.vibrate(VibrationEffect.createOneShot(duration, amplitude))
+                        return@post
+                    }
+                } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    @Suppress("DEPRECATION")
+                    val vibrator = context.getSystemService(Context.VIBRATOR_SERVICE) as? Vibrator
+                    if (vibrator != null && vibrator.hasVibrator()) {
+                        val duration = when (patternType) {
+                            "heavy" -> 35L
+                            "medium" -> 22L
+                            "double" -> 15L
+                            else -> 12L
+                        }
+                        val amplitude = when (patternType) {
+                            "heavy" -> 255
+                            "medium" -> 180
+                            else -> 120
+                        }
+                        vibrator.vibrate(VibrationEffect.createOneShot(duration, amplitude))
+                        return@post
+                    }
+                }
+                webView.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP)
+            } catch (e: Exception) {
+                // ignore
+            }
+        }
+    }
+
+    @JavascriptInterface
     fun startRecording() {
         recorderHelper.startRecording()
     }
@@ -176,6 +229,42 @@ class SmritiWebBridge(
             try {
                 context.cacheDir.deleteRecursively()
                 context.cacheDir.mkdirs()
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
+    }
+
+    @JavascriptInterface
+    fun purgeAllLocalData() {
+        mainHandler.post {
+            try {
+                val player = SmritiMediaPlaybackService.activePlayerInstance
+                player?.stop()
+                player?.clearMediaItems()
+                sendEventToJs("playbackStateChanged", JSONObject().put("isPlaying", false).toString())
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
+        scope.launch {
+            try {
+                // 1. Wipe Room database tables completely
+                db.audioDao().clearAllAudio()
+                db.playbackEventDao().clearAllEvents()
+                db.revisionDao().clearAllRevisions()
+
+                // 2. Clear cache dir
+                context.cacheDir.deleteRecursively()
+                context.cacheDir.mkdirs()
+
+                // 3. Clear audio files and recordings in filesDir
+                context.filesDir.listFiles()?.forEach { file ->
+                    val name = file.name.lowercase()
+                    if (name.endsWith(".m4a") || name.endsWith(".mp3") || name.endsWith(".wav") || name.startsWith("rec_")) {
+                        file.delete()
+                    }
+                }
             } catch (e: Exception) {
                 e.printStackTrace()
             }

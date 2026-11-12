@@ -165,7 +165,7 @@ export const RangeSlider = React.forwardRef<HTMLDivElement, RangeSliderProps>(
         )}
       >
         {/* Background Track */}
-        <div className="relative w-full h-2 rounded-full bg-slate-200/90 overflow-hidden">
+        <div className="relative w-full h-2 rounded-full bg-zinc-800/90 border border-zinc-700/50 overflow-hidden">
           {/* Active Highlight Range Bar */}
           <div
             onPointerDown={handlePointerDownRange}

@@ -10,6 +10,7 @@ import {
 } from 'recharts';
 import {
   Cloud,
+  CloudOff,
   HardDrive,
   RefreshCw,
   Headphones,
@@ -22,6 +23,15 @@ import {
   ShieldCheck,
   ArrowRight
 } from 'lucide-react';
+import {
+  Empty,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+  EmptyDescription,
+  EmptyContent
+} from '@/components/ui/empty';
+import { Button } from '@/components/ui/button';
 import {
   ChartContainer,
   ChartTooltip,
@@ -41,21 +51,30 @@ import { AudioItem } from '../types';
 export interface GoogleDriveStorageProps {
   audioItems: AudioItem[];
   isDriveConnected: boolean;
+  isSyncingDrive?: boolean;
   onConnectDrive: () => void;
   onDisconnectDrive: () => void;
+  onSyncDrive?: () => void;
+  onConnectWithToken?: (token: string) => Promise<void>;
   className?: string;
 }
 
 export const GoogleDriveStorage: React.FC<GoogleDriveStorageProps> = ({
   audioItems,
   isDriveConnected,
+  isSyncingDrive = false,
   onConnectDrive,
   onDisconnectDrive,
+  onSyncDrive,
+  onConnectWithToken,
   className
 }) => {
   const [quota, setQuota] = useState<GoogleDriveStorageQuota | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [chartView, setChartView] = useState<'donut' | 'bar'>('donut');
+  const [showManualTokenInput, setShowManualTokenInput] = useState(false);
+  const [manualToken, setManualToken] = useState('');
+  const [isSubmittingToken, setIsSubmittingToken] = useState(false);
 
   // Calculate actual Smriti audio notes size from client state
   const smritiAudioBytes = useMemo(() => {
@@ -63,6 +82,10 @@ export const GoogleDriveStorage: React.FC<GoogleDriveStorageProps> = ({
   }, [audioItems]);
 
   const fetchQuota = async () => {
+    if (!isDriveConnected) {
+      setQuota(null);
+      return;
+    }
     setIsLoading(true);
     try {
       const data = await googleDriveService.getStorageQuota();
@@ -173,6 +196,87 @@ export const GoogleDriveStorage: React.FC<GoogleDriveStorageProps> = ({
     }
   ];
 
+  if (!isDriveConnected) {
+    return (
+      <div
+        className={`bg-white border border-slate-200/80 rounded-3xl p-6 shadow-2xs ${
+          className || ''
+        }`}
+      >
+        <Empty className="py-2">
+          <EmptyHeader>
+            <EmptyMedia
+              variant="icon"
+              className="size-12 rounded-2xl bg-blue-50 text-blue-600 mb-1"
+            >
+              <CloudOff size={22} strokeWidth={2.2} />
+            </EmptyMedia>
+            <EmptyTitle className="text-base font-bold text-slate-950">
+              Google Drive Disconnected
+            </EmptyTitle>
+            <EmptyDescription className="text-xs text-slate-500 max-w-xs leading-relaxed">
+              Connect your personal Google Drive to sync audio notes and back up your study library.
+            </EmptyDescription>
+          </EmptyHeader>
+          <EmptyContent className="flex flex-col items-center gap-2.5 w-full max-w-xs pt-1">
+            <Button
+              onClick={onConnectDrive}
+              disabled={isSyncingDrive}
+              className="w-full h-10 rounded-xl bg-slate-950 hover:bg-slate-800 text-white font-semibold flex items-center justify-center gap-2 cursor-pointer shadow-xs active:scale-98"
+            >
+              <HardDrive size={15} className="text-blue-400" />
+              <span>{isSyncingDrive ? 'Connecting...' : 'Connect Personal Google Drive'}</span>
+            </Button>
+            {onConnectWithToken && (
+              <button
+                type="button"
+                onClick={() => setShowManualTokenInput(!showManualTokenInput)}
+                className="text-[11px] text-slate-400 hover:text-slate-700 font-medium transition-colors cursor-pointer"
+              >
+                {showManualTokenInput ? 'Cancel' : 'Connect with access token'}
+              </button>
+            )}
+          </EmptyContent>
+
+          {showManualTokenInput && (
+            <div className="w-full max-w-xs mt-3 p-3 bg-slate-50 border border-slate-200/80 rounded-2xl space-y-2 text-left animate-in fade-in">
+              <label className="text-[10px] font-mono uppercase tracking-wider text-slate-500 font-bold block">
+                Google OAuth Access Token
+              </label>
+              <input
+                type="password"
+                value={manualToken}
+                onChange={(e) => setManualToken(e.target.value)}
+                placeholder="ya29.a0AfH6SM..."
+                className="w-full px-3 py-1.5 text-xs bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 text-slate-900"
+              />
+              <div className="flex justify-end gap-2 pt-1">
+                <Button
+                  size="sm"
+                  disabled={!manualToken.trim() || isSubmittingToken}
+                  onClick={async () => {
+                    if (!manualToken.trim()) return;
+                    setIsSubmittingToken(true);
+                    try {
+                      await onConnectWithToken?.(manualToken.trim());
+                      setManualToken('');
+                      setShowManualTokenInput(false);
+                    } finally {
+                      setIsSubmittingToken(false);
+                    }
+                  }}
+                  className="bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-xs font-semibold"
+                >
+                  {isSubmittingToken ? 'Connecting...' : 'Connect Token'}
+                </Button>
+              </div>
+            </div>
+          )}
+        </Empty>
+      </div>
+    );
+  }
+
   return (
     <div
       className={`bg-white border border-slate-200/80 rounded-3xl p-4.5 shadow-2xs space-y-4 ${
@@ -190,21 +294,13 @@ export const GoogleDriveStorage: React.FC<GoogleDriveStorageProps> = ({
               <h3 className="text-xs font-bold text-slate-950 uppercase tracking-wider">
                 Google Drive Storage
               </h3>
-              <span
-                className={`px-2 py-0.5 rounded-full text-[10px] font-bold font-mono border ${
-                  isDriveConnected
-                    ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                    : 'bg-slate-100 text-slate-600 border-slate-200'
-                }`}
-              >
-                {isDriveConnected ? 'Connected' : 'Offline / Local'}
+              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold font-mono border bg-emerald-50 text-emerald-700 border-emerald-200">
+                Connected
               </span>
             </div>
             <p className="text-xs font-semibold text-slate-700 mt-0.5 flex items-center gap-1">
-              <span>{quota?.userEmail || (isDriveConnected ? 'Personal Google Account' : 'Offline / Local Vault')}</span>
-              {isDriveConnected && (
-                <ShieldCheck size={12} className="text-emerald-600 shrink-0" />
-              )}
+              <span>{quota?.userEmail || googleDriveService.getUserProfile()?.email || 'Personal Google Account'}</span>
+              <ShieldCheck size={12} className="text-emerald-600 shrink-0" />
             </p>
           </div>
         </div>
@@ -515,8 +611,35 @@ export const GoogleDriveStorage: React.FC<GoogleDriveStorageProps> = ({
         </div>
       </div>
 
-      {/* 6. Connection / Action Button */}
-      {isDriveConnected ? (
+      {/* 6. Action Buttons & Live Sync Feedback */}
+      {isSyncingDrive && (
+        <div className="p-3 rounded-2xl bg-blue-50 border border-blue-200/80 flex items-center gap-3 animate-in fade-in">
+          <RefreshCw size={16} className="text-blue-600 animate-spin shrink-0" />
+          <div className="min-w-0 flex-1">
+            <p className="text-xs font-bold text-blue-900">Retrieving Cloud Data...</p>
+            <p className="text-[10px] text-blue-700 font-mono">
+              Scanning folders and indexing audio notes from your Google Drive
+            </p>
+          </div>
+        </div>
+      )}
+
+      <div className="space-y-2">
+        {onSyncDrive && (
+          <button
+            type="button"
+            onClick={onSyncDrive}
+            disabled={isSyncingDrive}
+            className="w-full py-2.5 px-4 rounded-2xl bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 text-xs font-semibold flex items-center justify-between active:scale-98 transition-all cursor-pointer shadow-2xs disabled:opacity-50"
+          >
+            <span className="flex items-center gap-2">
+              <RefreshCw size={14} className={isSyncingDrive ? 'animate-spin' : ''} />
+              <span>Sync / Refresh from Google Drive</span>
+            </span>
+            <ArrowRight size={14} />
+          </button>
+        )}
+
         <button
           type="button"
           onClick={onDisconnectDrive}
@@ -528,25 +651,13 @@ export const GoogleDriveStorage: React.FC<GoogleDriveStorageProps> = ({
           </span>
           <ArrowRight size={14} />
         </button>
-      ) : (
-        <button
-          type="button"
-          onClick={onConnectDrive}
-          className="w-full py-2.5 px-4 rounded-2xl bg-slate-950 hover:bg-slate-800 text-white text-xs font-semibold flex items-center justify-between active:scale-98 transition-all cursor-pointer shadow-xs"
-        >
-          <span className="flex items-center gap-2">
-            <HardDrive size={14} className="text-blue-400" />
-            <span>Connect Personal Google Drive (15 GB Free)</span>
-          </span>
-          <ArrowRight size={14} />
-        </button>
-      )}
+      </div>
 
       {/* 7. Zero Central Server Privacy Banner */}
       <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-200/60 flex items-start gap-2">
         <Sparkles size={14} className="text-amber-500 shrink-0 mt-0.5" />
         <p className="text-[11px] text-slate-500 leading-relaxed">
-          <strong className="text-slate-700 font-medium">100% Private Storage:</strong> SMRITI operates with zero central audio servers. All audio is encrypted in your personal Google Drive and directly synced.
+          <strong className="text-slate-700 font-medium">Multi-Account &amp; Safe Disconnect:</strong> Connect multiple Google Drive accounts on one device. Disconnecting immediately and safely purges all local cache and audio files to safeguard user privacy.
         </p>
       </div>
     </div>

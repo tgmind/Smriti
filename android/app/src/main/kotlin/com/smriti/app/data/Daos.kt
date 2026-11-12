@@ -17,6 +17,9 @@ interface AudioDao {
     @Query("DELETE FROM cached_audio_items WHERE id = :audioId")
     suspend fun deleteAudio(audioId: String)
 
+    @Query("DELETE FROM cached_audio_items")
+    suspend fun clearAllAudio()
+
     @Query("SELECT SUM(fileSizeBytes) FROM cached_audio_items")
     suspend fun getTotalStorageBytes(): Long?
 }
@@ -32,6 +35,9 @@ interface PlaybackEventDao {
     @Query("DELETE FROM pending_playback_events WHERE id IN (:eventIds)")
     suspend fun deleteSyncedEvents(eventIds: List<String>)
 
+    @Query("DELETE FROM pending_playback_events")
+    suspend fun clearAllEvents()
+
     @Query("SELECT COUNT(*) FROM pending_playback_events")
     suspend fun getPendingEventsCount(): Int
 }
@@ -43,6 +49,9 @@ interface RevisionDao {
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertOrUpdateRevision(revision: OfflineRevisionEntity)
+
+    @Query("DELETE FROM offline_revisions")
+    suspend fun clearAllRevisions()
 
     @Query("SELECT COUNT(*) FROM offline_revisions")
     suspend fun getTotalCount(): Int

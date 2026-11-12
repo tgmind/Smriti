@@ -8,7 +8,8 @@ import {
   Sliders,
   Database,
   ChevronRight,
-  Sparkles
+  Sparkles,
+  User
 } from 'lucide-react';
 import { UserSettings, StorageOverview, AudioItem, RevisionItem, DailyStudyStats } from '../types';
 import { exportDataAsJSON, exportDataAsCSV } from '../services/supabase';
@@ -23,9 +24,12 @@ interface ProfileTabProps {
   revisionItems: RevisionItem[];
   dailyStats: DailyStudyStats[];
   isDriveConnected: boolean;
+  isSyncingDrive?: boolean;
   onUpdateSettings: (settings: Partial<UserSettings>) => void;
   onConnectDrive: () => void;
   onDisconnectDrive: () => void;
+  onSyncDrive?: () => void;
+  onConnectWithToken?: (token: string) => Promise<void>;
   onClearCache: () => void;
 }
 
@@ -36,9 +40,12 @@ export const ProfileTab: React.FC<ProfileTabProps> = ({
   revisionItems,
   dailyStats,
   isDriveConnected,
+  isSyncingDrive = false,
   onUpdateSettings,
   onConnectDrive,
   onDisconnectDrive,
+  onSyncDrive,
+  onConnectWithToken,
   onClearCache
 }) => {
   const [cacheClearedSuccess, setCacheClearedSuccess] = useState(false);
@@ -63,25 +70,54 @@ export const ProfileTab: React.FC<ProfileTabProps> = ({
         </div>
       </div>
 
-      {/* User Profile Card with Large Avatar */}
+      {/* User Profile Card - Minimalist & True Status */}
       <div className="text-center py-2 space-y-1">
-        <div className="w-20 h-20 rounded-full ring-4 ring-emerald-300/60 bg-gradient-to-tr from-emerald-100 to-teal-100 flex items-center justify-center text-3xl font-black text-emerald-800 mx-auto shadow-sm">
-          स्म
+        <div
+          className={`w-18 h-18 rounded-full flex items-center justify-center mx-auto shadow-2xs overflow-hidden transition-all ${
+            isDriveConnected
+              ? 'ring-4 ring-emerald-300/60 bg-gradient-to-tr from-emerald-100 to-teal-100 text-3xl font-black text-emerald-800'
+              : 'ring-4 ring-slate-100 bg-slate-50 text-slate-400'
+          }`}
+        >
+          {isDriveConnected ? (
+            googleDriveService.getUserProfile()?.picture ? (
+              <img
+                src={googleDriveService.getUserProfile()!.picture}
+                alt="Google Account Avatar"
+                className="w-full h-full object-cover"
+              />
+            ) : (
+              <span className="text-2xl font-bold font-mono">
+                {(googleDriveService.getUserProfile()?.name || 'G')[0].toUpperCase()}
+              </span>
+            )
+          ) : (
+            <User size={28} strokeWidth={1.8} className="text-slate-400" />
+          )}
         </div>
-        <h2 className="text-lg font-black text-slate-950 tracking-tight mt-2">
-          Scholar
-        </h2>
-        <p className="text-xs text-slate-500 font-medium font-mono">
-          {isDriveConnected ? (googleDriveService.getUserProfile()?.email || 'Google Drive Connected') : 'Offline Student Vault'}
-        </p>
+        <div>
+          <h2 className="text-base font-bold text-slate-950 tracking-tight mt-1">
+            {isDriveConnected
+              ? googleDriveService.getUserProfile()?.name || 'Connected Google Account'
+              : 'Local Account'}
+          </h2>
+          <p className="text-xs text-slate-400 font-medium font-mono mt-0.5">
+            {isDriveConnected
+              ? googleDriveService.getUserProfile()?.email || 'Google Drive Connected'
+              : 'Offline Mode • Local Storage'}
+          </p>
+        </div>
       </div>
 
       {/* Google Drive Storage (Realistic Quota, Recharts Breakdown & Progress) */}
       <GoogleDriveStorage
         audioItems={audioItems}
         isDriveConnected={isDriveConnected}
+        isSyncingDrive={isSyncingDrive}
         onConnectDrive={onConnectDrive}
         onDisconnectDrive={onDisconnectDrive}
+        onSyncDrive={onSyncDrive}
+        onConnectWithToken={onConnectWithToken}
       />
 
       {/* Settings List Items with Squircles & Chevrons (Like Image 1) */}

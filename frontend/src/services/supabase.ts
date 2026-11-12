@@ -12,12 +12,12 @@ export const supabase: SupabaseClient | null = isSupabaseConfigured
   ? createClient(supabaseUrl, supabaseAnonKey)
   : null;
 
-// Standard educational subjects for academic organization
+// Standard educational subjects for academic organization - unified universal icons (no special PCMB symbols)
 export const DEFAULT_SUBJECTS: Subject[] = [
-  { id: 'sub-1', name: 'Physics', icon_name: 'Atom', color_hex: '#38bdf8', description: 'Physics lecture & study notes', sort_order: 1 },
-  { id: 'sub-2', name: 'Chemistry', icon_name: 'FlaskConical', color_hex: '#f59e0b', description: 'Chemistry lecture & study notes', sort_order: 2 },
-  { id: 'sub-3', name: 'Biology', icon_name: 'Dna', color_hex: '#10b981', description: 'Biology lecture & study notes', sort_order: 3 },
-  { id: 'sub-4', name: 'Mathematics', icon_name: 'Binary', color_hex: '#a855f7', description: 'Mathematics lecture & study notes', sort_order: 4 },
+  { id: 'sub-1', name: 'Physics', icon_name: 'BookOpen', color_hex: '#38bdf8', description: 'Physics lecture & study notes', sort_order: 1 },
+  { id: 'sub-2', name: 'Chemistry', icon_name: 'BookOpen', color_hex: '#f59e0b', description: 'Chemistry lecture & study notes', sort_order: 2 },
+  { id: 'sub-3', name: 'Biology', icon_name: 'BookOpen', color_hex: '#10b981', description: 'Biology lecture & study notes', sort_order: 3 },
+  { id: 'sub-4', name: 'Mathematics', icon_name: 'BookOpen', color_hex: '#a855f7', description: 'Mathematics lecture & study notes', sort_order: 4 },
 ];
 
 export const DEMO_SUBJECTS: Subject[] = DEFAULT_SUBJECTS;

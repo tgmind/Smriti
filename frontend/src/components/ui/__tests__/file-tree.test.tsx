@@ -8,7 +8,7 @@ describe('FileTree hierarchy component', () => {
     {
       id: 'sub-phys',
       name: 'Physics',
-      icon_name: 'Atom',
+      icon_name: 'BookOpen',
       color_hex: '#3b82f6',
       sort_order: 1,
     },

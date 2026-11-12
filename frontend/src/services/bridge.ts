@@ -20,6 +20,8 @@ interface ISmritiBridgeNative {
   removeOfflineDownload(audioId: string): void;
   getStorageInformation(): string;
   clearTemporaryCache(): void;
+  purgeAllLocalData(): void;
+  triggerHapticFeedback(patternType: string): void;
 }
 
 declare global {
@@ -286,6 +288,22 @@ class BridgeManager {
     this.browserAudio?.pause();
   }
 
+  public stopAudio() {
+    this.pause();
+    this.stopSpeech();
+    if (this.browserAudio) {
+      try {
+        this.browserAudio.pause();
+        this.browserAudio.currentTime = 0;
+        this.browserAudio.removeAttribute('src');
+        this.browserAudio.load();
+      } catch (e) {
+        // ignore
+      }
+    }
+    this.emit('playbackStateChanged', { isPlaying: false });
+  }
+
   public resume() {
     if (this.isNativeApp() && window.SmritiBridge) {
       window.SmritiBridge.resumeAudio();
@@ -503,6 +521,41 @@ class BridgeManager {
     }
   }
 
+  /**
+   * Safely and comprehensively purges all local cache, downloaded files,
+   * IndexedDB blobs, and Room database records across native Android and Web apps.
+   * Invoked upon Google Drive disconnection to protect user privacy.
+   */
+  public async purgeAllLocalData(): Promise<void> {
+    // 1. Native Android purge
+    if (this.isNativeApp() && window.SmritiBridge?.purgeAllLocalData) {
+      try {
+        window.SmritiBridge.purgeAllLocalData();
+      } catch (e) {
+        console.warn('Native purgeAllLocalData failed', e);
+      }
+    }
+
+    // 2. Stop browser audio
+    if (this.browserAudio) {
+      try {
+        this.browserAudio.pause();
+        this.browserAudio.currentTime = 0;
+        this.browserAudio.removeAttribute('src');
+        this.browserAudio.load();
+      } catch (e) {
+        // ignore
+      }
+    }
+
+    // 3. Purge IndexedDB offline audio blobs
+    try {
+      await audioStorage.clearAllAudioBlobs();
+    } catch (e) {
+      console.warn('IndexedDB clearAllAudioBlobs error', e);
+    }
+  }
+
   public async downloadForOffline(audio: AudioItem) {
     if (this.isNativeApp() && window.SmritiBridge) {
       window.SmritiBridge.downloadForOffline(JSON.stringify(audio));
@@ -529,6 +582,36 @@ class BridgeManager {
       await audioStorage.deleteAudioBlob(audioId);
     } catch (e) {
       console.warn('Failed removing offline blob', e);
+    }
+  }
+
+  /**
+   * Triggers crisp, tactile vibrate haptic feedback across native Android (via Vibrator)
+   * and Web browsers (via navigator.vibrate).
+   */
+  public triggerHaptic(type: 'light' | 'medium' | 'heavy' | 'double' = 'light') {
+    if (this.isNativeApp() && window.SmritiBridge?.triggerHapticFeedback) {
+      try {
+        window.SmritiBridge.triggerHapticFeedback(type);
+        return;
+      } catch (e) {
+        // fallback to navigator.vibrate
+      }
+    }
+    if (typeof navigator !== 'undefined' && 'vibrate' in navigator) {
+      try {
+        const pattern =
+          type === 'heavy'
+            ? [35]
+            : type === 'medium'
+            ? [22]
+            : type === 'double'
+            ? [12, 40, 15]
+            : [12];
+        navigator.vibrate(pattern);
+      } catch (e) {
+        // ignore
+      }
     }
   }
 }

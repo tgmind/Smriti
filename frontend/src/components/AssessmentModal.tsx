@@ -2,6 +2,14 @@ import React, { useState } from 'react';
 import { X, CheckCircle2, HelpCircle, ArrowRight, Sparkles } from 'lucide-react';
 import { RevisionItem, RatingScore } from '../types';
 import { calculateNextReview } from '../services/learningEngine';
+import {
+  Empty,
+  EmptyHeader,
+  EmptyMedia,
+  EmptyTitle,
+  EmptyDescription,
+  EmptyContent,
+} from '@/components/ui/empty';
 
 interface AssessmentModalProps {
   items: RevisionItem[];
@@ -26,21 +34,28 @@ export const AssessmentModal: React.FC<AssessmentModalProps> = ({
   if (items.length === 0) {
     return (
       <div className="fixed inset-0 z-50 bg-slate-900/40 backdrop-blur-md flex items-center justify-center p-4">
-        <div className="bg-white border border-slate-200 p-6 rounded-3xl max-w-sm w-full text-center space-y-4 shadow-xl">
-          <div className="w-12 h-12 rounded-full bg-emerald-50 text-emerald-600 border border-emerald-200 mx-auto flex items-center justify-center">
-            <CheckCircle2 size={28} />
-          </div>
-          <h3 className="text-base font-bold text-slate-900">All Caught Up!</h3>
-          <p className="text-xs text-slate-500 leading-relaxed">
-            No recall assessments are due right now. Continue listening to your audio notes to strengthen retrieval cues.
-          </p>
-          <button
-            onClick={onClose}
-            className="w-full py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-semibold text-xs transition-all active:scale-[0.98]"
-          >
-            Back to Lessons
-          </button>
-        </div>
+        <Empty className="bg-white border border-slate-200 p-6 rounded-3xl max-w-sm w-full text-center shadow-xl">
+          <EmptyHeader>
+            <EmptyMedia
+              variant="icon"
+              className="w-12 h-12 rounded-full bg-emerald-50 text-emerald-600 border border-emerald-200 mx-auto flex items-center justify-center mb-0.5"
+            >
+              <CheckCircle2 size={28} />
+            </EmptyMedia>
+            <EmptyTitle className="text-base font-bold text-slate-900">All Caught Up!</EmptyTitle>
+            <EmptyDescription className="text-xs text-slate-500 leading-relaxed">
+              No recall assessments are due right now. Continue listening to your audio notes to strengthen retrieval cues.
+            </EmptyDescription>
+          </EmptyHeader>
+          <EmptyContent className="w-full pt-1">
+            <button
+              onClick={onClose}
+              className="w-full py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-semibold text-xs transition-all active:scale-[0.98] cursor-pointer"
+            >
+              Back to Lessons
+            </button>
+          </EmptyContent>
+        </Empty>
       </div>
     );
   }

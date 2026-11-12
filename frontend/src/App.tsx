@@ -15,10 +15,10 @@ import {
   DailyStudyStats,
   UserSettings,
   PlaybackState,
-  StorageOverview
+  StorageOverview,
+  UploadProgressState
 } from './types';
 import {
-  DEMO_SUBJECTS,
   DEFAULT_USER_SETTINGS
 } from './services/supabase';
 import { bridge } from './services/bridge';
@@ -29,6 +29,10 @@ import { audioStorage } from './services/audioStorage';
 export const App: React.FC = () => {
   const [currentTab, setCurrentTab] = useState<TabType>('home');
   const [audioItems, setAudioItems] = useState<AudioItem[]>(() => {
+    // If Google Drive is not connected, enforce strict privacy: 0 audio notes displayed
+    if (!googleDriveService.isConnected()) {
+      return [];
+    }
     const saved = localStorage.getItem('smriti_audio_items');
     if (!saved) return [];
     try {
@@ -41,7 +45,42 @@ export const App: React.FC = () => {
     }
   });
 
-  const [subjects] = useState<Subject[]>(DEMO_SUBJECTS);
+  const [subjects, setSubjects] = useState<Subject[]>(() => {
+    const saved = localStorage.getItem('smriti_subjects');
+    const fallbackSubjects: Subject[] = [
+      { id: 'general', name: 'General', icon_name: 'BookOpen', color_hex: '#38bdf8', description: 'General study & lecture notes', sort_order: 1 }
+    ];
+    if (!saved) return fallbackSubjects;
+    try {
+      const parsed: Subject[] = JSON.parse(saved);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        // Strictly deduplicate by normalized name and normalize deprecated icons
+        const map = new Map<string, Subject>();
+        for (const s of parsed) {
+          if (!s || !s.name) continue;
+          const norm = s.name.trim().toLowerCase();
+          if (!map.has(norm)) {
+            map.set(norm, {
+              ...s,
+              icon_name:
+                s.icon_name === 'Atom' ||
+                s.icon_name === 'FlaskConical' ||
+                s.icon_name === 'Dna' ||
+                s.icon_name === 'Binary' ||
+                s.icon_name === 'Folder'
+                  ? 'BookOpen'
+                  : (s.icon_name || 'BookOpen'),
+            });
+          }
+        }
+        const cleaned = Array.from(map.values());
+        return cleaned.length > 0 ? cleaned : fallbackSubjects;
+      }
+      return fallbackSubjects;
+    } catch {
+      return fallbackSubjects;
+    }
+  });
   const [revisionItems] = useState<RevisionItem[]>(() => {
     const saved = localStorage.getItem('smriti_revisions');
     if (!saved) return [];
@@ -72,7 +111,8 @@ export const App: React.FC = () => {
   });
 
   const [storageInfo, setStorageInfo] = useState<StorageOverview>(() => bridge.getStorageInfo());
-  const [isDriveConnected, setIsDriveConnected] = useState<boolean>(false);
+  const [isDriveConnected, setIsDriveConnected] = useState<boolean>(() => googleDriveService.isConnected());
+  const [isSyncingDrive, setIsSyncingDrive] = useState<boolean>(false);
 
   // Playback & UI Modals
   const [isFullScreenPlayerOpen, setIsFullScreenPlayerOpen] = useState(false);
@@ -98,6 +138,10 @@ export const App: React.FC = () => {
   useEffect(() => {
     localStorage.setItem('smriti_audio_items', JSON.stringify(audioItems));
   }, [audioItems]);
+
+  useEffect(() => {
+    localStorage.setItem('smriti_subjects', JSON.stringify(subjects));
+  }, [subjects]);
 
   useEffect(() => {
     localStorage.setItem('smriti_revisions', JSON.stringify(revisionItems));
@@ -343,8 +387,12 @@ export const App: React.FC = () => {
     const nextState = !audio.is_downloaded_offline;
     if (nextState) {
       bridge.downloadForOffline(audio);
+      if (audio.google_drive_file_id && googleDriveService.isConnected()) {
+        handleDownloadItemFromDrive(audio);
+      }
     } else {
       bridge.removeOfflineDownload(audio.id);
+      audioStorage.deleteAudioBlob(audio.id).catch(() => {});
     }
     setAudioItems(prev =>
       prev.map(item => (item.id === audio.id ? { ...item, is_downloaded_offline: nextState } : item))
@@ -397,17 +445,36 @@ export const App: React.FC = () => {
     handlePlayAudio(queue[prevIndex]);
   };
 
-  // Check Google Drive connection status on mount
+  // Check Google Drive connection status on mount and load cloud data if connected
   useEffect(() => {
     if (googleDriveService.isConnected()) {
       setIsDriveConnected(true);
       googleDriveService.fetchUserProfile().catch(() => {});
+      setIsSyncingDrive(true);
+      googleDriveService.fetchDriveData().then(data => {
+        if (data.audioItems) {
+          setAudioItems(data.audioItems);
+        }
+        if (data.subjects && data.subjects.length > 0) {
+          setSubjects(data.subjects);
+        }
+      }).catch(err => {
+        console.warn('Initial Drive data fetch warning:', err);
+      }).finally(() => {
+        setIsSyncingDrive(false);
+      });
     }
   }, []);
 
-  // Save new recording
-  const handleSaveAudio = async (partialItem: Partial<AudioItem>, fileBlob?: Blob) => {
+  // Save new recording with real-time progress reporting
+  const handleSaveAudio = async (
+    partialItem: Partial<AudioItem>,
+    fileBlob?: Blob,
+    options?: { syncToDrive?: boolean },
+    onProgress?: (progress: UploadProgressState) => void
+  ) => {
     const newId = `aud-${Date.now()}`;
+    const totalBytes = fileBlob ? fileBlob.size : (partialItem.file_size_bytes || 2000000);
     const newItem: AudioItem = {
       id: newId,
       title: partialItem.title || 'Untitled Lecture Note',
@@ -416,58 +483,243 @@ export const App: React.FC = () => {
       duration_seconds: partialItem.duration_seconds || 60,
       source_type: 'recorded',
       file_format: 'm4a',
-      file_size_bytes: partialItem.file_size_bytes || 2000000,
+      file_size_bytes: totalBytes,
       audio_enhancement_applied: !!partialItem.audio_enhancement_applied,
       waveform_peaks: partialItem.waveform_peaks || [20, 40, 60, 80, 50],
       key_terms: partialItem.key_terms || [],
       is_favorite: false,
-      is_downloaded_offline: true,
+      is_downloaded_offline: false, // Default to Google Drive cloud storage; user taps download arrow to cache locally
       created_at: new Date().toISOString()
     };
 
     // 1. Save blob to IndexedDB for 100% offline local playback
     if (fileBlob) {
+      onProgress?.({
+        stage: 'local_save',
+        percent: 15,
+        loadedBytes: Math.round(totalBytes * 0.15),
+        totalBytes,
+        message: 'Saving offline audio copy to device...'
+      });
+
       try {
         await audioStorage.saveAudioBlob(newId, fileBlob);
         newItem.file_url = URL.createObjectURL(fileBlob);
+        onProgress?.({
+          stage: 'local_save',
+          percent: 25,
+          loadedBytes: Math.round(totalBytes * 0.25),
+          totalBytes,
+          message: 'Saved to local device storage'
+        });
       } catch (e) {
         console.warn('Failed saving blob to IndexedDB', e);
       }
     }
 
-    // 2. If Google Drive connected and blob exists, upload directly to Drive
-    if (googleDriveService.isConnected() && fileBlob) {
+    // 2. If Google Drive connected and sync enabled, upload directly to Drive
+    const shouldSyncDrive =
+      options?.syncToDrive !== false &&
+      (googleDriveService.isConnected() || options?.syncToDrive === true);
+
+    if (shouldSyncDrive && fileBlob) {
       try {
-        const uploaded = await googleDriveService.uploadAudio(fileBlob, `${newItem.title}.m4a`);
+        onProgress?.({
+          stage: 'uploading',
+          percent: 28,
+          loadedBytes: Math.round(totalBytes * 0.28),
+          totalBytes,
+          message: 'Connecting to Google Drive...'
+        });
+
+        const uploaded = await googleDriveService.uploadAudio(
+          fileBlob,
+          `${newItem.title}.m4a`,
+          newItem.subject_name || 'General',
+          (drivePercent, loadedBytes, fileTotal) => {
+            // Map 0-100% drive upload into 30%-98% range for overall, or report actual drive percentage
+            const effectivePercent = Math.min(
+              99,
+              Math.max(30, Math.round(30 + drivePercent * 0.68))
+            );
+            onProgress?.({
+              stage: 'uploading',
+              percent: effectivePercent,
+              loadedBytes,
+              totalBytes: fileTotal,
+              message:
+                drivePercent < 95
+                  ? `Uploading to Google Drive (${drivePercent}%)...`
+                  : 'Finalizing file on Google Drive...'
+            });
+          }
+        );
+
         newItem.google_drive_file_id = uploaded.id;
         if (uploaded.webContentLink) {
           newItem.file_url = uploaded.webContentLink;
         }
+
+        onProgress?.({
+          stage: 'done',
+          percent: 100,
+          loadedBytes: totalBytes,
+          totalBytes,
+          driveFileId: uploaded.id,
+          message: 'Successfully backed up to Google Drive!'
+        });
       } catch (err: any) {
         console.warn('Google Drive direct upload failed, kept in local offline storage:', err);
+        onProgress?.({
+          stage: 'error',
+          percent: 100,
+          loadedBytes: totalBytes,
+          totalBytes,
+          message: 'Drive sync interrupted. Note safely stored on device.',
+          error: err.message || 'Upload failed'
+        });
       }
+    } else {
+      onProgress?.({
+        stage: 'done',
+        percent: 100,
+        loadedBytes: totalBytes,
+        totalBytes,
+        message: 'Audio note saved offline successfully!'
+      });
     }
 
-    setAudioItems(prev => [newItem, ...prev]);
+    setAudioItems(prev => {
+      const next = [newItem, ...prev];
+      if (googleDriveService.isConnected()) {
+        googleDriveService.saveCatalog({ subjects, audioItems: next });
+      }
+      return next;
+    });
+
+    // Give the user a moment to see the 100% completed status bar
+    await new Promise(r => setTimeout(r, 650));
     setCurrentTab('library');
   };
 
-  // Google Drive connection trigger
+  // Google Drive connection trigger: Authorizes account, fetches account cloud data, and displays it
   const handleConnectDrive = async () => {
     try {
+      setIsSyncingDrive(true);
       await googleDriveService.authorize();
       setIsDriveConnected(true);
+
+      // Fetch cloud catalog and recordings for this specific connected account
+      const driveData = await googleDriveService.fetchDriveData(subjects);
+      if (driveData) {
+        setAudioItems(driveData.audioItems || []);
+        if (driveData.subjects && driveData.subjects.length > 0) {
+          setSubjects(driveData.subjects);
+        }
+      }
+
       const info = await bridge.getStorageInfoAsync();
       setStorageInfo(info);
     } catch (err: any) {
       console.error('Google Drive sign-in error:', err);
       alert(`Google Drive Sign-In: ${err.message || 'Could not complete authorization'}`);
+    } finally {
+      setIsSyncingDrive(false);
     }
   };
 
-  const handleDisconnectDrive = () => {
-    googleDriveService.disconnect();
-    setIsDriveConnected(false);
+  // Direct token connection trigger (useful for manual token or restricted WebViews)
+  const handleConnectWithToken = async (token: string) => {
+    try {
+      setIsSyncingDrive(true);
+      await googleDriveService.connectWithToken(token);
+      setIsDriveConnected(true);
+
+      const driveData = await googleDriveService.fetchDriveData(subjects);
+      if (driveData) {
+        setAudioItems(driveData.audioItems || []);
+        if (driveData.subjects && driveData.subjects.length > 0) {
+          setSubjects(driveData.subjects);
+        }
+      }
+
+      const info = await bridge.getStorageInfoAsync();
+      setStorageInfo(info);
+    } catch (err: any) {
+      console.error('Google Drive token connection error:', err);
+      alert(`Google Drive Error: ${err.message || 'Could not connect with token'}`);
+    } finally {
+      setIsSyncingDrive(false);
+    }
+  };
+
+  // Re-sync cloud data from Google Drive
+  const handleSyncDrive = async () => {
+    if (!googleDriveService.isConnected()) {
+      await handleConnectDrive();
+      return;
+    }
+    try {
+      setIsSyncingDrive(true);
+      const driveData = await googleDriveService.fetchDriveData(subjects);
+      if (driveData) {
+        setAudioItems(driveData.audioItems || []);
+        if (driveData.subjects && driveData.subjects.length > 0) {
+          setSubjects(driveData.subjects);
+        }
+      }
+      const info = await bridge.getStorageInfoAsync();
+      setStorageInfo(info);
+    } catch (err: any) {
+      console.error('Error syncing with Google Drive:', err);
+    } finally {
+      setIsSyncingDrive(false);
+    }
+  };
+
+  // Google Drive disconnect trigger: Stops playback, safely purges all local cache/audio files across Android and Web, clears UI to protect privacy
+  const handleDisconnectDrive = async () => {
+    try {
+      // 1. Immediately halt playback and reset player
+      bridge.stopAudio();
+      setPlaybackState({
+        currentAudio: null,
+        isPlaying: false,
+        positionSeconds: 0,
+        durationSeconds: 0,
+        playbackSpeed: 1.0,
+        isRepeatTrack: false,
+        isRepeatQueue: false,
+        abLoop: null,
+        sleepTimerRemainingSeconds: null,
+        learningModeActive: false
+      });
+      setIsFullScreenPlayerOpen(false);
+
+      // 2. Comprehensive local data purge across Android and Web apps
+      await bridge.purgeAllLocalData();
+
+      // 3. Clear Google Drive credentials and tokens
+      googleDriveService.disconnect();
+
+      // 4. Safely clear local account cache
+      localStorage.removeItem('smriti_audio_items');
+      localStorage.removeItem('smriti_subjects');
+      localStorage.removeItem('smriti_revisions');
+      localStorage.removeItem('smriti_drive_transfers');
+
+      // 5. Zero data displayed - 100% privacy protection with clean neutral default
+      setAudioItems([]);
+      setSubjects([
+        { id: 'general', name: 'General', icon_name: 'BookOpen', color_hex: '#38bdf8', description: 'General study & lecture notes', sort_order: 1 }
+      ]);
+      setIsDriveConnected(false);
+
+      const info = await bridge.getStorageInfoAsync();
+      setStorageInfo(info);
+    } catch (e) {
+      console.error('Error during Google Drive disconnect and data purge', e);
+    }
   };
 
   const handleSyncItemToDrive = async (audio: AudioItem) => {
@@ -478,7 +730,11 @@ export const App: React.FC = () => {
       }
       const blob = await audioStorage.getAudioBlob(audio.id);
       if (blob && googleDriveService.isConnected()) {
-        const uploaded = await googleDriveService.uploadAudio(blob, `${audio.title}.m4a`);
+        const uploaded = await googleDriveService.uploadAudio(
+          blob,
+          `${audio.title}.m4a`,
+          audio.subject_name || 'General'
+        );
         setAudioItems(prev =>
           prev.map(item =>
             item.id === audio.id
@@ -520,6 +776,118 @@ export const App: React.FC = () => {
     setCurrentTab('library');
   };
 
+  const handleCreateSubject = (newSubject: Subject) => {
+    setSubjects(prev => {
+      if (prev.some(s => s.id === newSubject.id || s.name.toLowerCase() === newSubject.name.toLowerCase())) return prev;
+      const next = [...prev, newSubject];
+      if (googleDriveService.isConnected()) {
+        googleDriveService.saveCatalog({ subjects: next, audioItems });
+      }
+      return next;
+    });
+
+    if (googleDriveService.isConnected()) {
+      googleDriveService.getOrCreateSubjectFolder(newSubject.name).catch(e => {
+        console.warn('Could not create subject folder on Google Drive:', newSubject.name, e);
+      });
+    }
+  };
+
+  const handleDeleteSubject = async (
+    subjectId: string,
+    options?: { deleteRecordings?: boolean }
+  ) => {
+    const targetSubject = subjects.find(
+      s => s.id === subjectId || s.name.toLowerCase() === subjectId.toLowerCase()
+    );
+    if (!targetSubject) return;
+
+    const subjectName = targetSubject.name;
+    const deleteRecordings = !!options?.deleteRecordings;
+
+    // 1. Optimistic UI update
+    let nextSubjects = subjects.filter(
+      s => s.id !== targetSubject.id && s.name.toLowerCase() !== subjectName.toLowerCase()
+    );
+    if (nextSubjects.length === 0) {
+      nextSubjects = [
+        { id: 'general', name: 'General', icon_name: 'BookOpen', color_hex: '#38bdf8', description: 'General study & lecture notes', sort_order: 1 }
+      ];
+    }
+    setSubjects(nextSubjects);
+
+    let nextAudioItems: AudioItem[] = [];
+    if (deleteRecordings) {
+      const toDelete = audioItems.filter(
+        a => a.subject_id === targetSubject.id || a.subject_name?.toLowerCase() === subjectName.toLowerCase()
+      );
+      nextAudioItems = audioItems.filter(
+        a => a.subject_id !== targetSubject.id && a.subject_name?.toLowerCase() !== subjectName.toLowerCase()
+      );
+      setAudioItems(nextAudioItems);
+
+      // Async local & drive cleanup
+      for (const item of toDelete) {
+        audioStorage.deleteAudioBlob(item.id).catch(() => {});
+        bridge.removeOfflineDownload(item.id);
+        if (googleDriveService.isConnected() && item.google_drive_file_id) {
+          googleDriveService.deleteAudio(item.google_drive_file_id).catch(() => {});
+        }
+      }
+    } else {
+      nextAudioItems = audioItems.map(a => {
+        if (a.subject_id === targetSubject.id || a.subject_name?.toLowerCase() === subjectName.toLowerCase()) {
+          return {
+            ...a,
+            subject_id: 'general',
+            subject_name: 'General'
+          };
+        }
+        return a;
+      });
+      setAudioItems(nextAudioItems);
+    }
+
+    // 2. Google Drive two-way handshake
+    if (googleDriveService.isConnected()) {
+      try {
+        await googleDriveService.deleteSubjectFolder(subjectName);
+        await googleDriveService.saveCatalog({
+          subjects: nextSubjects,
+          audioItems: nextAudioItems
+        });
+      } catch (e) {
+        console.warn('Google Drive delete subject notice:', e);
+      }
+    }
+
+    const info = await bridge.getStorageInfoAsync();
+    setStorageInfo(info);
+  };
+
+  const handleDeleteAudio = async (audioId: string) => {
+    const itemToDelete = audioItems.find(a => a.id === audioId);
+    if (!itemToDelete) return;
+
+    const nextAudioItems = audioItems.filter(a => a.id !== audioId);
+    setAudioItems(nextAudioItems);
+
+    if (playbackState.currentAudio?.id === audioId) {
+      handleDismissPlayer();
+    }
+
+    audioStorage.deleteAudioBlob(audioId).catch(() => {});
+    bridge.removeOfflineDownload(audioId);
+
+    if (googleDriveService.isConnected() && itemToDelete.google_drive_file_id) {
+      googleDriveService.deleteAudio(itemToDelete.google_drive_file_id).catch(console.warn);
+      googleDriveService.saveCatalog({ subjects, audioItems: nextAudioItems }).catch(console.warn);
+    }
+
+    const info = await bridge.getStorageInfoAsync();
+    setStorageInfo(info);
+  };
+
   const handleNavigateToAccount = () => {
     setCurrentTab('profile');
   };
@@ -538,6 +906,7 @@ export const App: React.FC = () => {
             onConnectDrive={handleConnectDrive}
             onSyncToDrive={handleSyncItemToDrive}
             onDownloadFromDrive={handleDownloadItemFromDrive}
+            onToggleOffline={handleToggleOffline}
             onPlayAudio={handlePlayAudio}
             onSeek={handleSeek}
             onGoToRecord={() => setCurrentTab('record')}
@@ -552,6 +921,10 @@ export const App: React.FC = () => {
             subjects={subjects}
             initialSubjectId={selectedSubjectForLibrary}
             playbackState={playbackState}
+            isDriveConnected={isDriveConnected}
+            isSyncingDrive={isSyncingDrive}
+            onSyncDrive={handleSyncDrive}
+            onConnectDrive={handleConnectDrive}
             onTogglePlay={handleTogglePlay}
             onSeek={handleSeek}
             onSetSpeed={handleSetSpeed}
@@ -559,6 +932,9 @@ export const App: React.FC = () => {
             onToggleFavorite={handleToggleFavorite}
             onToggleOffline={handleToggleOffline}
             onGoToRecord={() => setCurrentTab('record')}
+            onCreateSubject={handleCreateSubject}
+            onDeleteSubject={handleDeleteSubject}
+            onDeleteAudio={handleDeleteAudio}
           />
         )}
 
@@ -573,6 +949,8 @@ export const App: React.FC = () => {
             subjects={subjects}
             onSaveAudio={handleSaveAudio}
             onCancel={() => setCurrentTab('home')}
+            isDriveConnected={isDriveConnected}
+            onConnectDrive={handleConnectDrive}
           />
         )}
 
@@ -584,9 +962,12 @@ export const App: React.FC = () => {
             revisionItems={revisionItems}
             dailyStats={dailyStats}
             isDriveConnected={isDriveConnected}
+            isSyncingDrive={isSyncingDrive}
             onUpdateSettings={(s) => setUserSettings(prev => ({ ...prev, ...s }))}
             onConnectDrive={handleConnectDrive}
             onDisconnectDrive={handleDisconnectDrive}
+            onSyncDrive={handleSyncDrive}
+            onConnectWithToken={handleConnectWithToken}
             onClearCache={() => {
               bridge.clearTemporaryCache();
               setStorageInfo(bridge.getStorageInfo());
@@ -599,6 +980,9 @@ export const App: React.FC = () => {
       {isFullScreenPlayerOpen && (
         <FullScreenPlayer
           playbackState={playbackState}
+          audioQueue={audioItems}
+          subjects={subjects}
+          onSelectTrack={handlePlayAudio}
           onClose={() => setIsFullScreenPlayerOpen(false)}
           onTogglePlay={handleTogglePlay}
           onSeek={handleSeek}
@@ -609,6 +993,8 @@ export const App: React.FC = () => {
           onSetSleepTimer={handleSetSleepTimer}
           onToggleFavorite={handleToggleFavorite}
           onToggleOffline={handleToggleOffline}
+          onNext={() => handleNextTrack(true)}
+          onPrevious={() => handlePreviousTrack(true)}
         />
       )}
 

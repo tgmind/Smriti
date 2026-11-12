@@ -131,3 +131,13 @@ export interface UserSettings {
   theme_mode: 'system' | 'light' | 'dark';
   offline_sync_wifi_only: boolean;
 }
+
+export interface UploadProgressState {
+  stage: 'idle' | 'local_save' | 'uploading' | 'optimizing' | 'done' | 'error';
+  percent: number; // 0 to 100
+  loadedBytes: number;
+  totalBytes: number;
+  message: string;
+  driveFileId?: string;
+  error?: string;
+}

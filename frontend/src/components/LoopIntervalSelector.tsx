@@ -87,34 +87,34 @@ export const LoopIntervalSelector: React.FC<LoopIntervalSelectorProps> = ({
   };
 
   return (
-    <div className="space-y-3.5 select-none">
+    <div className="space-y-3.5 select-none text-white">
       {/* 1. Header Status & Interval Badge */}
-      <div className="flex items-center justify-between bg-slate-50 p-2.5 rounded-2xl border border-slate-200/90 text-xs">
+      <div className="flex items-center justify-between bg-zinc-900/90 p-2.5 rounded-2xl border border-zinc-800 text-xs">
         <div className="flex items-center gap-1.5">
           <BookmarkCheck
             size={16}
-            className={activeLoop?.enabled ? 'text-amber-600' : 'text-slate-400'}
+            className={activeLoop?.enabled ? 'text-amber-400' : 'text-zinc-500'}
           />
-          <span className="font-semibold text-slate-800">Repeat Interval</span>
+          <span className="font-semibold text-zinc-200">Repeat Interval</span>
         </div>
 
         <div className="flex items-center gap-1.5 font-mono text-[11px]">
-          <span className="font-bold text-slate-900 bg-white px-2 py-0.5 rounded-lg border border-slate-200 shadow-2xs">
+          <span className="font-bold text-white bg-zinc-800 px-2 py-0.5 rounded-lg border border-zinc-700 shadow-2xs">
             {formatDuration(startSec)} → {formatDuration(endSec)}
           </span>
-          <span className="text-slate-400 font-medium">({Math.round(loopDuration)}s)</span>
+          <span className="text-zinc-400 font-medium">({Math.round(loopDuration)}s)</span>
         </div>
       </div>
 
       {/* 2. Visual Interactive Range Slider */}
-      <div className="space-y-1 bg-amber-50/50 p-3 rounded-2xl border border-amber-200/80">
-        <div className="flex justify-between items-center text-[10px] font-mono text-amber-900/80 px-1">
+      <div className="space-y-1 bg-zinc-900/80 p-3 rounded-2xl border border-zinc-800/90">
+        <div className="flex justify-between items-center text-[10px] font-mono text-zinc-400 px-1">
           <span className="flex items-center gap-1">
-            <span className="size-2 rounded-full bg-amber-500 inline-block" />
-            Drag handles A & B or slide range
+            <span className="size-2 rounded-full bg-amber-400 inline-block" />
+            Drag handles A &amp; B or slide range
           </span>
-          <span className="font-bold text-amber-800">
-            {activeLoop?.enabled ? 'Looping' : 'Previewing'}
+          <span className={activeLoop?.enabled ? 'font-bold text-amber-400' : 'text-zinc-400'}>
+            {activeLoop?.enabled ? 'Looping Active' : 'Previewing'}
           </span>
         </div>
 
@@ -130,7 +130,7 @@ export const LoopIntervalSelector: React.FC<LoopIntervalSelectorProps> = ({
           onCommit={handleSliderCommit}
         />
 
-        <div className="flex justify-between text-[10px] font-mono text-slate-400 px-0.5 pt-0.5">
+        <div className="flex justify-between text-[10px] font-mono text-zinc-500 px-0.5 pt-0.5">
           <span>0:00</span>
           <span>Playback at {formatDuration(currentPosition)}</span>
           <span>{formatDuration(safeDuration)}</span>
@@ -140,21 +140,21 @@ export const LoopIntervalSelector: React.FC<LoopIntervalSelectorProps> = ({
       {/* 3. Minimalist Fine-Tuning Cards for A and B */}
       <div className="grid grid-cols-2 gap-2">
         {/* Point A Controls */}
-        <div className="bg-white p-2 rounded-xl border border-slate-200/90 shadow-2xs space-y-1.5">
+        <div className="bg-zinc-900/90 p-2.5 rounded-xl border border-zinc-800 shadow-2xs space-y-1.5">
           <div className="flex items-center justify-between text-[11px]">
-            <span className="font-bold text-amber-900 flex items-center gap-1">
-              <span className="size-4 rounded-full bg-amber-500 text-white flex items-center justify-center text-[9px] font-mono">
+            <span className="font-bold text-amber-400 flex items-center gap-1">
+              <span className="size-4 rounded-full bg-amber-500 text-black flex items-center justify-center text-[9px] font-mono font-bold">
                 A
               </span>
               Start Point
             </span>
-            <span className="font-mono font-bold text-slate-800">{formatDuration(startSec)}</span>
+            <span className="font-mono font-bold text-white">{formatDuration(startSec)}</span>
           </div>
 
           <div className="flex items-center justify-between gap-1">
             <button
               onClick={() => nudgeStart(-1)}
-              className="py-1 px-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-[10px] font-mono font-bold active:scale-95 transition-all cursor-pointer"
+              className="py-1 px-2 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-[10px] font-mono font-bold active:scale-95 transition-all cursor-pointer"
               title="Nudge Point A backward 1s"
             >
               -1s
@@ -165,14 +165,14 @@ export const LoopIntervalSelector: React.FC<LoopIntervalSelectorProps> = ({
                 setStartSec(cur);
                 if (activeLoop?.enabled) onSetLoop(cur, endSec);
               }}
-              className="py-1 px-2 rounded-lg bg-amber-100 hover:bg-amber-200 text-amber-900 text-[10px] font-mono font-bold active:scale-95 transition-all cursor-pointer"
+              className="py-1 px-2 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/30 text-[10px] font-mono font-bold active:scale-95 transition-all cursor-pointer"
               title="Set Point A to current playback time"
             >
               Now
             </button>
             <button
               onClick={() => nudgeStart(1)}
-              className="py-1 px-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-[10px] font-mono font-bold active:scale-95 transition-all cursor-pointer"
+              className="py-1 px-2 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-[10px] font-mono font-bold active:scale-95 transition-all cursor-pointer"
               title="Nudge Point A forward 1s"
             >
               +1s
@@ -181,21 +181,21 @@ export const LoopIntervalSelector: React.FC<LoopIntervalSelectorProps> = ({
         </div>
 
         {/* Point B Controls */}
-        <div className="bg-white p-2 rounded-xl border border-slate-200/90 shadow-2xs space-y-1.5">
+        <div className="bg-zinc-900/90 p-2.5 rounded-xl border border-zinc-800 shadow-2xs space-y-1.5">
           <div className="flex items-center justify-between text-[11px]">
-            <span className="font-bold text-amber-900 flex items-center gap-1">
-              <span className="size-4 rounded-full bg-amber-500 text-white flex items-center justify-center text-[9px] font-mono">
+            <span className="font-bold text-amber-400 flex items-center gap-1">
+              <span className="size-4 rounded-full bg-amber-500 text-black flex items-center justify-center text-[9px] font-mono font-bold">
                 B
               </span>
               End Point
             </span>
-            <span className="font-mono font-bold text-slate-800">{formatDuration(endSec)}</span>
+            <span className="font-mono font-bold text-white">{formatDuration(endSec)}</span>
           </div>
 
           <div className="flex items-center justify-between gap-1">
             <button
               onClick={() => nudgeEnd(-1)}
-              className="py-1 px-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-[10px] font-mono font-bold active:scale-95 transition-all cursor-pointer"
+              className="py-1 px-2 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-[10px] font-mono font-bold active:scale-95 transition-all cursor-pointer"
               title="Nudge Point B backward 1s"
             >
               -1s
@@ -206,14 +206,14 @@ export const LoopIntervalSelector: React.FC<LoopIntervalSelectorProps> = ({
                 setEndSec(cur);
                 if (activeLoop?.enabled) onSetLoop(startSec, cur);
               }}
-              className="py-1 px-2 rounded-lg bg-amber-100 hover:bg-amber-200 text-amber-900 text-[10px] font-mono font-bold active:scale-95 transition-all cursor-pointer"
+              className="py-1 px-2 rounded-lg bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/30 text-[10px] font-mono font-bold active:scale-95 transition-all cursor-pointer"
               title="Set Point B to current playback time"
             >
               Now
             </button>
             <button
               onClick={() => nudgeEnd(1)}
-              className="py-1 px-2 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-[10px] font-mono font-bold active:scale-95 transition-all cursor-pointer"
+              className="py-1 px-2 rounded-lg bg-zinc-800 hover:bg-zinc-700 text-zinc-200 text-[10px] font-mono font-bold active:scale-95 transition-all cursor-pointer"
               title="Nudge Point B forward 1s"
             >
               +1s
@@ -224,7 +224,7 @@ export const LoopIntervalSelector: React.FC<LoopIntervalSelectorProps> = ({
 
       {/* 4. Minimalist Quick Interval Presets */}
       <div className="space-y-1.5 pt-0.5">
-        <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block px-0.5">
+        <span className="text-[10px] font-bold uppercase tracking-wider text-zinc-400 block px-0.5">
           Quick Interval Presets
         </span>
         <div className="grid grid-cols-4 gap-1.5">
@@ -237,7 +237,7 @@ export const LoopIntervalSelector: React.FC<LoopIntervalSelectorProps> = ({
             <button
               key={preset.len}
               onClick={() => applyPreset(preset.len)}
-              className="py-1.5 px-1 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-[10px] font-mono font-semibold transition-all active:scale-95 cursor-pointer text-center"
+              className="py-1.5 px-1 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-zinc-300 border border-zinc-800 hover:border-zinc-700 text-[10px] font-mono font-semibold transition-all active:scale-95 cursor-pointer text-center"
             >
               {preset.label}
             </button>
@@ -251,8 +251,8 @@ export const LoopIntervalSelector: React.FC<LoopIntervalSelectorProps> = ({
           onClick={handleActivateOrToggle}
           className={`flex-1 py-2.5 px-3 rounded-2xl text-xs font-bold transition-all active:scale-98 shadow-sm flex items-center justify-center gap-2 cursor-pointer ${
             activeLoop?.enabled
-              ? 'bg-amber-500 hover:bg-amber-600 text-white shadow-amber-500/25 ring-2 ring-amber-400/40'
-              : 'bg-slate-950 hover:bg-slate-900 text-white shadow-slate-950/20'
+              ? 'bg-amber-400 hover:bg-amber-300 text-black font-extrabold shadow-amber-500/25 ring-2 ring-amber-400/40'
+              : 'bg-white hover:bg-zinc-200 text-black font-extrabold shadow-white/20'
           }`}
         >
           {activeLoop?.enabled ? (
@@ -271,7 +271,7 @@ export const LoopIntervalSelector: React.FC<LoopIntervalSelectorProps> = ({
         {activeLoop?.enabled && (
           <button
             onClick={onClearLoop}
-            className="py-2.5 px-3 rounded-2xl bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200/80 text-xs font-bold transition-all active:scale-95 cursor-pointer"
+            className="py-2.5 px-3 rounded-2xl bg-zinc-900 hover:bg-zinc-800 text-rose-400 border border-rose-900/40 hover:border-rose-700 text-xs font-bold transition-all active:scale-95 cursor-pointer"
             title="Clear repeat loop"
           >
             Clear

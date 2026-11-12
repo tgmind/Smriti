@@ -105,13 +105,11 @@ describe('Telegram-Style Compact Player Architecture & UI Design', () => {
     expect(html).toContain('group/midprogress');
   });
 
-  it('filters queue to the active audio subject and does not blur background', () => {
-    // Render with sheet open to inspect expanded view
+  it('completely eliminates the Telegram sheet modal and configures compact bar to open full screen player directly', () => {
     const html = renderToString(
       <MiniPlayer
         playbackState={activePlaybackState}
         audioQueue={mockQueue}
-        initialSheetOpen={true}
         onTogglePlay={vi.fn()}
         onSeek={vi.fn()}
         onSeekRelative={vi.fn()}
@@ -121,25 +119,22 @@ describe('Telegram-Style Compact Player Architecture & UI Design', () => {
       />
     );
 
-    // Verify background overlay has no backdrop-blur
+    // Verify Telegram bottom sheet modal elements are completely removed
+    expect(html).not.toContain('Study Mode • Full Screen Player');
+    expect(html).not.toContain('Telegram Queue');
     expect(html).not.toContain('backdrop-blur-xs');
 
-    // Verify functional track menu button
-    expect(html).toContain('aria-label="Open track menu"');
+    // Verify compact player is direct trigger for full screen player
+    expect(html).toContain('title="Press to open full screen player"');
+    expect(html).toContain('aria-label="Open full screen player for percentage to Fraction.mp3"');
+    expect(html).toContain('aria-label="Open playlist queue"');
   });
 
-  it('handles paused state with correct timecodes and aria-labels in sheet modal', () => {
-    const pausedState: PlaybackState = {
-      ...activePlaybackState,
-      isPlaying: false,
-      positionSeconds: 0
-    };
-
+  it('renders modern slaty-grey progress bar and equalizer in compact player', () => {
     const html = renderToString(
       <MiniPlayer
-        playbackState={pausedState}
+        playbackState={activePlaybackState}
         audioQueue={mockQueue}
-        initialSheetOpen={true}
         onTogglePlay={vi.fn()}
         onSeek={vi.fn()}
         onSeekRelative={vi.fn()}
@@ -149,9 +144,9 @@ describe('Telegram-Style Compact Player Architecture & UI Design', () => {
       />
     );
 
-    expect(html).toContain('aria-label="Play"');
-    expect(html).toContain('0:00');
-    expect(html).toContain('0:55');
+    expect(html).toContain('animate-eq-1');
+    expect(html).toContain('from-slate-400');
+    expect(html).toContain('to-white');
   });
 
   it('safely handles non-finite duration and prevents Infinity:NaN:NaN fallback', () => {
@@ -178,25 +173,6 @@ describe('Telegram-Style Compact Player Architecture & UI Design', () => {
     expect(html).not.toContain('Infinity');
     expect(html).toContain('0:00');
     expect(html).toContain('0:55'); // Fallback to currentAudio.duration_seconds
-  });
-
-  it('renders with BlueWaveDesign containing waveGradFront to preserve the signature Blue wavy design in sheet modal', () => {
-    const html = renderToString(
-      <MiniPlayer
-        playbackState={activePlaybackState}
-        audioQueue={mockQueue}
-        initialSheetOpen={true}
-        onTogglePlay={vi.fn()}
-        onSeek={vi.fn()}
-        onSeekRelative={vi.fn()}
-        onOpenFullScreen={vi.fn()}
-        onCycleSpeed={vi.fn()}
-        onDismiss={vi.fn()}
-      />
-    );
-
-    // Verify waveGradFront is present in the SVG definitions preserving the Blue wavy design
-    expect(html).toContain('waveGradFront');
   });
 
   it('attaches seamlessly above Navigation in a unified curvy container and transforms record button to contrasting play/pause', () => {

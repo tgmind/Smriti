@@ -6,44 +6,77 @@ import {
   Trash2,
   HardDrive,
   RefreshCw,
-  Atom,
-  FlaskConical,
-  Dna,
-  Binary,
   Tag,
   X,
   Check,
-  BookOpen
+  BookOpen,
+  Cloud,
+  CheckCircle2,
+  AlertCircle
 } from 'lucide-react';
 import { bridge } from '../services/bridge';
-import { Subject, AudioItem } from '../types';
+import { Subject, AudioItem, UploadProgressState } from '../types';
 import { formatDuration } from '../services/learningEngine';
 import { AudioTrimmer } from './AudioTrimmer';
 import { trimAudioBlob } from '../services/audioTrimmerEngine';
+import { resolveSubjectVisual } from '../utils/subjectVisuals';
 
 interface RecordTabProps {
   subjects: Subject[];
-  onSaveAudio: (audioItem: Partial<AudioItem>, fileBlob?: Blob) => Promise<void>;
+  onSaveAudio: (
+    audioItem: Partial<AudioItem>,
+    fileBlob?: Blob,
+    options?: { syncToDrive?: boolean },
+    onProgress?: (progress: UploadProgressState) => void
+  ) => Promise<void>;
   onCancel: () => void;
+  isDriveConnected?: boolean;
+  onConnectDrive?: () => Promise<void>;
+  initialState?: 'idle' | 'recording' | 'paused' | 'review';
+  initialTitle?: string;
+  initialUploadProgress?: UploadProgressState | null;
+  initialIsSaving?: boolean;
 }
+
+const formatBytes = (bytes: number): string => {
+  if (!bytes || bytes <= 0) return '0 B';
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
+};
 
 export const RecordTab: React.FC<RecordTabProps> = ({
   subjects,
   onSaveAudio,
-  onCancel
+  onCancel,
+  isDriveConnected = false,
+  onConnectDrive,
+  initialState = 'idle',
+  initialTitle = '',
+  initialUploadProgress = null,
+  initialIsSaving = false
 }) => {
-  const [recordingState, setRecordingState] = useState<'idle' | 'recording' | 'paused' | 'review'>('idle');
+  const [recordingState, setRecordingState] = useState<'idle' | 'recording' | 'paused' | 'review'>(initialState);
   const [recordedDuration, setRecordedDuration] = useState(0);
   const [liveAmplitudes, setLiveAmplitudes] = useState<number[]>(new Array(32).fill(15));
   const [recordedBlob, setRecordedBlob] = useState<Blob | null>(null);
   const [recordedUrl, setRecordedUrl] = useState<string | null>(null);
 
   // Post-recording Review & Edit state
-  const [title, setTitle] = useState('');
+  const [title, setTitle] = useState(initialTitle);
   const [selectedSubjectId, setSelectedSubjectId] = useState(subjects[0]?.id || '');
   const [tags, setTags] = useState<string[]>([]);
   const [newTagInput, setNewTagInput] = useState('');
   const [enhancementEnabled, setEnhancementEnabled] = useState(true);
+  const [syncToDrive, setSyncToDrive] = useState(isDriveConnected);
+  const [uploadProgress, setUploadProgress] = useState<UploadProgressState | null>(initialUploadProgress);
+  const [isConnectingDrive, setIsConnectingDrive] = useState(false);
+
+  useEffect(() => {
+    if (isDriveConnected) {
+      setSyncToDrive(true);
+    }
+  }, [isDriveConnected]);
 
   // Trim state
   const [trimStartSeconds, setTrimStartSeconds] = useState(0);
@@ -51,7 +84,7 @@ export const RecordTab: React.FC<RecordTabProps> = ({
   const [trimFadeIn, setTrimFadeIn] = useState(true);
   const [trimFadeOut, setTrimFadeOut] = useState(true);
 
-  const [isSaving, setIsSaving] = useState(false);
+  const [isSaving, setIsSaving] = useState(initialIsSaving);
 
   // Listen to Bridge live amplitude events
   useEffect(() => {
@@ -99,42 +132,25 @@ export const RecordTab: React.FC<RecordTabProps> = ({
     }
   }, [recordingState, title]);
 
-  // Subject Visual Helpers
-  const getSubjectVisual = (name: string, iconName?: string) => {
-    const n = (name || '').toLowerCase();
-    if (n.includes('physic') || iconName === 'Atom') {
-      return {
-        icon: Atom,
-        colorClass: 'text-violet-600',
-        bgClass: 'bg-violet-50',
-        activeBorder: 'border-violet-600 ring-2 ring-violet-500/20 bg-violet-50/50',
-        badgeBg: 'bg-violet-100 text-violet-800'
-      };
-    }
-    if (n.includes('chem') || iconName === 'FlaskConical') {
-      return {
-        icon: FlaskConical,
-        colorClass: 'text-rose-600',
-        bgClass: 'bg-rose-50',
-        activeBorder: 'border-rose-600 ring-2 ring-rose-500/20 bg-rose-50/50',
-        badgeBg: 'bg-rose-100 text-rose-800'
-      };
-    }
-    if (n.includes('bio') || iconName === 'Dna') {
-      return {
-        icon: Dna,
-        colorClass: 'text-emerald-600',
-        bgClass: 'bg-emerald-50',
-        activeBorder: 'border-emerald-600 ring-2 ring-emerald-500/20 bg-emerald-50/50',
-        badgeBg: 'bg-emerald-100 text-emerald-800'
-      };
-    }
+  // Subject Visual Helpers - Generalized for all academic and study subjects
+  const getSubjectVisual = (name: string, iconName?: string, colorHex?: string) => {
+    const visual = resolveSubjectVisual({
+      subjectName: name,
+      iconName,
+      colorHex,
+      subjects
+    });
+
+    const bgParts = visual.bg.split(' ');
+    const bgClass = bgParts[0] || 'bg-indigo-50';
+    const colorClass = bgParts[1] || 'text-indigo-600';
+
     return {
-      icon: Binary,
-      colorClass: 'text-amber-600',
-      bgClass: 'bg-amber-50',
-      activeBorder: 'border-amber-600 ring-2 ring-amber-500/20 bg-amber-50/50',
-      badgeBg: 'bg-amber-100 text-amber-800'
+      icon: visual.icon,
+      colorClass,
+      bgClass,
+      activeBorder: `border-indigo-600 ring-2 ring-indigo-500/20 ${visual.cardBg}`,
+      badgeBg: visual.badgeBg
     };
   };
 
@@ -264,9 +280,13 @@ export const RecordTab: React.FC<RecordTabProps> = ({
           waveform_peaks: peaksToSave,
           key_terms: tags,
           is_favorite: false,
-          is_downloaded_offline: true
+          is_downloaded_offline: false
         },
-        finalBlob || undefined
+        finalBlob || undefined,
+        { syncToDrive },
+        (progress) => {
+          setUploadProgress(progress);
+        }
       );
 
       // Reset
@@ -275,6 +295,7 @@ export const RecordTab: React.FC<RecordTabProps> = ({
       setRecordedBlob(null);
       setRecordedUrl(null);
       setTags([]);
+      setUploadProgress(null);
     } catch (e) {
       console.error('Failed to save audio', e);
     } finally {
@@ -289,6 +310,17 @@ export const RecordTab: React.FC<RecordTabProps> = ({
     setRecordedUrl(null);
     setTags([]);
     onCancel();
+  };
+
+  const handleConnectDriveFromRecord = async () => {
+    if (!onConnectDrive) return;
+    setIsConnectingDrive(true);
+    try {
+      await onConnectDrive();
+      setSyncToDrive(true);
+    } finally {
+      setIsConnectingDrive(false);
+    }
   };
 
   return (
@@ -417,7 +449,7 @@ export const RecordTab: React.FC<RecordTabProps> = ({
 
             <div className="grid grid-cols-2 gap-2">
               {subjects.map((s) => {
-                const visual = getSubjectVisual(s.name, s.icon_name);
+                const visual = getSubjectVisual(s.name, s.icon_name, s.color_hex);
                 const Icon = visual.icon;
                 const isSelected = selectedSubjectId === s.id;
 
@@ -609,12 +641,200 @@ export const RecordTab: React.FC<RecordTabProps> = ({
             </button>
           </div>
 
-          {/* 5. ACTION BUTTONS (Generous bottom padding so never obscured by floating nav) */}
+          {/* 5. GOOGLE DRIVE CLOUD BACKUP SYNC */}
+          <div className="bg-white border border-slate-200/90 rounded-2xl p-3.5 flex items-center justify-between gap-3 shadow-2xs">
+            <div className="flex items-center gap-2.5 min-w-0">
+              <div
+                className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 border transition-colors ${
+                  isDriveConnected
+                    ? 'bg-sky-50 text-sky-600 border-sky-200/80 shadow-2xs'
+                    : 'bg-slate-50 text-slate-400 border-slate-200/80'
+                }`}
+              >
+                <Cloud size={16} />
+              </div>
+              <div className="min-w-0">
+                <div className="flex items-center gap-1.5">
+                  <span className="text-xs font-bold text-slate-900 truncate">
+                    Google Drive Backup
+                  </span>
+                  {isDriveConnected && (
+                    <span className="px-1.5 py-0.2 rounded-full text-[9px] font-bold font-mono bg-emerald-50 text-emerald-700 border border-emerald-200/70">
+                      CONNECTED
+                    </span>
+                  )}
+                </div>
+                <span className="text-[10px] text-slate-500 block truncate">
+                  {isDriveConnected
+                    ? 'Sync audio note to Google Drive cloud folder'
+                    : 'Connect Drive for free cloud storage backup'}
+                </span>
+              </div>
+            </div>
+
+            {isDriveConnected ? (
+              <button
+                type="button"
+                onClick={() => setSyncToDrive(!syncToDrive)}
+                className={`w-11 h-6 rounded-full transition-colors relative flex items-center px-0.5 cursor-pointer ${
+                  syncToDrive ? 'bg-sky-500' : 'bg-slate-200'
+                }`}
+                aria-label="Toggle Google Drive Sync"
+              >
+                <div
+                  className={`w-5 h-5 rounded-full bg-white shadow-xs transition-transform ${
+                    syncToDrive ? 'translate-x-5' : 'translate-x-0'
+                  }`}
+                />
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={handleConnectDriveFromRecord}
+                disabled={isConnectingDrive}
+                className="px-2.5 py-1.5 rounded-xl bg-sky-50 hover:bg-sky-100 text-sky-700 border border-sky-200/80 text-[11px] font-semibold flex items-center gap-1 active:scale-95 transition-all shrink-0 cursor-pointer disabled:opacity-50"
+              >
+                {isConnectingDrive ? (
+                  <RefreshCw size={11} className="animate-spin text-sky-600" />
+                ) : (
+                  <Cloud size={11} />
+                )}
+                <span>Connect</span>
+              </button>
+            )}
+          </div>
+
+          {/* 6. LIVE UPLOAD & BACKUP PROGRESS BAR */}
+          {(isSaving || uploadProgress) && uploadProgress && (
+            <div
+              role="status"
+              aria-live="polite"
+              className="bg-white border border-slate-200/90 rounded-2xl p-4 shadow-sm space-y-3 animate-in fade-in slide-in-from-bottom-2 duration-300 ring-1 ring-sky-500/10"
+            >
+              {/* Header: Icon, Stage Info & Percentage Badge */}
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <div
+                    className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 border transition-all ${
+                      uploadProgress.stage === 'done'
+                        ? 'bg-emerald-50 text-emerald-600 border-emerald-200/80'
+                        : uploadProgress.stage === 'error'
+                        ? 'bg-rose-50 text-rose-600 border-rose-200/80'
+                        : 'bg-sky-50 text-sky-600 border-sky-200/80 shadow-2xs'
+                    }`}
+                  >
+                    {uploadProgress.stage === 'done' ? (
+                      <CheckCircle2 size={18} className="text-emerald-600" />
+                    ) : uploadProgress.stage === 'error' ? (
+                      <AlertCircle size={18} className="text-rose-600" />
+                    ) : (
+                      <Cloud size={18} className="text-sky-600 animate-pulse" />
+                    )}
+                  </div>
+                  <div className="min-w-0">
+                    <h4 className="text-xs font-bold text-slate-900 truncate">
+                      {uploadProgress.stage === 'done'
+                        ? 'Backup Complete'
+                        : uploadProgress.stage === 'error'
+                        ? 'Upload Interrupted (Saved Locally)'
+                        : uploadProgress.stage === 'uploading'
+                        ? 'Saving to Google Drive'
+                        : uploadProgress.stage === 'optimizing'
+                        ? 'Optimizing Audio'
+                        : 'Saving Audio Note'}
+                    </h4>
+                    <p className="text-[11px] text-slate-500 truncate mt-0.5">
+                      {uploadProgress.message || 'Processing and synchronizing note...'}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Real-time Percentage Badge */}
+                <div className="shrink-0 flex items-center gap-1.5">
+                  <span
+                    data-testid="upload-percentage"
+                    className={`font-mono font-bold text-xs px-2.5 py-1 rounded-full border transition-all shadow-2xs ${
+                      uploadProgress.stage === 'done'
+                        ? 'bg-emerald-50 text-emerald-700 border-emerald-200/80'
+                        : uploadProgress.stage === 'error'
+                        ? 'bg-amber-50 text-amber-700 border-amber-200/80'
+                        : 'bg-sky-50 text-sky-700 border-sky-200/80'
+                    }`}
+                  >
+                    {uploadProgress.percent}%
+                  </span>
+                </div>
+              </div>
+
+              {/* Modern Aesthetic Multi-Stop Progress Bar with Shimmer */}
+              <div className="space-y-1.5">
+                <div className="w-full bg-slate-100/90 border border-slate-200/60 rounded-full h-3 p-0.5 overflow-hidden relative shadow-inner">
+                  <div
+                    data-testid="upload-progress-bar"
+                    role="progressbar"
+                    aria-valuenow={uploadProgress.percent}
+                    aria-valuemin={0}
+                    aria-valuemax={100}
+                    className={`h-full rounded-full transition-all duration-300 ease-out shadow-xs relative overflow-hidden ${
+                      uploadProgress.stage === 'done'
+                        ? 'bg-emerald-500'
+                        : uploadProgress.stage === 'error'
+                        ? 'bg-amber-500'
+                        : 'bg-gradient-to-r from-sky-500 via-indigo-500 to-emerald-500'
+                    }`}
+                    style={{ width: `${Math.max(4, uploadProgress.percent)}%` }}
+                  >
+                    {/* Animated Shimmer Sweep */}
+                    {uploadProgress.stage !== 'done' && (
+                      <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent animate-shimmer" />
+                    )}
+                  </div>
+                </div>
+
+                {/* Byte Metrics & Transfer Status Footer */}
+                <div className="flex items-center justify-between text-[10px] font-mono text-slate-400 px-0.5">
+                  <div className="flex items-center gap-1">
+                    <span className="font-semibold text-slate-700">
+                      {uploadProgress.loadedBytes > 0
+                        ? formatBytes(uploadProgress.loadedBytes)
+                        : '0 KB'}
+                    </span>
+                    <span>/</span>
+                    <span>
+                      {uploadProgress.totalBytes > 0
+                        ? formatBytes(uploadProgress.totalBytes)
+                        : 'Estimating size...'}
+                    </span>
+                  </div>
+
+                  <div className="flex items-center gap-1">
+                    {uploadProgress.stage === 'uploading' && (
+                      <span className="flex items-center gap-1 text-sky-600 font-bold">
+                        <span className="w-1.5 h-1.5 rounded-full bg-sky-500 animate-ping inline-block" />
+                        <span>Real-time transfer</span>
+                      </span>
+                    )}
+                    {uploadProgress.stage === 'done' && (
+                      <span className="text-emerald-600 font-bold flex items-center gap-0.5">
+                        <span>Synced to Drive</span>
+                      </span>
+                    )}
+                    {uploadProgress.stage === 'local_save' && (
+                      <span className="text-slate-500 font-medium">Local Storage</span>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* 7. ACTION BUTTONS (Generous bottom padding so never obscured by floating nav) */}
           <div className="flex items-center gap-2.5 pt-2">
             <button
               type="button"
               onClick={handleDiscard}
-              className="flex-1 py-3.5 rounded-2xl bg-white border border-slate-200 text-slate-700 hover:text-rose-600 hover:bg-rose-50/50 hover:border-rose-200 font-semibold text-xs flex items-center justify-center gap-1.5 active:scale-95 transition-all shadow-2xs cursor-pointer"
+              disabled={isSaving}
+              className="flex-1 py-3.5 rounded-2xl bg-white border border-slate-200 text-slate-700 hover:text-rose-600 hover:bg-rose-50/50 hover:border-rose-200 font-semibold text-xs flex items-center justify-center gap-1.5 active:scale-95 transition-all shadow-2xs disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
             >
               <Trash2 size={14} />
               <span>Discard</span>
@@ -629,7 +849,15 @@ export const RecordTab: React.FC<RecordTabProps> = ({
               {isSaving ? (
                 <>
                   <RefreshCw size={14} className="animate-spin text-amber-400" />
-                  <span>Saving Note...</span>
+                  <span>
+                    {uploadProgress?.stage === 'uploading'
+                      ? `Saving to Drive (${uploadProgress.percent}%)`
+                      : uploadProgress?.stage === 'done'
+                      ? 'Saved & Uploaded!'
+                      : uploadProgress
+                      ? `Saving Note (${uploadProgress.percent}%)...`
+                      : 'Saving Note...'}
+                  </span>
                 </>
               ) : (
                 <>

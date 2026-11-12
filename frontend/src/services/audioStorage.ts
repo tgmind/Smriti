@@ -67,6 +67,21 @@ class AudioStorageManager {
     });
   }
 
+  /**
+   * Safely purges all stored audio blobs from IndexedDB.
+   * Invoked upon Google Drive disconnection/logout to protect user privacy.
+   */
+  public async clearAllAudioBlobs(): Promise<void> {
+    const db = await this.getDB();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(STORE_NAME, 'readwrite');
+      const store = tx.objectStore(STORE_NAME);
+      const req = store.clear();
+      req.onsuccess = () => resolve();
+      req.onerror = () => reject(req.error);
+    });
+  }
+
   public async getTotalStorageBytes(): Promise<number> {
     const db = await this.getDB();
     return new Promise((resolve) => {

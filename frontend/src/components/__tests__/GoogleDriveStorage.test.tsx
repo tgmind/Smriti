@@ -39,17 +39,34 @@ describe('GoogleDriveStorage UI component', () => {
     expect(html).toContain('Disconnect Google Drive');
   });
 
-  it('renders connect callout when drive is not connected', () => {
+  it('renders minimalistic and beautiful empty state when drive is not connected, without fake account or placeholders', () => {
     const html = renderToString(
       <GoogleDriveStorage
-        audioItems={[]}
+        audioItems={mockAudioItems}
         isDriveConnected={false}
         onConnectDrive={vi.fn()}
         onDisconnectDrive={vi.fn()}
       />
     );
 
-    expect(html).toContain('Offline / Local');
+    // Empty state is shown asking to connect drive
+    expect(html).toContain('data-slot="empty"');
+    expect(html).toContain('data-slot="empty-header"');
+    expect(html).toContain('data-slot="empty-media"');
+    expect(html).toContain('data-slot="empty-title"');
+    expect(html).toContain('Google Drive Disconnected');
+    expect(html).toContain('data-slot="empty-description"');
+    expect(html).toContain('Connect your personal Google Drive to sync audio notes');
+    expect(html).toContain('data-slot="empty-content"');
     expect(html).toContain('Connect Personal Google Drive');
+
+    // No fake account or placeholders are shown
+    expect(html).not.toContain('Offline / Local Vault');
+    expect(html).not.toContain('15.00 GB');
+    expect(html).not.toContain('Free Quota Available');
+    expect(html).not.toContain('Google Drive Documents');
+    expect(html).not.toContain('Gmail &amp; Google Photos');
+    expect(html).not.toContain('Storage Allocation');
+    expect(html).not.toContain('Usage Breakdown');
   });
 });
