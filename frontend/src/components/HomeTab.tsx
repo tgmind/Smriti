@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import {
   Play,
+  Pause,
   Sparkles,
   Mic,
   Star,
@@ -14,31 +15,55 @@ import {
   Dna,
   Binary,
   Cloud,
-  CheckCircle2
+  CheckCircle2,
+  ChevronRight,
+  ShieldCheck,
+  X
 } from 'lucide-react';
-import { AudioItem, UserSettings } from '../types';
+import { AudioItem, Subject, UserSettings, PlaybackState } from '../types';
 import { formatDuration } from '../services/learningEngine';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 interface HomeTabProps {
   recentAudio: AudioItem[];
+  subjects?: Subject[];
+  playbackState?: PlaybackState;
   userSettings?: UserSettings;
   todayListeningSeconds?: number;
   onPlayAudio: (audio: AudioItem) => void;
   onGoToRecord: () => void;
+  onNavigateToLibrary: (subjectId?: string) => void;
+  onNavigateToAccount: () => void;
 }
 
 type FilterMode = 'all' | 'favorites' | 'short';
 
 export const HomeTab: React.FC<HomeTabProps> = ({
   recentAudio,
+  subjects = [],
+  playbackState,
   onPlayAudio,
-  onGoToRecord
+  onGoToRecord,
+  onNavigateToLibrary,
+  onNavigateToAccount
 }) => {
   const [filterMode, setFilterMode] = useState<FilterMode>('all');
   const [searchQuery, setSearchQuery] = useState('');
+  const [showNotificationToast, setShowNotificationToast] = useState(false);
 
-  const continueAudio = recentAudio.length > 0 ? recentAudio[0] : null;
+  // Fallback to most recent or first audio note for "Continue Listening"
+  const continueAudio = useMemo(() => {
+    if (playbackState?.currentAudio) {
+      return playbackState.currentAudio;
+    }
+    return recentAudio.length > 0 ? recentAudio[0] : null;
+  }, [playbackState?.currentAudio, recentAudio]);
+
+  const isCurrentAudioPlaying = Boolean(
+    continueAudio &&
+    playbackState?.isPlaying &&
+    playbackState?.currentAudio?.id === continueAudio.id
+  );
 
   // Search and filter logic
   const filteredBySearch = useMemo(() => {
@@ -47,7 +72,8 @@ export const HomeTab: React.FC<HomeTabProps> = ({
     return recentAudio.filter(
       a =>
         a.title.toLowerCase().includes(q) ||
-        (a.subject_name && a.subject_name.toLowerCase().includes(q))
+        (a.subject_name && a.subject_name.toLowerCase().includes(q)) ||
+        (a.key_terms && a.key_terms.some(t => t.toLowerCase().includes(q)))
     );
   }, [recentAudio, searchQuery]);
 
@@ -68,7 +94,33 @@ export const HomeTab: React.FC<HomeTabProps> = ({
 
   const currentItems = getFilteredItems(filterMode);
 
-  // Subject theme helper for squircles
+  // Subject Visuals & Dynamic Counts
+  const subjectList = useMemo(() => {
+    const defaultMeta = [
+      { id: 'sub-1', name: 'Physics', icon: Atom, bg: 'bg-violet-100 text-violet-700', activeRing: 'hover:ring-violet-300' },
+      { id: 'sub-2', name: 'Chemistry', icon: FlaskConical, bg: 'bg-rose-100 text-rose-700', activeRing: 'hover:ring-rose-300' },
+      { id: 'sub-3', name: 'Biology', icon: Dna, bg: 'bg-emerald-100 text-emerald-700', activeRing: 'hover:ring-emerald-300' },
+      { id: 'sub-4', name: 'Mathematics', icon: Binary, bg: 'bg-amber-100 text-amber-700', activeRing: 'hover:ring-amber-300' }
+    ];
+
+    return defaultMeta.map(meta => {
+      const existing = subjects.find(s => s.id === meta.id || s.name.toLowerCase() === meta.name.toLowerCase());
+      const count = recentAudio.filter(
+        a => a.subject_id === meta.id || a.subject_name?.toLowerCase().includes(meta.name.toLowerCase().slice(0, 4))
+      ).length;
+
+      return {
+        id: existing?.id || meta.id,
+        name: meta.name === 'Mathematics' ? 'Math' : meta.name,
+        fullName: meta.name,
+        icon: meta.icon,
+        bg: meta.bg,
+        activeRing: meta.activeRing,
+        count: `${count} note${count === 1 ? '' : 's'}`
+      };
+    });
+  }, [subjects, recentAudio]);
+
   const getSubjectVisual = (subjectName?: string) => {
     const s = (subjectName || '').toLowerCase();
     if (s.includes('physic')) {
@@ -105,7 +157,7 @@ export const HomeTab: React.FC<HomeTabProps> = ({
 
   return (
     <div className="space-y-4 pb-28 pt-3 px-4 max-w-md mx-auto">
-      {/* Top Bar: User Greeting & Bell Icon */}
+      {/* Top Bar: User Greeting & Notification Bell */}
       <div className="flex items-center justify-between pt-1">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-full ring-2 ring-emerald-400/60 bg-gradient-to-tr from-emerald-100 to-teal-100 flex items-center justify-center text-emerald-800 font-bold text-sm shadow-2xs">
@@ -119,18 +171,51 @@ export const HomeTab: React.FC<HomeTabProps> = ({
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
             </div>
             <p className="text-[11px] text-slate-500 font-medium">
-              6 Day Streak 🔥 • Offline Ready
+              Offline-First Vault • Ready to Study
             </p>
           </div>
         </div>
 
-        <button
-          type="button"
-          aria-label="Notifications"
-          className="w-9 h-9 rounded-full bg-white border border-slate-200/80 shadow-2xs flex items-center justify-center text-slate-600 hover:text-slate-900 hover:border-slate-300 active:scale-95 transition-all cursor-pointer"
-        >
-          <Bell size={16} />
-        </button>
+        <div className="relative">
+          <button
+            type="button"
+            onClick={() => setShowNotificationToast(prev => !prev)}
+            aria-label="Notifications"
+            className="w-9 h-9 rounded-full bg-white border border-slate-200/80 shadow-2xs flex items-center justify-center text-slate-600 hover:text-slate-900 hover:border-slate-300 active:scale-95 transition-all cursor-pointer"
+          >
+            <Bell size={16} />
+            <span className="absolute top-0.5 right-0.5 w-2 h-2 rounded-full bg-emerald-500 ring-2 ring-white" />
+          </button>
+
+          {/* Quick Notification Dropdown Banner */}
+          {showNotificationToast && (
+            <div className="absolute right-0 top-11 w-64 p-3 bg-slate-950 text-white rounded-2xl shadow-xl z-50 animate-in fade-in slide-in-from-top-2 border border-slate-800 text-xs space-y-1.5">
+              <div className="flex items-center justify-between">
+                <span className="font-bold flex items-center gap-1.5 text-emerald-400 text-[11px] uppercase tracking-wider">
+                  <ShieldCheck size={14} /> Sovereign Vault Active
+                </span>
+                <button
+                  onClick={() => setShowNotificationToast(false)}
+                  className="text-slate-400 hover:text-white cursor-pointer"
+                >
+                  <X size={12} />
+                </button>
+              </div>
+              <p className="text-[11px] text-slate-300 leading-snug">
+                All 4 subjects are downloaded locally for 100% offline study. Direct Google Drive sync is active.
+              </p>
+              <button
+                onClick={() => {
+                  setShowNotificationToast(false);
+                  onNavigateToAccount();
+                }}
+                className="text-[10px] font-semibold text-emerald-300 hover:underline pt-0.5 block"
+              >
+                Inspect Storage Quota →
+              </button>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Main Page Title */}
@@ -143,7 +228,7 @@ export const HomeTab: React.FC<HomeTabProps> = ({
         </p>
       </div>
 
-      {/* Modern Search Bar with Filter Slider */}
+      {/* Modern Search Bar */}
       <div className="relative flex items-center">
         <div className="absolute left-3.5 text-slate-400 pointer-events-none">
           <Search size={16} />
@@ -152,46 +237,53 @@ export const HomeTab: React.FC<HomeTabProps> = ({
           type="text"
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
-          placeholder="Search audio notes, subjects..."
+          placeholder="Search audio notes, subjects, concepts..."
           className="w-full pl-10 pr-10 py-2.5 rounded-2xl bg-white border border-slate-200/90 text-xs font-medium text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-400 transition-all shadow-[0_2px_8px_rgba(0,0,0,0.02)]"
         />
-        <button
-          type="button"
-          aria-label="Filter"
-          className="absolute right-3 text-slate-400 hover:text-slate-700 transition-colors cursor-pointer"
-        >
-          <SlidersHorizontal size={15} />
-        </button>
+        {searchQuery ? (
+          <button
+            type="button"
+            onClick={() => setSearchQuery('')}
+            className="absolute right-3 text-slate-400 hover:text-slate-700 transition-colors cursor-pointer"
+          >
+            <X size={14} />
+          </button>
+        ) : (
+          <div className="absolute right-3 text-slate-400 pointer-events-none">
+            <SlidersHorizontal size={14} />
+          </div>
+        )}
       </div>
 
-      {/* Hero Pastel Card: Recent Files & Subjects (Lavender Container from Image 1) */}
-      <div className="bg-[#EEECFE] border border-indigo-150/70 rounded-3xl p-4.5 space-y-3 shadow-2xs">
+      {/* Hero Container: Recent Files & Clickable Subject Folders */}
+      <div className="bg-[#EEECFE] border border-indigo-150/70 rounded-3xl p-4 space-y-3 shadow-2xs">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-1.5">
             <span className="text-xs font-bold text-slate-900">
-              Recent Files & Folders
+              Subject Folders
             </span>
           </div>
-          <span className="text-[10px] font-mono font-semibold px-2 py-0.5 rounded-full bg-white/70 text-indigo-900 border border-indigo-200/50">
-            {recentAudio.length} Files
-          </span>
+          <button
+            onClick={() => onNavigateToLibrary()}
+            className="text-[10px] font-mono font-semibold px-2 py-0.5 rounded-full bg-white/80 hover:bg-white text-indigo-900 border border-indigo-200/50 flex items-center gap-0.5 cursor-pointer transition-colors"
+          >
+            <span>View All ({recentAudio.length})</span>
+            <ChevronRight size={10} />
+          </button>
         </div>
 
-        {/* 4 Circular Subject Shortcuts */}
-        <div className="grid grid-cols-4 gap-2 pt-1">
-          {[
-            { name: 'Physics', icon: Atom, count: '3 audio', bg: 'bg-violet-200 text-violet-800' },
-            { name: 'Chemistry', icon: FlaskConical, count: '1 audio', bg: 'bg-rose-200 text-rose-800' },
-            { name: 'Biology', icon: Dna, count: '1 audio', bg: 'bg-emerald-200 text-emerald-800' },
-            { name: 'Math', icon: Binary, count: '1 audio', bg: 'bg-amber-200 text-amber-800' }
-          ].map((subj, idx) => {
+        {/* 4 Interactive Subject Buttons */}
+        <div className="grid grid-cols-4 gap-2 pt-0.5">
+          {subjectList.map((subj) => {
             const Icon = subj.icon;
             return (
-              <div
-                key={idx}
-                className="flex flex-col items-center gap-1.5 p-2 rounded-2xl bg-white/60 hover:bg-white/90 border border-white/80 transition-all text-center cursor-default shadow-2xs"
+              <button
+                key={subj.id}
+                type="button"
+                onClick={() => onNavigateToLibrary(subj.id)}
+                className={`flex flex-col items-center gap-1.5 p-2 rounded-2xl bg-white/70 hover:bg-white border border-white/80 hover:border-indigo-200 transition-all text-center cursor-pointer shadow-2xs hover:scale-105 active:scale-95 group ${subj.activeRing}`}
               >
-                <div className={`w-10 h-10 rounded-full ${subj.bg} flex items-center justify-center shadow-2xs`}>
+                <div className={`w-10 h-10 rounded-full ${subj.bg} flex items-center justify-center shadow-2xs transition-transform group-hover:scale-110`}>
                   <Icon size={18} strokeWidth={2.2} />
                 </div>
                 <span className="text-[11px] font-bold text-slate-900 truncate w-full">
@@ -200,79 +292,100 @@ export const HomeTab: React.FC<HomeTabProps> = ({
                 <span className="text-[9px] text-slate-500 font-mono truncate w-full -mt-0.5">
                   {subj.count}
                 </span>
-              </div>
+              </button>
             );
           })}
         </div>
 
-        <div className="pt-1 text-center">
+        <div className="pt-0.5 text-center">
           <span className="text-[10px] font-mono text-indigo-900/70 font-semibold">
-            {recentAudio.length} Audio Notes • 4 Structured Subject Folders
+            {recentAudio.length} Audio Notes • 4 Structured Subject Hierarchies
           </span>
         </div>
       </div>
 
-      {/* Hero Pastel Card 2: Continue Listening (Yellow / Peach Card from Image 1) */}
+      {/* Continue Listening: Sleek Minimalist Studio Card */}
       {continueAudio && (
-        <div className="bg-[#FFF5D6] border border-amber-200/60 rounded-3xl p-4.5 space-y-2.5 shadow-2xs">
+        <div className="bg-gradient-to-br from-slate-900 to-slate-950 text-white rounded-3xl p-4.5 space-y-3 shadow-md border border-slate-800">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-slate-900">
-              Continue Listening
-            </span>
-            <span className="text-[10px] font-mono text-amber-900/70 font-semibold">
+            <div className="flex items-center gap-2">
+              <span className={`w-2 h-2 rounded-full ${isCurrentAudioPlaying ? 'bg-emerald-400 animate-pulse' : 'bg-amber-400'}`} />
+              <span className="text-[11px] font-bold uppercase tracking-wider text-slate-300">
+                {isCurrentAudioPlaying ? 'Currently Playing' : 'Continue Listening'}
+              </span>
+            </div>
+            <span className="text-[10px] font-mono text-slate-400">
               {formatDuration(continueAudio.duration_seconds)}
             </span>
           </div>
 
-          <p className="text-[11px] text-amber-950/80 leading-snug">
-            Resume your study session where you left off:
-          </p>
-
-          <div className="flex items-center justify-between p-3 rounded-2xl bg-white/70 border border-amber-200/70 gap-3">
+          <div className="flex items-center justify-between gap-3">
             <div className="flex-1 min-w-0">
-              <span className="text-[10px] font-mono font-bold uppercase text-amber-800 block">
-                {continueAudio.subject_name || 'Subject'}
+              <span className="text-[10px] font-mono font-bold uppercase text-emerald-400 block tracking-wider">
+                {continueAudio.subject_name || 'Academic'}
               </span>
-              <h3 className="text-xs font-bold text-slate-900 truncate mt-0.5">
+              <h3 className="text-xs font-bold text-white truncate mt-0.5">
                 {continueAudio.title}
               </h3>
             </div>
 
             <button
               onClick={() => onPlayAudio(continueAudio)}
-              aria-label={`Play ${continueAudio.title}`}
-              className="w-10 h-10 rounded-full bg-slate-950 hover:bg-slate-800 text-white flex items-center justify-center transition-all active:scale-90 shadow-sm shrink-0 cursor-pointer"
+              aria-label={isCurrentAudioPlaying ? `Pause ${continueAudio.title}` : `Play ${continueAudio.title}`}
+              className="w-11 h-11 rounded-full bg-emerald-500 hover:bg-emerald-400 text-slate-950 flex items-center justify-center transition-all active:scale-95 shadow-md shadow-emerald-500/20 shrink-0 cursor-pointer"
             >
-              <Play size={15} fill="currentColor" className="translate-x-0.5" />
+              {isCurrentAudioPlaying ? (
+                <Pause size={17} fill="currentColor" />
+              ) : (
+                <Play size={17} fill="currentColor" className="translate-x-0.5" />
+              )}
             </button>
           </div>
+
+          {/* Minimalist Progress Track */}
+          {playbackState?.currentAudio?.id === continueAudio.id && (
+            <div className="pt-0.5 space-y-1">
+              <div className="w-full bg-slate-800 h-1.5 rounded-full overflow-hidden">
+                <div
+                  className="bg-emerald-400 h-full rounded-full transition-all duration-200"
+                  style={{
+                    width: `${Math.min(100, Math.max(0, (playbackState.positionSeconds / (playbackState.durationSeconds || 1)) * 100))}%`
+                  }}
+                />
+              </div>
+              <div className="flex justify-between text-[9px] font-mono text-slate-400">
+                <span>{formatDuration(Math.round(playbackState.positionSeconds))}</span>
+                <span>{formatDuration(Math.round(playbackState.durationSeconds))}</span>
+              </div>
+            </div>
+          )}
         </div>
       )}
 
-      {/* Action Chips Row (Upload, Folder, Scan style in Image 1) */}
+      {/* Action Chips Row (Correctly mapped to Record, Folders/Library, and Drive/Storage) */}
       <div className="grid grid-cols-3 gap-2">
         <button
           onClick={onGoToRecord}
           className="bg-[#E8F8F0] hover:bg-[#DCF3E7] text-emerald-800 border border-emerald-200/70 p-2.5 rounded-2xl flex items-center justify-center gap-1.5 text-xs font-semibold active:scale-95 transition-all shadow-2xs cursor-pointer"
+          title="Open Audio Recorder"
         >
           <Mic size={15} className="text-emerald-700" />
           <span>Record</span>
         </button>
 
         <button
-          onClick={() => {
-            const tabsElem = document.getElementById('lessons-tabs-section');
-            tabsElem?.scrollIntoView({ behavior: 'smooth' });
-          }}
+          onClick={() => onNavigateToLibrary()}
           className="bg-[#FFEFEF] hover:bg-[#FFE5E5] text-rose-800 border border-rose-200/70 p-2.5 rounded-2xl flex items-center justify-center gap-1.5 text-xs font-semibold active:scale-95 transition-all shadow-2xs cursor-pointer"
+          title="Open Library & Subject Folders"
         >
           <Folder size={15} className="text-rose-700" />
           <span>Folders</span>
         </button>
 
         <button
-          onClick={onGoToRecord}
+          onClick={onNavigateToAccount}
           className="bg-[#EEF6FF] hover:bg-[#E0EEFF] text-sky-800 border border-sky-200/70 p-2.5 rounded-2xl flex items-center justify-center gap-1.5 text-xs font-semibold active:scale-95 transition-all shadow-2xs cursor-pointer"
+          title="View Sovereign Google Drive Storage"
         >
           <Cloud size={15} className="text-sky-700" />
           <span>Drive</span>
@@ -324,7 +437,7 @@ export const HomeTab: React.FC<HomeTabProps> = ({
             </TabsTrigger>
           </TabsList>
 
-          {/* Lesson List Cards (Styled like the Dropbox files list with squircles) */}
+          {/* Lesson List Cards */}
           <TabsContent value="all" className="space-y-2 mt-0">
             {renderLessonList(currentItems, 'No audio notes match your search.')}
           </TabsContent>
@@ -357,11 +470,17 @@ export const HomeTab: React.FC<HomeTabProps> = ({
         {items.map((audio) => {
           const visual = getSubjectVisual(audio.subject_name);
           const Icon = visual.icon;
+          const isPlayingThis = Boolean(
+            playbackState?.isPlaying &&
+            playbackState?.currentAudio?.id === audio.id
+          );
 
           return (
             <div
               key={audio.id}
-              className="group bg-white border border-slate-200/80 hover:border-slate-300 p-3 rounded-2xl flex items-center justify-between gap-3 transition-all duration-200 shadow-2xs hover:shadow-xs"
+              className={`group bg-white border p-3 rounded-2xl flex items-center justify-between gap-3 transition-all duration-200 shadow-2xs hover:shadow-xs ${
+                isPlayingThis ? 'border-emerald-500 ring-2 ring-emerald-500/10' : 'border-slate-200/80 hover:border-slate-300'
+              }`}
             >
               {/* Left Squircle Icon */}
               <div
@@ -403,10 +522,16 @@ export const HomeTab: React.FC<HomeTabProps> = ({
                 </span>
                 <button
                   onClick={() => onPlayAudio(audio)}
-                  className="w-8 h-8 rounded-full bg-slate-950 hover:bg-slate-800 text-white flex items-center justify-center transition-all active:scale-90 shadow-2xs hover:scale-105 cursor-pointer"
-                  aria-label={`Play ${audio.title}`}
+                  className={`w-8 h-8 rounded-full flex items-center justify-center transition-all active:scale-90 shadow-2xs hover:scale-105 cursor-pointer ${
+                    isPlayingThis ? 'bg-emerald-600 text-white' : 'bg-slate-950 hover:bg-slate-800 text-white'
+                  }`}
+                  aria-label={isPlayingThis ? `Pause ${audio.title}` : `Play ${audio.title}`}
                 >
-                  <Play size={12} fill="currentColor" className="translate-x-0.5" />
+                  {isPlayingThis ? (
+                    <Pause size={12} fill="currentColor" />
+                  ) : (
+                    <Play size={12} fill="currentColor" className="translate-x-0.5" />
+                  )}
                 </button>
               </div>
             </div>

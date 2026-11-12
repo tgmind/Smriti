@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
   Search,
   Star,
@@ -51,6 +51,7 @@ import { AudioTrimmer } from './AudioTrimmer';
 export interface LibraryTabProps {
   audioItems: AudioItem[];
   subjects: Subject[];
+  initialSubjectId?: string | null;
   playbackState?: PlaybackState;
   onTogglePlay?: () => void;
   onSeek?: (seconds: number) => void;
@@ -68,6 +69,7 @@ type SortMode = 'recent' | 'duration' | 'title';
 export const LibraryTab: React.FC<LibraryTabProps> = ({
   audioItems,
   subjects,
+  initialSubjectId,
   playbackState,
   onTogglePlay,
   onSeek,
@@ -78,9 +80,19 @@ export const LibraryTab: React.FC<LibraryTabProps> = ({
   onGoToRecord
 }) => {
   // 3-Tier Navigation State: Library (topics) -> Subject -> Audio Note
-  const [viewMode, setViewMode] = useState<LibraryViewMode>('topics');
-  const [selectedSubjectId, setSelectedSubjectId] = useState<string | null>(null);
+  const [viewMode, setViewMode] = useState<LibraryViewMode>(initialSubjectId ? 'subject' : 'topics');
+  const [selectedSubjectId, setSelectedSubjectId] = useState<string | null>(initialSubjectId || null);
   const [selectedAudioId, setSelectedAudioId] = useState<string | null>(null);
+
+  // Sync initialSubjectId changes from external navigation (e.g. Home tab cards)
+  useEffect(() => {
+    if (initialSubjectId) {
+      setSelectedSubjectId(initialSubjectId);
+      setSelectedAudioId(null);
+      setViewMode('subject');
+      setSelectedTopicTag(null);
+    }
+  }, [initialSubjectId]);
 
   // Filters & Search
   const [searchQuery, setSearchQuery] = useState('');

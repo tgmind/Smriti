@@ -366,6 +366,18 @@ export const App: React.FC = () => {
     setIsDriveConnected(false);
   };
 
+  // Navigation helper for targeted subject opening
+  const [selectedSubjectForLibrary, setSelectedSubjectForLibrary] = useState<string | null>(null);
+
+  const handleNavigateToLibrary = (subjectId?: string) => {
+    setSelectedSubjectForLibrary(subjectId || null);
+    setCurrentTab('library');
+  };
+
+  const handleNavigateToAccount = () => {
+    setCurrentTab('profile');
+  };
+
   return (
     <div className="min-h-screen bg-[#F8F9FD] text-slate-900 flex flex-col font-sans select-none">
       {/* Active Tab Screen */}
@@ -373,9 +385,13 @@ export const App: React.FC = () => {
         {currentTab === 'home' && (
           <HomeTab
             recentAudio={audioItems}
+            subjects={subjects}
+            playbackState={playbackState}
             userSettings={userSettings}
             onPlayAudio={handlePlayAudio}
             onGoToRecord={() => setCurrentTab('record')}
+            onNavigateToLibrary={handleNavigateToLibrary}
+            onNavigateToAccount={handleNavigateToAccount}
           />
         )}
 
@@ -383,6 +399,7 @@ export const App: React.FC = () => {
           <LibraryTab
             audioItems={audioItems}
             subjects={subjects}
+            initialSubjectId={selectedSubjectForLibrary}
             playbackState={playbackState}
             onTogglePlay={handleTogglePlay}
             onSeek={handleSeek}

@@ -5,7 +5,15 @@ import {
   Sparkles,
   Trash2,
   HardDrive,
-  RefreshCw
+  RefreshCw,
+  Atom,
+  FlaskConical,
+  Dna,
+  Binary,
+  Tag,
+  X,
+  Check,
+  BookOpen
 } from 'lucide-react';
 import { bridge } from '../services/bridge';
 import { Subject, AudioItem } from '../types';
@@ -33,7 +41,8 @@ export const RecordTab: React.FC<RecordTabProps> = ({
   // Post-recording Review & Edit state
   const [title, setTitle] = useState('');
   const [selectedSubjectId, setSelectedSubjectId] = useState(subjects[0]?.id || '');
-  const [keyTermsInput, setKeyTermsInput] = useState('');
+  const [tags, setTags] = useState<string[]>([]);
+  const [newTagInput, setNewTagInput] = useState('');
   const [enhancementEnabled, setEnhancementEnabled] = useState(true);
 
   // Trim state
@@ -90,52 +99,96 @@ export const RecordTab: React.FC<RecordTabProps> = ({
     }
   }, [recordingState, title]);
 
-  // Meta Inputs: Smart Click-Oriented Presets
-  const titlePresets = [
-    'Formula Derivation',
-    'Concept Summary',
-    'Rapid Revision',
-    'Exam Notes',
-    'Core Law',
-    'Lecture Recap',
-    'Problem Solving'
+  // Subject Visual Helpers
+  const getSubjectVisual = (name: string, iconName?: string) => {
+    const n = (name || '').toLowerCase();
+    if (n.includes('physic') || iconName === 'Atom') {
+      return {
+        icon: Atom,
+        colorClass: 'text-violet-600',
+        bgClass: 'bg-violet-50',
+        activeBorder: 'border-violet-600 ring-2 ring-violet-500/20 bg-violet-50/50',
+        badgeBg: 'bg-violet-100 text-violet-800'
+      };
+    }
+    if (n.includes('chem') || iconName === 'FlaskConical') {
+      return {
+        icon: FlaskConical,
+        colorClass: 'text-rose-600',
+        bgClass: 'bg-rose-50',
+        activeBorder: 'border-rose-600 ring-2 ring-rose-500/20 bg-rose-50/50',
+        badgeBg: 'bg-rose-100 text-rose-800'
+      };
+    }
+    if (n.includes('bio') || iconName === 'Dna') {
+      return {
+        icon: Dna,
+        colorClass: 'text-emerald-600',
+        bgClass: 'bg-emerald-50',
+        activeBorder: 'border-emerald-600 ring-2 ring-emerald-500/20 bg-emerald-50/50',
+        badgeBg: 'bg-emerald-100 text-emerald-800'
+      };
+    }
+    return {
+      icon: Binary,
+      colorClass: 'text-amber-600',
+      bgClass: 'bg-amber-50',
+      activeBorder: 'border-amber-600 ring-2 ring-amber-500/20 bg-amber-50/50',
+      badgeBg: 'bg-amber-100 text-amber-800'
+    };
+  };
+
+  // Title Category Shortcuts
+  const categoryPills = [
+    'Concept',
+    'Derivation',
+    'Formula',
+    'Revision',
+    'Exam Note'
   ];
 
-  const subjectTermPresets: Record<string, string[]> = {
-    'Physics': ['Derivation', 'Formulas', 'SI Units', 'Conservation Laws', 'Numericals', 'Definitions'],
-    'Chemistry': ['Reaction Mechanism', 'Equilibrium', 'Periodic Trends', 'Enthalpy', 'Nomenclature'],
-    'Biology': ['Metabolic Pathway', 'Diagram Notes', 'Physiology', 'Key Terms', 'Taxonomy'],
-    'Mathematics': ['Theorem Proof', 'Identities', 'Matrix Rules', 'Shortcuts', 'Calculus Steps'],
-    'General': ['Key Points', 'Exam Cues', 'Mnemonic', 'Quick Summary']
-  };
-
-  const currentSubjectObj = subjects.find(s => s.id === selectedSubjectId);
-  const currentSubjectName = currentSubjectObj?.name || 'General';
-  const availableTerms = subjectTermPresets[currentSubjectName] || subjectTermPresets['General'];
-
-  const selectedTerms = keyTermsInput
-    .split(',')
-    .map(t => t.trim())
-    .filter(Boolean);
-
-  const toggleTerm = (term: string) => {
-    let next: string[];
-    if (selectedTerms.includes(term)) {
-      next = selectedTerms.filter(t => t !== term);
-    } else {
-      next = [...selectedTerms, term];
-    }
-    setKeyTermsInput(next.join(', '));
-  };
-
-  const applyTitlePreset = (preset: string) => {
+  const applyCategory = (category: string) => {
     if (!title.trim() || title.startsWith('Lecture Note')) {
-      setTitle(`${currentSubjectName}: ${preset}`);
-    } else {
-      setTitle(prev => `${prev} - ${preset}`);
+      const curSub = subjects.find(s => s.id === selectedSubjectId);
+      setTitle(`${curSub?.name || 'Academic'} - ${category}`);
+    } else if (!title.includes(category)) {
+      setTitle(prev => `${prev} (${category})`);
     }
   };
 
+  // Subject-specific smart concept suggestions
+  const subjectConcepts: Record<string, string[]> = {
+    'Physics': ['Derivation', 'Formulas', 'SI Units', 'Conservation Laws', 'Numericals'],
+    'Chemistry': ['Mechanism', 'Equilibrium', 'Periodic Trends', 'Enthalpy', 'Isomerism'],
+    'Biology': ['Cell Biology', 'Metabolic Pathway', 'Physiology', 'Genetics', 'Diagrams'],
+    'Mathematics': ['Theorem Proof', 'Identities', 'Calculus', 'Matrix Rules', 'Vectors']
+  };
+
+  const currentSubject = subjects.find(s => s.id === selectedSubjectId);
+  const currentSubjectName = currentSubject?.name || 'General';
+  const suggestedConcepts = subjectConcepts[currentSubjectName] || ['Core Concept', 'Summary', 'Key Note'];
+
+  // Tag Handlers
+  const addTag = (tagText: string) => {
+    const trimmed = tagText.trim().replace(/^#+/, '');
+    if (trimmed && !tags.includes(trimmed)) {
+      setTags(prev => [...prev, trimmed]);
+    }
+  };
+
+  const removeTag = (tagToRemove: string) => {
+    setTags(prev => prev.filter(t => t !== tagToRemove));
+  };
+
+  const handleTagInputKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter' || e.key === ',') {
+      e.preventDefault();
+      addTag(newTagInput);
+      setNewTagInput('');
+    }
+  };
+
+  // Recording Controls
   const handleStartRecording = async () => {
     const success = await bridge.startRecording({ enableNoiseSuppression: enhancementEnabled });
     if (success) {
@@ -172,8 +225,7 @@ export const RecordTab: React.FC<RecordTabProps> = ({
       let effectiveDuration = Math.max(1, (trimEndSeconds || recordedDuration) - trimStartSeconds);
       let peaksToSave = liveAmplitudes;
 
-      // GENUINE CLIENT-SIDE AUDIO TRIMMING
-      // If user adjusted trim boundaries and blob exists, slice and export trimmed audio
+      // CLIENT-SIDE AUDIO TRIMMING
       if (
         finalBlob &&
         (trimStartSeconds > 0.05 || (trimEndSeconds && trimEndSeconds < recordedDuration - 0.2))
@@ -197,10 +249,6 @@ export const RecordTab: React.FC<RecordTabProps> = ({
       }
 
       const sub = subjects.find(s => s.id === selectedSubjectId);
-      const terms = keyTermsInput
-        .split(',')
-        .map(t => t.trim())
-        .filter(Boolean);
 
       await onSaveAudio(
         {
@@ -213,7 +261,7 @@ export const RecordTab: React.FC<RecordTabProps> = ({
           file_size_bytes: finalBlob ? finalBlob.size : 2500000,
           audio_enhancement_applied: enhancementEnabled,
           waveform_peaks: peaksToSave,
-          key_terms: terms,
+          key_terms: tags,
           is_favorite: false,
           is_downloaded_offline: true
         },
@@ -225,6 +273,7 @@ export const RecordTab: React.FC<RecordTabProps> = ({
       setRecordedDuration(0);
       setRecordedBlob(null);
       setRecordedUrl(null);
+      setTags([]);
     } catch (e) {
       console.error('Failed to save audio', e);
     } finally {
@@ -237,18 +286,21 @@ export const RecordTab: React.FC<RecordTabProps> = ({
     setRecordedDuration(0);
     setRecordedBlob(null);
     setRecordedUrl(null);
+    setTags([]);
     onCancel();
   };
 
   return (
-    <div className="space-y-4 pb-28 pt-3 px-4 max-w-md mx-auto">
+    <div className="space-y-4 pb-36 pt-3 px-4 max-w-md mx-auto">
       {/* Header */}
       <div className="pt-1">
         <h1 className="text-2xl font-black text-slate-950 tracking-tight">
-          Record Note
+          {recordingState === 'review' ? 'Review & Organize' : 'Record Note'}
         </h1>
         <p className="text-xs text-slate-500 mt-0.5">
-          Clean voice capture with on-device DSP noise suppression & visual trimming.
+          {recordingState === 'review'
+            ? 'Trim audio, assign to a subject folder, and tag key concepts.'
+            : 'Clean voice capture with on-device DSP noise suppression & visual trimming.'}
         </p>
       </div>
 
@@ -332,15 +384,15 @@ export const RecordTab: React.FC<RecordTabProps> = ({
             <div className="flex items-center gap-2">
               <span className="w-2 h-2 rounded-full bg-emerald-500" />
               <span className="text-xs font-bold uppercase tracking-wider text-slate-900">
-                Review & Trim Note
+                Recording Finished
               </span>
             </div>
             <span className="text-xs font-mono font-semibold text-slate-500">
-              {formatDuration(recordedDuration)} recorded
+              {formatDuration(recordedDuration)} total
             </span>
           </div>
 
-          {/* 1. VISUAL AUDIO TRIMMER (Interactive timeline, handles, steppers & preview) */}
+          {/* 1. VISUAL AUDIO TRIMMER (Studio dark waveform, tactile handles & timeline) */}
           <AudioTrimmer
             durationSeconds={recordedDuration}
             audioUrl={recordedUrl}
@@ -350,15 +402,189 @@ export const RecordTab: React.FC<RecordTabProps> = ({
             onTrimChange={handleTrimChange}
           />
 
-          {/* 2. ON-DEVICE AUDIO ENHANCEMENT TOGGLE */}
-          <div className="bg-white border border-slate-200/80 rounded-2xl p-3.5 flex items-center justify-between gap-3 shadow-2xs">
+          {/* 2. SUBJECT ASSIGNMENT (4 Clean Modern Cards) */}
+          <div className="bg-white border border-slate-200/90 rounded-3xl p-4 shadow-2xs space-y-2.5">
+            <div className="flex items-center justify-between">
+              <label className="text-[11px] font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1.5">
+                <BookOpen size={13} className="text-slate-400" />
+                <span>Assign to Subject</span>
+              </label>
+              <span className="text-[10px] font-mono text-slate-400">
+                1 tap assignment
+              </span>
+            </div>
+
+            <div className="grid grid-cols-2 gap-2">
+              {subjects.map((s) => {
+                const visual = getSubjectVisual(s.name, s.icon_name);
+                const Icon = visual.icon;
+                const isSelected = selectedSubjectId === s.id;
+
+                return (
+                  <button
+                    key={s.id}
+                    type="button"
+                    onClick={() => setSelectedSubjectId(s.id)}
+                    className={`p-3 rounded-2xl border text-left transition-all flex items-center gap-3 cursor-pointer ${
+                      isSelected
+                        ? visual.activeBorder
+                        : 'bg-white border-slate-200/80 hover:border-slate-300 hover:bg-slate-50/50'
+                    }`}
+                  >
+                    <div className={`w-9 h-9 rounded-xl ${visual.bgClass} ${visual.colorClass} flex items-center justify-center shrink-0 shadow-2xs`}>
+                      <Icon size={18} strokeWidth={2.2} />
+                    </div>
+
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center justify-between gap-1">
+                        <span className="text-xs font-bold text-slate-900 truncate">
+                          {s.name}
+                        </span>
+                        {isSelected && (
+                          <div className="w-4 h-4 rounded-full bg-slate-950 text-white flex items-center justify-center shrink-0">
+                            <Check size={10} strokeWidth={3} />
+                          </div>
+                        )}
+                      </div>
+                      <span className="text-[10px] text-slate-400 font-mono block truncate">
+                        {s.item_count ? `${s.item_count} notes` : 'Folder'}
+                      </span>
+                    </div>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* 3. LESSON TITLE & CATEGORY CHIPS */}
+          <div className="bg-white border border-slate-200/90 rounded-3xl p-4 shadow-2xs space-y-3">
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between">
+                <label className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                  Lesson Title
+                </label>
+                <span className="text-[10px] text-slate-400 font-mono">
+                  Clear & descriptive
+                </span>
+              </div>
+
+              {/* Title Input */}
+              <input
+                type="text"
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                placeholder="e.g. Thermodynamics Carnot Cycle Derivation"
+                className="w-full bg-slate-50/80 border border-slate-200 focus:border-slate-400 focus:bg-white rounded-xl px-3.5 py-2.5 text-xs text-slate-900 placeholder:text-slate-400 focus:outline-none shadow-2xs transition-all font-medium"
+              />
+
+              {/* Quick Category Chips (Linear style) */}
+              <div className="flex items-center gap-1.5 pt-1 overflow-x-auto no-scrollbar">
+                <span className="text-[10px] text-slate-400 uppercase font-mono mr-0.5 shrink-0">Type:</span>
+                {categoryPills.map((pill) => (
+                  <button
+                    key={pill}
+                    type="button"
+                    onClick={() => applyCategory(pill)}
+                    className="px-2 py-1 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-700 text-[10px] font-medium transition-all active:scale-95 cursor-pointer whitespace-nowrap"
+                  >
+                    + {pill}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* TAGS & KEY CONCEPTS */}
+            <div className="space-y-2 pt-2 border-t border-slate-100">
+              <div className="flex items-center justify-between">
+                <label className="text-[11px] font-bold uppercase tracking-wider text-slate-500 flex items-center gap-1.5">
+                  <Tag size={12} className="text-slate-400" />
+                  <span>Key Concepts & Tags</span>
+                </label>
+                <span className="text-[10px] text-slate-400 font-mono">
+                  {tags.length} added
+                </span>
+              </div>
+
+              {/* Active Tags Chips */}
+              {tags.length > 0 && (
+                <div className="flex flex-wrap gap-1.5 p-2 rounded-xl bg-slate-50 border border-slate-200/70">
+                  {tags.map((tag) => (
+                    <span
+                      key={tag}
+                      className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-white border border-slate-200 text-xs font-mono font-medium text-slate-800 shadow-2xs group"
+                    >
+                      <span className="text-slate-400">#</span>
+                      <span>{tag}</span>
+                      <button
+                        type="button"
+                        onClick={() => removeTag(tag)}
+                        className="text-slate-400 hover:text-rose-600 transition-colors ml-0.5 cursor-pointer"
+                        title="Remove tag"
+                      >
+                        <X size={12} />
+                      </button>
+                    </span>
+                  ))}
+                </div>
+              )}
+
+              {/* Suggested Concept Tags from Curriculum */}
+              <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-0.5">
+                <span className="text-[10px] text-slate-400 uppercase font-mono mr-0.5 shrink-0">Suggest:</span>
+                {suggestedConcepts.map((concept) => {
+                  const isAlreadyAdded = tags.includes(concept);
+                  return (
+                    <button
+                      key={concept}
+                      type="button"
+                      onClick={() => isAlreadyAdded ? removeTag(concept) : addTag(concept)}
+                      className={`px-2.5 py-1 rounded-lg text-[10px] font-medium transition-all active:scale-95 cursor-pointer whitespace-nowrap border ${
+                        isAlreadyAdded
+                          ? 'bg-slate-900 border-slate-900 text-white font-bold'
+                          : 'bg-white border-slate-200 text-slate-600 hover:border-slate-300'
+                      }`}
+                    >
+                      {isAlreadyAdded ? `✓ ${concept}` : `+ ${concept}`}
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* Custom Tag Input */}
+              <div className="relative flex items-center">
+                <input
+                  type="text"
+                  value={newTagInput}
+                  onChange={(e) => setNewTagInput(e.target.value)}
+                  onKeyDown={handleTagInputKeyDown}
+                  placeholder="Type a custom tag and press Enter or comma..."
+                  className="w-full bg-slate-50/70 border border-slate-200 focus:border-slate-400 focus:bg-white rounded-xl pl-3 pr-16 py-2 text-[11px] text-slate-900 placeholder:text-slate-400 focus:outline-none shadow-2xs transition-all font-mono"
+                />
+                {newTagInput.trim() && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      addTag(newTagInput);
+                      setNewTagInput('');
+                    }}
+                    className="absolute right-2 px-2 py-0.5 rounded-md bg-slate-900 text-white text-[10px] font-semibold active:scale-95 cursor-pointer"
+                  >
+                    Add
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* 4. ON-DEVICE DSP NOISE SUPPRESSION */}
+          <div className="bg-white border border-slate-200/90 rounded-2xl p-3.5 flex items-center justify-between gap-3 shadow-2xs">
             <div className="flex items-center gap-2.5">
               <div className="w-8 h-8 rounded-xl bg-sky-50 text-sky-700 border border-sky-200 flex items-center justify-center shrink-0">
                 <Sparkles size={16} />
               </div>
               <div>
                 <span className="text-xs font-bold text-slate-900 block">
-                  Hardware Noise Suppression
+                  Neural DSP Voice Clarity
                 </span>
                 <span className="text-[10px] text-slate-500">
                   On-device background noise reduction applied
@@ -372,6 +598,7 @@ export const RecordTab: React.FC<RecordTabProps> = ({
               className={`w-11 h-6 rounded-full transition-colors relative flex items-center px-0.5 cursor-pointer ${
                 enhancementEnabled ? 'bg-slate-950' : 'bg-slate-200'
               }`}
+              aria-label="Toggle DSP Noise Suppression"
             >
               <div
                 className={`w-5 h-5 rounded-full bg-white shadow-xs transition-transform ${
@@ -381,142 +608,27 @@ export const RecordTab: React.FC<RecordTabProps> = ({
             </button>
           </div>
 
-          {/* 3. METADATA: SUBJECT, TITLE & CONCEPTS */}
-          <div className="bg-white border border-slate-200/80 rounded-3xl p-4.5 shadow-2xs space-y-3.5">
-            {/* Subject Selector */}
-            <div className="space-y-1.5">
-              <label className="text-[11px] font-bold uppercase tracking-wider text-slate-500 block">
-                Assign Subject
-              </label>
-              <div className="flex gap-1.5 overflow-x-auto pb-1 no-scrollbar">
-                {subjects.map((s) => {
-                  const isSelected = selectedSubjectId === s.id;
-                  return (
-                    <button
-                      key={s.id}
-                      type="button"
-                      onClick={() => setSelectedSubjectId(s.id)}
-                      className={`px-3 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap transition-all border cursor-pointer ${
-                        isSelected
-                          ? 'bg-slate-950 border-slate-950 text-white shadow-2xs scale-[1.02]'
-                          : 'bg-white border-slate-200 text-slate-700 hover:border-slate-300'
-                      }`}
-                    >
-                      {s.name}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-
-            {/* Lesson Title */}
-            <div className="space-y-1.5">
-              <div className="flex items-center justify-between">
-                <label className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
-                  Lesson Title
-                </label>
-                <span className="text-[10px] text-slate-400 font-mono">Tap preset or edit</span>
-              </div>
-
-              {/* Title Presets */}
-              <div className="flex flex-wrap gap-1 pb-1">
-                {titlePresets.map((preset) => (
-                  <button
-                    key={preset}
-                    type="button"
-                    onClick={() => applyTitlePreset(preset)}
-                    className="px-2 py-0.5 rounded-lg bg-slate-100 hover:bg-amber-100 hover:text-amber-900 text-slate-700 text-[10px] font-medium transition-colors border border-slate-200/80 active:scale-95 cursor-pointer"
-                  >
-                    + {preset}
-                  </button>
-                ))}
-              </div>
-
-              <input
-                type="text"
-                value={title}
-                onChange={(e) => setTitle(e.target.value)}
-                placeholder="e.g. Thermodynamics First Law Derivation"
-                className="w-full bg-slate-50/70 border border-slate-200 focus:border-slate-400 rounded-xl px-3 py-2 text-xs text-slate-900 placeholder:text-slate-400 focus:outline-none shadow-2xs"
-              />
-            </div>
-
-            {/* Key Terms & Concepts */}
-            <div className="space-y-1.5 pt-0.5">
-              <div className="flex items-center justify-between">
-                <label className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
-                  Concepts & Key Terms
-                </label>
-                <span className="text-[10px] text-slate-400 font-mono">Tap to toggle</span>
-              </div>
-
-              {/* Suggested Terms */}
-              <div className="flex flex-wrap gap-1">
-                {availableTerms.map((term) => {
-                  const isChecked = selectedTerms.includes(term);
-                  return (
-                    <button
-                      key={term}
-                      type="button"
-                      onClick={() => toggleTerm(term)}
-                      className={`px-2.5 py-1 rounded-full text-[11px] font-medium transition-all border cursor-pointer ${
-                        isChecked
-                          ? 'bg-blue-600 border-blue-600 text-white font-bold shadow-2xs'
-                          : 'bg-white border-slate-200 text-slate-600 hover:border-slate-300'
-                      }`}
-                    >
-                      {isChecked ? `✓ ${term}` : `+ ${term}`}
-                    </button>
-                  );
-                })}
-              </div>
-
-              {/* Active Terms Pills */}
-              {selectedTerms.length > 0 && (
-                <div className="flex flex-wrap gap-1 p-2 rounded-xl bg-slate-50 border border-slate-200/80">
-                  {selectedTerms.map((term) => (
-                    <span
-                      key={term}
-                      onClick={() => toggleTerm(term)}
-                      className="px-2 py-0.5 rounded-md bg-white border border-slate-200 text-[10px] font-mono text-slate-800 flex items-center gap-1 cursor-pointer hover:bg-rose-50 hover:text-rose-700 hover:border-rose-200 transition-colors"
-                      title="Tap to remove"
-                    >
-                      <span>#{term}</span>
-                      <span className="text-slate-400 hover:text-rose-600">✕</span>
-                    </span>
-                  ))}
-                </div>
-              )}
-
-              <input
-                type="text"
-                value={keyTermsInput}
-                onChange={(e) => setKeyTermsInput(e.target.value)}
-                placeholder="Or type custom terms (comma separated)..."
-                className="w-full bg-slate-50/70 border border-slate-200 focus:border-slate-400 rounded-xl px-3 py-1.5 text-xs text-slate-900 placeholder:text-slate-400 focus:outline-none shadow-2xs text-[11px]"
-              />
-            </div>
-          </div>
-
-          {/* 4. SAVE & DISCARD BUTTONS */}
-          <div className="flex items-center gap-2 pt-1">
+          {/* 5. ACTION BUTTONS (Generous bottom padding so never obscured by floating nav) */}
+          <div className="flex items-center gap-2.5 pt-2">
             <button
+              type="button"
               onClick={handleDiscard}
-              className="flex-1 py-3 rounded-2xl bg-white border border-slate-200 text-slate-700 hover:text-rose-600 hover:bg-rose-50/50 font-semibold text-xs flex items-center justify-center gap-1.5 active:scale-95 transition-all shadow-2xs cursor-pointer"
+              className="flex-1 py-3.5 rounded-2xl bg-white border border-slate-200 text-slate-700 hover:text-rose-600 hover:bg-rose-50/50 hover:border-rose-200 font-semibold text-xs flex items-center justify-center gap-1.5 active:scale-95 transition-all shadow-2xs cursor-pointer"
             >
               <Trash2 size={14} />
               <span>Discard</span>
             </button>
 
             <button
+              type="button"
               onClick={handleSave}
               disabled={isSaving || !title.trim()}
-              className="flex-[2] py-3 rounded-2xl bg-slate-950 hover:bg-slate-800 text-white font-semibold text-xs active:scale-98 transition-all flex items-center justify-center gap-2 shadow-sm disabled:opacity-50 cursor-pointer"
+              className="flex-[2] py-3.5 rounded-2xl bg-slate-950 hover:bg-slate-800 text-white font-semibold text-xs active:scale-98 transition-all flex items-center justify-center gap-2 shadow-sm disabled:opacity-50 cursor-pointer"
             >
               {isSaving ? (
                 <>
                   <RefreshCw size={14} className="animate-spin text-amber-400" />
-                  <span>Saving Trimmed Audio...</span>
+                  <span>Saving Note...</span>
                 </>
               ) : (
                 <>
