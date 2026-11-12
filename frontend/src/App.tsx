@@ -466,6 +466,11 @@ export const App: React.FC = () => {
           <LibraryTab
             audioItems={audioItems}
             subjects={subjects}
+            revisionsDue={revisionsDueToday}
+            playbackState={playbackState}
+            onTogglePlay={handleTogglePlay}
+            onSeek={handleSeek}
+            onSetSpeed={handleSetSpeed}
             onPlayAudio={handlePlayAudio}
             onToggleFavorite={handleToggleFavorite}
             onToggleOffline={handleToggleOffline}

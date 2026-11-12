@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Play, Sparkles, Clock, Flame, ArrowRight, Mic, CheckCircle2, Zap, Star } from 'lucide-react';
 import { AudioItem, RevisionItem, UserSettings } from '../types';
 import { formatDuration } from '../services/learningEngine';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 interface HomeTabProps {
   recentAudio: AudioItem[];
@@ -15,6 +16,8 @@ interface HomeTabProps {
   onUpdateGoal?: (minutes: number) => void;
 }
 
+type FilterMode = 'all' | 'due' | 'favorites' | 'short';
+
 export const HomeTab: React.FC<HomeTabProps> = ({
   recentAudio,
   revisionsDue,
@@ -26,28 +29,117 @@ export const HomeTab: React.FC<HomeTabProps> = ({
   onGoToRecord,
   onUpdateGoal
 }) => {
-  const [filterMode, setFilterMode] = useState<'all' | 'due' | 'favorites' | 'short'>('all');
+  const [filterMode, setFilterMode] = useState<FilterMode>('all');
+  const [tabVariant, setTabVariant] = useState<'default' | 'line'>('default');
+
   const goalSeconds = userSettings.daily_listening_goal_minutes * 60;
   const goalProgress = Math.min(100, Math.round((todayListeningSeconds / (goalSeconds || 1)) * 100));
   const continueAudio = recentAudio.length > 0 ? recentAudio[0] : null;
 
   const dueAudioIds = new Set(revisionsDue.map(r => r.audio_id));
 
-  const filteredRecentAudio = recentAudio.filter(audio => {
-    if (filterMode === 'due') return dueAudioIds.has(audio.id);
-    if (filterMode === 'favorites') return !!audio.is_favorite;
-    if (filterMode === 'short') return audio.duration_seconds <= 300;
-    return true;
-  });
+  const allAudio = recentAudio;
+  const dueAudio = recentAudio.filter(a => dueAudioIds.has(a.id));
+  const favoriteAudio = recentAudio.filter(a => !!a.is_favorite);
+  const shortAudio = recentAudio.filter(a => a.duration_seconds <= 300);
 
+  const getFilteredItems = (mode: FilterMode) => {
+    switch (mode) {
+      case 'due': return dueAudio;
+      case 'favorites': return favoriteAudio;
+      case 'short': return shortAudio;
+      default: return allAudio;
+    }
+  };
+
+  const currentItems = getFilteredItems(filterMode);
   const goalPresets = [15, 30, 45, 60];
+
+  const renderLessonCards = (items: AudioItem[], emptyMessage: string) => {
+    if (items.length === 0) {
+      return (
+        <div className="bg-white border border-slate-200/80 rounded-2xl p-7 text-center shadow-2xs">
+          <div className="w-10 h-10 rounded-full bg-slate-100 text-slate-400 mx-auto flex items-center justify-center mb-2.5">
+            <Sparkles size={18} />
+          </div>
+          <p className="text-xs font-semibold text-slate-800">{emptyMessage}</p>
+          <p className="text-[11px] text-slate-500 mt-1">Tap 'All' to browse your entire study catalog.</p>
+        </div>
+      );
+    }
+
+    return (
+      <div className="space-y-2">
+        {items.slice(0, 5).map((audio) => {
+          const isDue = dueAudioIds.has(audio.id);
+          return (
+            <div
+              key={audio.id}
+              className="group bg-white border border-slate-200/90 hover:border-slate-300 p-3.5 rounded-2xl flex items-center justify-between gap-3 transition-all duration-200 shadow-2xs hover:shadow-xs"
+            >
+              <div
+                onClick={() => onPlayAudio(audio)}
+                className="flex-1 min-w-0 cursor-pointer"
+              >
+                <div className="flex items-center gap-1.5 mb-1.5 flex-wrap">
+                  <span className="px-2 py-0.5 rounded-md bg-slate-100 text-[10px] font-bold text-slate-700 font-mono tracking-tight uppercase">
+                    {audio.subject_name || 'General'}
+                  </span>
+                  {audio.is_downloaded_offline && (
+                    <span className="px-1.5 py-0.5 rounded-md bg-emerald-50 text-emerald-700 border border-emerald-200/70 text-[9px] font-bold font-mono tracking-tight flex items-center gap-1">
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                      OFFLINE
+                    </span>
+                  )}
+                  {isDue && (
+                    <span className="px-1.5 py-0.5 rounded-md bg-amber-50 text-amber-800 border border-amber-300/80 text-[9px] font-bold font-mono tracking-tight flex items-center gap-0.5">
+                      <Sparkles size={9} className="text-amber-600" />
+                      DUE
+                    </span>
+                  )}
+                </div>
+                <h4 className="text-xs font-bold text-slate-900 truncate group-hover:text-amber-600 transition-colors">
+                  {audio.title}
+                </h4>
+              </div>
+
+              <div className="flex items-center gap-2 shrink-0">
+                <span className="text-[11px] text-slate-400 font-mono font-medium">
+                  {formatDuration(audio.duration_seconds)}
+                </span>
+
+                {/* Direct 1-Tap Recall Button */}
+                <button
+                  onClick={() => onOpenAssessmentForAudio ? onOpenAssessmentForAudio(audio) : onOpenAssessment()}
+                  className="px-2.5 py-1.5 rounded-lg bg-amber-50 hover:bg-amber-100/90 text-amber-900 border border-amber-200/90 text-[11px] font-bold font-mono flex items-center gap-1 active:scale-95 transition-all shadow-2xs cursor-pointer"
+                  title="Test active recall for this lesson"
+                >
+                  <Zap size={11} className="fill-amber-600 text-amber-600" />
+                  <span>Recall</span>
+                </button>
+
+                {/* Direct 1-Tap Play Button */}
+                <button
+                  onClick={() => onPlayAudio(audio)}
+                  className="w-8 h-8 rounded-full bg-slate-950 hover:bg-slate-800 text-white flex items-center justify-center transition-all active:scale-90 shadow-2xs hover:scale-105 cursor-pointer"
+                  aria-label={`Play ${audio.title}`}
+                >
+                  <Play size={13} fill="currentColor" className="translate-x-0.5" />
+                </button>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    );
+  };
 
   return (
     <div className="space-y-5 pb-28 pt-4 px-4 max-w-md mx-auto">
       {/* Brand & Streak Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2.5">
-          <div className="w-8 h-8 rounded-xl bg-slate-900 text-amber-400 font-extrabold flex items-center justify-center text-sm shadow-xs">
+          <div className="w-8 h-8 rounded-xl bg-slate-950 text-amber-400 font-extrabold flex items-center justify-center text-sm shadow-xs ring-1 ring-slate-900/10">
             स्म
           </div>
           <div>
@@ -60,14 +152,14 @@ export const HomeTab: React.FC<HomeTabProps> = ({
           </div>
         </div>
 
-        <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-50 border border-amber-200/80 text-amber-800 shadow-2xs">
+        <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-amber-50/90 border border-amber-200/80 text-amber-800 shadow-2xs">
           <Flame size={14} className="text-amber-600 fill-amber-500" />
           <span className="text-xs font-mono font-bold">6 Day Streak</span>
         </div>
       </div>
 
       {/* Daily Listening Goal Card with 1-Tap Quick Presets */}
-      <div className="bg-white border border-slate-200/80 rounded-2xl p-4.5 shadow-[0_1px_3px_rgba(0,0,0,0.04)] space-y-3">
+      <div className="bg-white border border-slate-200/90 rounded-2xl p-4.5 shadow-[0_1px_3px_rgba(0,0,0,0.03)] space-y-3">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <div className="w-6 h-6 rounded-lg bg-slate-100 flex items-center justify-center text-slate-700">
@@ -77,7 +169,7 @@ export const HomeTab: React.FC<HomeTabProps> = ({
               Daily Goal
             </h2>
           </div>
-          <span className="text-xs font-mono font-semibold text-slate-700 bg-slate-100 px-2 py-0.5 rounded-md">
+          <span className="text-xs font-mono font-semibold text-slate-700 bg-slate-100/90 px-2 py-0.5 rounded-md border border-slate-200/60">
             {formatDuration(todayListeningSeconds)} / {userSettings.daily_listening_goal_minutes}m ({goalProgress}%)
           </span>
         </div>
@@ -100,9 +192,9 @@ export const HomeTab: React.FC<HomeTabProps> = ({
                 <button
                   key={preset}
                   onClick={() => onUpdateGoal?.(preset)}
-                  className={`px-2.5 py-0.5 rounded-full text-[11px] font-mono font-bold transition-all border ${
+                  className={`px-2.5 py-0.5 rounded-full text-[11px] font-mono font-bold transition-all border cursor-pointer ${
                     isActive
-                      ? 'bg-slate-900 border-slate-900 text-white shadow-2xs'
+                      ? 'bg-slate-950 border-slate-950 text-white shadow-2xs'
                       : 'bg-slate-50 border-slate-200 text-slate-600 hover:border-slate-300 hover:bg-slate-100'
                   }`}
                   aria-label={`Set daily target to ${preset} minutes`}
@@ -126,7 +218,7 @@ export const HomeTab: React.FC<HomeTabProps> = ({
 
       {/* Today's Spaced Repetition Due Card */}
       {revisionsDue.length > 0 && (
-        <div className="bg-gradient-to-br from-amber-500/10 via-amber-50/50 to-white border border-amber-200/90 rounded-2xl p-4.5 shadow-[0_2px_8px_rgba(245,158,11,0.08)] space-y-3">
+        <div className="bg-gradient-to-br from-amber-500/10 via-amber-50/50 to-white border border-amber-200/90 rounded-2xl p-4.5 shadow-2xs space-y-3">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <div className="w-7 h-7 rounded-lg bg-amber-500 text-slate-950 flex items-center justify-center shadow-xs">
@@ -147,7 +239,7 @@ export const HomeTab: React.FC<HomeTabProps> = ({
 
           <button
             onClick={onOpenAssessment}
-            className="w-full py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-semibold active:scale-[0.98] transition-all flex items-center justify-center gap-2 text-xs shadow-xs"
+            className="w-full py-2.5 rounded-xl bg-slate-950 hover:bg-slate-800 text-white font-semibold active:scale-[0.98] transition-all flex items-center justify-center gap-2 text-xs shadow-xs cursor-pointer"
           >
             <span>Start Active Recall Check</span>
             <ArrowRight size={14} />
@@ -162,23 +254,23 @@ export const HomeTab: React.FC<HomeTabProps> = ({
             <h2 className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
               Continue Listening
             </h2>
-            <span className="text-[11px] text-slate-400 font-mono">Resume last</span>
+            <span className="text-[11px] text-slate-400 font-mono font-medium">Resume last</span>
           </div>
 
           <div
             onClick={() => onPlayAudio(continueAudio)}
-            className="group bg-white border border-slate-200/80 hover:border-slate-300 rounded-2xl p-3.5 shadow-[0_1px_3px_rgba(0,0,0,0.04)] flex items-center gap-3.5 cursor-pointer transition-all active:scale-[0.98]"
+            className="group bg-white border border-slate-200/90 hover:border-slate-300 rounded-2xl p-3.5 shadow-2xs hover:shadow-xs flex items-center gap-3.5 cursor-pointer transition-all active:scale-[0.99]"
           >
-            <div className="w-11 h-11 rounded-xl bg-amber-500 text-slate-950 flex items-center justify-center flex-shrink-0 shadow-xs group-hover:scale-105 transition-transform">
-              <Play size={18} fill="currentColor" className="translate-x-0.5" />
+            <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-amber-400 to-amber-500 text-slate-950 flex items-center justify-center shrink-0 shadow-sm shadow-amber-500/25 group-hover:scale-105 transition-transform">
+              <Play size={20} fill="currentColor" className="translate-x-0.5" />
             </div>
 
             <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2 mb-0.5">
-                <span className="px-2 py-0.2 rounded-full bg-slate-100 border border-slate-200 text-[10px] uppercase font-bold text-slate-700 font-mono">
+              <div className="flex items-center gap-2 mb-1">
+                <span className="px-2 py-0.5 rounded-md bg-slate-100 text-[10px] uppercase font-bold text-slate-700 font-mono">
                   {continueAudio.subject_name || 'Subject'}
                 </span>
-                <span className="text-[11px] text-slate-400 font-mono">
+                <span className="text-[11px] text-slate-400 font-mono font-medium">
                   {formatDuration(continueAudio.duration_seconds)}
                 </span>
               </div>
@@ -193,145 +285,147 @@ export const HomeTab: React.FC<HomeTabProps> = ({
       {/* Quick Record Studio Shortcut */}
       <div
         onClick={onGoToRecord}
-        className="bg-white border border-dashed border-slate-300 hover:border-slate-400 rounded-2xl p-3.5 flex items-center gap-3 cursor-pointer transition-all active:scale-[0.98]"
+        className="group bg-white border border-dashed border-slate-300 hover:border-amber-400 hover:bg-amber-50/20 rounded-2xl p-3.5 flex items-center gap-3 cursor-pointer transition-all active:scale-[0.99] shadow-2xs"
       >
-        <div className="w-9 h-9 rounded-xl bg-amber-50 text-amber-700 border border-amber-200/60 flex items-center justify-center flex-shrink-0">
-          <Mic size={18} />
+        <div className="w-10 h-10 rounded-xl bg-amber-50 text-amber-700 border border-amber-200/80 flex items-center justify-center shrink-0 group-hover:scale-105 group-hover:bg-amber-100 transition-all">
+          <Mic size={18} strokeWidth={2.2} />
         </div>
         <div className="flex-1 min-w-0">
-          <h4 className="text-xs font-bold text-slate-900">
+          <h4 className="text-xs font-bold text-slate-900 group-hover:text-amber-700 transition-colors">
             Record Audio Lesson or Voice Notes
           </h4>
-          <p className="text-[11px] text-slate-500 truncate">
+          <p className="text-[11px] text-slate-500 truncate mt-0.5">
             DSP noise suppression & personal Google Drive sync
           </p>
         </div>
       </div>
 
-      {/* Recent Audio Lessons with 1-Tap Filter Pills */}
-      <div className="space-y-2.5">
-        <div className="flex items-center justify-between px-1">
-          <h2 className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
-            Lessons
-          </h2>
-          <span className="text-xs text-slate-600 font-medium font-mono">
-            {filteredRecentAudio.length} shown
-          </span>
-        </div>
-
-        {/* 1-Tap Quick Filter Pills */}
-        <div className="flex items-center gap-1.5 overflow-x-auto pb-1 no-scrollbar">
-          <button
-            onClick={() => setFilterMode('all')}
-            className={`px-3 py-1 rounded-full text-[11px] font-bold font-mono transition-all border ${
-              filterMode === 'all'
-                ? 'bg-slate-900 border-slate-900 text-white shadow-2xs'
-                : 'bg-white border-slate-200 text-slate-600 hover:border-slate-300'
-            }`}
-          >
-            All ({recentAudio.length})
-          </button>
-          <button
-            onClick={() => setFilterMode('due')}
-            className={`px-3 py-1 rounded-full text-[11px] font-bold font-mono transition-all border flex items-center gap-1 ${
-              filterMode === 'due'
-                ? 'bg-amber-500 border-amber-500 text-slate-950 shadow-2xs'
-                : 'bg-white border-slate-200 text-slate-600 hover:border-slate-300'
-            }`}
-          >
-            <span>🔥 Due Recall</span>
-            <span className="text-[10px] opacity-80 font-normal">({revisionsDue.length})</span>
-          </button>
-          <button
-            onClick={() => setFilterMode('favorites')}
-            className={`px-3 py-1 rounded-full text-[11px] font-bold font-mono transition-all border flex items-center gap-1 ${
-              filterMode === 'favorites'
-                ? 'bg-amber-500 border-amber-500 text-slate-950 shadow-2xs'
-                : 'bg-white border-slate-200 text-slate-600 hover:border-slate-300'
-            }`}
-          >
-            <Star size={11} fill={filterMode === 'favorites' ? 'currentColor' : 'none'} />
-            <span>Favorites</span>
-          </button>
-          <button
-            onClick={() => setFilterMode('short')}
-            className={`px-3 py-1 rounded-full text-[11px] font-bold font-mono transition-all border ${
-              filterMode === 'short'
-                ? 'bg-slate-900 border-slate-900 text-white shadow-2xs'
-                : 'bg-white border-slate-200 text-slate-600 hover:border-slate-300'
-            }`}
-          >
-            ⚡ Quick &lt;5m
-          </button>
-        </div>
-
-        {/* Lesson List */}
-        <div className="space-y-1.5">
-          {filteredRecentAudio.length === 0 ? (
-            <div className="bg-white border border-slate-200 rounded-xl p-6 text-center text-xs text-slate-500">
-              No lessons match this filter. Tap 'All' to view all lessons.
+      {/* LESSONS SECTION with Base UI Tabs */}
+      <div className="space-y-3">
+        <Tabs
+          value={filterMode}
+          onValueChange={(val) => setFilterMode(val as FilterMode)}
+          className="w-full space-y-3"
+        >
+          {/* Header with Title, Count & Tab Variant Toggle */}
+          <div className="flex items-center justify-between px-0.5">
+            <div className="flex items-center gap-2">
+              <h2 className="text-xs font-bold uppercase tracking-wider text-slate-500">
+                Lessons
+              </h2>
+              <span className="text-[11px] font-mono font-semibold px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 border border-slate-200/70">
+                {currentItems.length} shown
+              </span>
             </div>
-          ) : (
-            filteredRecentAudio.slice(0, 5).map((audio) => {
-              const isDue = dueAudioIds.has(audio.id);
-              return (
-                <div
-                  key={audio.id}
-                  className="bg-white border border-slate-200/70 hover:border-slate-300 p-3 rounded-xl flex items-center justify-between gap-3 transition-all shadow-2xs"
-                >
-                  <div
-                    onClick={() => onPlayAudio(audio)}
-                    className="flex-1 min-w-0 cursor-pointer"
-                  >
-                    <div className="flex items-center gap-1.5 mb-1">
-                      <span className="px-2 py-0.2 rounded-full bg-slate-100 text-[10px] font-bold text-slate-700 font-mono">
-                        {audio.subject_name || 'General'}
-                      </span>
-                      {audio.is_downloaded_offline && (
-                        <span className="px-1.5 py-0.2 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 text-[9px] font-bold font-mono">
-                          OFFLINE
-                        </span>
-                      )}
-                      {isDue && (
-                        <span className="px-1.5 py-0.2 rounded-full bg-amber-50 text-amber-700 border border-amber-300 text-[9px] font-bold font-mono flex items-center gap-0.5">
-                          <Sparkles size={8} /> DUE
-                        </span>
-                      )}
-                    </div>
-                    <h4 className="text-xs font-bold text-slate-900 truncate hover:text-amber-600 transition-colors">
-                      {audio.title}
-                    </h4>
-                  </div>
 
-                  <div className="flex items-center gap-1.5 flex-shrink-0">
-                    <span className="text-[11px] text-slate-400 font-mono mr-1">
-                      {formatDuration(audio.duration_seconds)}
-                    </span>
+            {/* Subtle Tab Style Switcher (Pill vs Line) */}
+            <div className="flex items-center gap-1 bg-slate-100/90 p-0.5 rounded-lg border border-slate-200/70">
+              <button
+                type="button"
+                onClick={() => setTabVariant('default')}
+                className={`px-2 py-0.5 rounded-md text-[10px] font-mono font-semibold transition-all cursor-pointer ${
+                  tabVariant === 'default'
+                    ? 'bg-white text-slate-950 shadow-2xs border border-slate-200/80'
+                    : 'text-slate-500 hover:text-slate-800'
+                }`}
+                title="Pill / Segmented style"
+              >
+                Pill
+              </button>
+              <button
+                type="button"
+                onClick={() => setTabVariant('line')}
+                className={`px-2 py-0.5 rounded-md text-[10px] font-mono font-semibold transition-all cursor-pointer ${
+                  tabVariant === 'line'
+                    ? 'bg-white text-slate-950 shadow-2xs border border-slate-200/80'
+                    : 'text-slate-500 hover:text-slate-800'
+                }`}
+                title="Line underline style"
+              >
+                Line
+              </button>
+            </div>
+          </div>
 
-                    {/* Direct 1-Tap Recall Button */}
-                    <button
-                      onClick={() => onOpenAssessmentForAudio ? onOpenAssessmentForAudio(audio) : onOpenAssessment()}
-                      className="px-2 py-1 rounded-lg bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200/80 text-[10px] font-bold font-mono flex items-center gap-1 active:scale-95 transition-all shadow-2xs"
-                      title="Test active recall for this lesson"
-                    >
-                      <Zap size={10} fill="currentColor" />
-                      <span>Recall</span>
-                    </button>
+          {/* Base UI TabsList */}
+          <TabsList
+            variant={tabVariant}
+            className={
+              tabVariant === 'default'
+                ? 'w-full grid grid-cols-4 p-1 bg-slate-100/90 border border-slate-200/80 rounded-xl h-10 shadow-2xs'
+                : 'w-full grid grid-cols-4 border-b border-slate-200/90'
+            }
+          >
+            <TabsTrigger
+              value="all"
+              className={
+                tabVariant === 'default'
+                  ? 'flex items-center justify-center gap-1.5 text-xs'
+                  : 'flex items-center justify-center gap-1.5 text-xs pb-2'
+              }
+            >
+              <span>All</span>
+              <span className="text-[10px] font-mono font-bold px-1.5 py-0.2 rounded-full bg-slate-200/70 text-slate-700">
+                {allAudio.length}
+              </span>
+            </TabsTrigger>
 
-                    {/* Direct 1-Tap Play Button */}
-                    <button
-                      onClick={() => onPlayAudio(audio)}
-                      className="w-7 h-7 rounded-full bg-slate-900 hover:bg-slate-800 text-white flex items-center justify-center transition-all active:scale-95 shadow-2xs"
-                      aria-label="Play lesson"
-                    >
-                      <Play size={12} fill="currentColor" className="translate-x-0.5" />
-                    </button>
-                  </div>
-                </div>
-              );
-            })
-          )}
-        </div>
+            <TabsTrigger
+              value="due"
+              className={
+                tabVariant === 'default'
+                  ? 'flex items-center justify-center gap-1 text-xs'
+                  : 'flex items-center justify-center gap-1 text-xs pb-2'
+              }
+            >
+              <Flame className="size-3.5 text-amber-600 fill-amber-500" />
+              <span>Due</span>
+              {revisionsDue.length > 0 && (
+                <span className="text-[10px] font-mono font-bold px-1.5 py-0.2 rounded-full bg-amber-100 text-amber-900 border border-amber-300/70">
+                  {revisionsDue.length}
+                </span>
+              )}
+            </TabsTrigger>
+
+            <TabsTrigger
+              value="favorites"
+              className={
+                tabVariant === 'default'
+                  ? 'flex items-center justify-center gap-1 text-xs'
+                  : 'flex items-center justify-center gap-1 text-xs pb-2'
+              }
+            >
+              <Star className="size-3.5 text-amber-500" />
+              <span>Favs</span>
+            </TabsTrigger>
+
+            <TabsTrigger
+              value="short"
+              className={
+                tabVariant === 'default'
+                  ? 'flex items-center justify-center gap-1 text-xs'
+                  : 'flex items-center justify-center gap-1 text-xs pb-2'
+              }
+            >
+              <Zap className="size-3.5 text-sky-500 fill-sky-500" />
+              <span>&lt;5m</span>
+            </TabsTrigger>
+          </TabsList>
+
+          {/* Base UI TabsContent for each panel */}
+          <TabsContent value="all" className="space-y-2 mt-0">
+            {renderLessonCards(allAudio, 'No audio lessons found.')}
+          </TabsContent>
+          <TabsContent value="due" className="space-y-2 mt-0">
+            {renderLessonCards(dueAudio, 'No spaced revisions due today! Great job.')}
+          </TabsContent>
+          <TabsContent value="favorites" className="space-y-2 mt-0">
+            {renderLessonCards(favoriteAudio, 'No favorited lessons yet. Star lessons in Library to pin them here.')}
+          </TabsContent>
+          <TabsContent value="short" className="space-y-2 mt-0">
+            {renderLessonCards(shortAudio, 'No quick lessons under 5 minutes found.')}
+          </TabsContent>
+        </Tabs>
       </div>
     </div>
   );
