@@ -32,7 +32,6 @@ import {
   DriveTransferItem,
   GoogleDriveStorageQuota
 } from '../services/googleDrive';
-import { BlueWaveDesign } from './ui/BlueWaveDesign';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   Carousel,
@@ -490,30 +489,61 @@ export const HomeTab: React.FC<HomeTabProps> = ({
             Math.max(0, (currentPos / continueDuration) * 100)
           );
 
+          const subjectVisual = getSubjectVisual(continueAudio.subject_name);
+          const SubjectIcon = subjectVisual.icon;
+
           return (
-            <div className="bg-gradient-to-br from-white via-sky-50/50 to-blue-50/30 text-slate-900 rounded-3xl p-4.5 space-y-3 shadow-xs border border-sky-200/80 relative overflow-hidden group">
+            <div
+              className={`bg-gradient-to-br from-white via-sky-50/40 to-blue-50/20 text-slate-900 rounded-3xl p-4 sm:p-5 space-y-3.5 border transition-all duration-300 relative overflow-hidden group shadow-xs ${
+                isCurrentAudioPlaying
+                  ? 'border-sky-300/80 shadow-[0_4px_20px_-4px_rgba(36,161,222,0.15)] ring-1 ring-[#24A1DE]/25'
+                  : 'border-sky-200/70 hover:border-sky-300/60 hover:shadow-sm'
+              }`}
+            >
+              {/* Card Header: Status Indicator & State Pill */}
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <span
-                    className={`w-2 h-2 rounded-full ${
-                      isCurrentAudioPlaying ? 'bg-[#24A1DE] animate-pulse' : 'bg-amber-400'
+                    className={`size-2 rounded-full transition-colors ${
+                      isCurrentAudioPlaying
+                        ? 'bg-[#24A1DE] animate-pulse ring-4 ring-sky-200/60'
+                        : 'bg-amber-400'
                     }`}
                   />
                   <span className="text-[11px] font-bold uppercase tracking-wider text-slate-700">
                     {isCurrentAudioPlaying ? 'Currently Playing' : 'Continue Listening'}
                   </span>
                 </div>
-                <span className="text-[10px] font-mono text-slate-500 font-semibold">
-                  {formatDuration(continueDuration)}
-                </span>
+                {isCurrentAudioPlaying ? (
+                  <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-semibold bg-sky-100/80 text-sky-700 border border-sky-200/60 font-mono tracking-tight shadow-2xs">
+                    <span className="size-1.5 rounded-full bg-[#24A1DE] animate-ping" />
+                    Playing
+                  </span>
+                ) : (
+                  <span className="text-[10px] font-mono font-medium text-slate-500 bg-slate-100/90 px-2 py-0.5 rounded-full border border-slate-200/60">
+                    {cardProgressPercent > 0
+                      ? `${Math.round(cardProgressPercent)}% completed`
+                      : 'Ready to play'}
+                  </span>
+                )}
               </div>
 
+              {/* Card Body: Subject, Title & Hero Action Button */}
               <div className="flex items-center justify-between gap-3 relative z-10">
                 <div className="flex-1 min-w-0">
-                  <span className="text-[10px] font-mono font-bold uppercase text-[#24A1DE] block tracking-wider">
-                    {continueAudio.subject_name || 'Academic'}
-                  </span>
-                  <h3 className="text-xs font-bold text-slate-900 truncate mt-0.5">
+                  <div className="flex items-center gap-1.5 mb-1">
+                    <span className="inline-flex items-center gap-1 text-[10px] font-mono font-bold uppercase tracking-wider text-[#24A1DE]">
+                      <SubjectIcon size={12} strokeWidth={2.4} />
+                      {continueAudio.subject_name || subjectVisual.label}
+                    </span>
+                    {continueAudio.is_favorite && (
+                      <Star size={11} className="text-amber-500 fill-amber-500" />
+                    )}
+                  </div>
+                  <h3
+                    className="text-sm sm:text-base font-bold text-slate-900 truncate tracking-tight leading-snug"
+                    title={continueAudio.title}
+                  >
                     {continueAudio.title}
                   </h3>
                 </div>
@@ -525,25 +555,21 @@ export const HomeTab: React.FC<HomeTabProps> = ({
                       ? `Pause ${continueAudio.title}`
                       : `Play ${continueAudio.title}`
                   }
-                  className="size-11 rounded-full bg-[#24A1DE] hover:bg-[#1f8fca] text-white flex items-center justify-center transition-all active:scale-95 shadow-md shadow-[#24A1DE]/25 shrink-0 cursor-pointer"
+                  className="size-12 rounded-full bg-[#24A1DE] hover:bg-[#1a8bc4] active:scale-95 text-white flex items-center justify-center transition-all duration-200 shadow-md shadow-[#24A1DE]/25 shrink-0 cursor-pointer"
                 >
                   {isCurrentAudioPlaying ? (
-                    <div className="flex items-end justify-center gap-0.75 h-4 w-4">
-                      <span className="w-0.75 bg-white rounded-full animate-eq-1" />
-                      <span className="w-0.75 bg-white rounded-full animate-eq-2" />
-                      <span className="w-0.75 bg-white rounded-full animate-eq-3" />
-                    </div>
+                    <Pause size={19} fill="currentColor" />
                   ) : (
-                    <Play size={17} fill="currentColor" className="translate-x-0.5" />
+                    <Play size={19} fill="currentColor" className="translate-x-0.5" />
                   )}
                 </button>
               </div>
 
               {/* Interactive Scrubbable Seek Bar */}
-              <div className="pt-0.5 space-y-1.5 relative z-10">
+              <div className="space-y-1.5 relative z-10">
                 <div
-                  className="relative w-full bg-slate-200/80 hover:bg-slate-300/80 h-2 rounded-full overflow-hidden cursor-pointer group transition-colors"
-                  title="Tap or drag to seek"
+                  className="relative w-full py-1.5 cursor-pointer group/seek select-none"
+                  title="Tap or scrub to seek"
                   onClick={(e) => {
                     if (!onSeek) return;
                     const rect = e.currentTarget.getBoundingClientRect();
@@ -551,22 +577,27 @@ export const HomeTab: React.FC<HomeTabProps> = ({
                     onSeek(pct * continueDuration);
                   }}
                 >
-                  <div
-                    className="bg-gradient-to-r from-sky-400 to-[#24A1DE] h-full rounded-full transition-all duration-150"
-                    style={{ width: `${cardProgressPercent}%` }}
-                  />
+                  {/* Track */}
+                  <div className="relative h-2 w-full bg-slate-200/80 group-hover/seek:bg-slate-300/80 rounded-full transition-colors">
+                    {/* Fill */}
+                    <div
+                      className="bg-gradient-to-r from-sky-400 via-[#24A1DE] to-[#0284c7] h-full rounded-full transition-[width] duration-150 relative"
+                      style={{ width: `${cardProgressPercent}%` }}
+                    >
+                      {/* Scrubber thumb handle at active position */}
+                      <div className="absolute right-0 top-1/2 -translate-y-1/2 translate-x-1/2 size-3.5 bg-white rounded-full border-2 border-[#24A1DE] shadow-sm transition-transform duration-150 group-hover/seek:scale-125" />
+                    </div>
+                  </div>
                 </div>
-                <div className="flex justify-between text-[10px] font-mono text-slate-500 font-medium">
-                  <span>{formatDuration(currentPos)}</span>
+
+                {/* Timestamps */}
+                <div className="flex justify-between items-center text-[10px] font-mono text-slate-500 font-medium">
+                  <span className={isCurrentAudioPlaying ? 'text-sky-600 font-semibold' : ''}>
+                    {formatDuration(currentPos)}
+                  </span>
                   <span>{formatDuration(continueDuration)}</span>
                 </div>
               </div>
-
-              <BlueWaveDesign
-                variant="compact"
-                isPlaying={isCurrentAudioPlaying}
-                className="absolute bottom-0 left-0 right-0 z-0 opacity-50"
-              />
             </div>
           );
         })()}

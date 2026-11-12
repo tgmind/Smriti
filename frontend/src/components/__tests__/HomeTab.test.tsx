@@ -87,6 +87,9 @@ describe('HomeTab Component - 3 Tabs & Google Drive Attachments Architecture', (
     // 5. Verify Subject Carousel and Continue Listening
     expect(html).toContain('Subject Folders');
     expect(html).toContain('Continue Listening');
+    expect(html).toContain('Tap or scrub to seek');
+    // Ensure the confusing bottom line (waveGradCompact) is eliminated
+    expect(html).not.toContain('waveGradCompact');
 
     // 6. Verify restored top header with user profile greeting & brand hero
     expect(html).toContain('Hi, Scholar');
@@ -127,5 +130,44 @@ describe('HomeTab Component - 3 Tabs & Google Drive Attachments Architecture', (
     expect(html).toContain('Uploading to Drive');
     expect(html).toContain('65%');
     expect(html).toContain('data-state="uploading"');
+  });
+
+  it('renders upgraded Continue Listening card with single seekbar and no confusing bottom line', () => {
+    const html = renderToString(
+      <HomeTab
+        recentAudio={mockAudio}
+        subjects={mockSubjects}
+        playbackState={{
+          currentAudio: mockAudio[0],
+          isPlaying: true,
+          positionSeconds: 15,
+          durationSeconds: 120,
+          playbackSpeed: 1,
+          isRepeatTrack: false,
+          isRepeatQueue: false,
+          abLoop: null,
+          sleepTimerRemainingSeconds: null,
+          learningModeActive: false
+        }}
+        onPlayAudio={vi.fn()}
+        onSeek={vi.fn()}
+        onGoToRecord={vi.fn()}
+        onNavigateToLibrary={vi.fn()}
+        onNavigateToAccount={vi.fn()}
+      />
+    );
+
+    // Verify playing state badges
+    expect(html).toContain('Currently Playing');
+    expect(html).toContain('Playing');
+    expect(html).toContain('Pause Thermodynamics Carnot Cycle');
+
+    // Verify single seekbar with timestamps
+    expect(html).toContain('Tap or scrub to seek');
+    expect(html).toContain('0:15');
+    expect(html).toContain('2:00');
+
+    // Verify absence of confusing dual seekbar line
+    expect(html).not.toContain('waveGradCompact');
   });
 });

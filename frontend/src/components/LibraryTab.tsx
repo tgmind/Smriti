@@ -954,20 +954,20 @@ export const LibraryTab: React.FC<LibraryTabProps> = ({
         </TabsList>
       </Tabs>
 
-      {/* APPLE MUSIC STYLE SUBJECT LIBRARY CONTAINER */}
-      <div className="bg-slate-50/70 border border-slate-200/80 rounded-3xl p-3.5 sm:p-4 space-y-3 shadow-2xs">
+      {/* MINIMALIST SUBJECT CATALOG CONTAINER */}
+      <div className="bg-white border border-slate-200/80 rounded-3xl p-3 sm:p-4 space-y-3 shadow-2xs">
         <div className="flex items-center justify-between px-1">
           <div className="flex items-center gap-1.5">
             <span className="text-xs font-bold uppercase tracking-wider text-slate-700">
-              {layoutMode === 'tree' ? 'Catalog Tracklist' : 'Subjects'}
+              {layoutMode === 'tree' ? 'File Tree' : 'Subjects'}
             </span>
             <span className="text-[11px] font-mono text-slate-400 font-medium">
               ({subjects.length})
             </span>
           </div>
 
-          {/* View Mode Toggle: Folders vs File Tree */}
-          <div className="flex items-center gap-0.5 bg-slate-200/60 p-0.5 rounded-xl border border-slate-200/70">
+          {/* View Mode Toggle: Cards vs Catalog (File Tree) */}
+          <div className="flex items-center gap-0.5 bg-slate-100 p-0.5 rounded-xl border border-slate-200/70">
             <button
               type="button"
               onClick={() => setLayoutMode('folders')}
@@ -995,7 +995,7 @@ export const LibraryTab: React.FC<LibraryTabProps> = ({
           </div>
         </div>
 
-        {/* View Option 1: File Tree (Apple Music Tracklist hierarchy) */}
+        {/* View Option 1: File Tree (Minimalist Folder/File Hierarchy) */}
         {layoutMode === 'tree' ? (
           <FileTree
             subjects={subjects}
@@ -1006,7 +1006,7 @@ export const LibraryTab: React.FC<LibraryTabProps> = ({
             activeAudioId={playbackState?.currentAudio?.id}
           />
         ) : (
-          /* View Option 2: Clean Minimalist Subject Cards (Apple Music Style) */
+          /* View Option 2: Clean Minimalist Subject Cards */
           <div className="space-y-2">
             {subjects.map((subject) => {
               const subjectAudios = audiosBySubject.get(subject.id) || [];
@@ -1019,20 +1019,18 @@ export const LibraryTab: React.FC<LibraryTabProps> = ({
                 <div
                   key={subject.id}
                   onClick={() => handleOpenSubject(subject.id)}
-                  className="group bg-white hover:bg-slate-50/90 border border-slate-200/80 hover:border-slate-300 rounded-2xl p-3.5 flex items-center justify-between gap-3.5 transition-all cursor-pointer shadow-2xs hover:shadow-xs active:scale-[0.99]"
+                  className="group bg-white hover:bg-slate-50/90 border border-slate-200/80 hover:border-slate-300 rounded-2xl p-3 sm:p-3.5 flex items-center justify-between gap-3 transition-all cursor-pointer shadow-2xs hover:shadow-xs active:scale-[0.99]"
                 >
-                  {/* Left: Apple Music Style Squircle Medallion */}
-                  <div className={`w-12 h-12 rounded-2xl ${subjectTheme.bg} flex items-center justify-center shrink-0 shadow-2xs group-hover:scale-105 transition-transform border ${subjectTheme.border}`}>
-                    <SubjectIcon size={22} />
+                  {/* Left: Minimalist Subject Icon */}
+                  <div className={`w-10 h-10 rounded-2xl ${subjectTheme.bg} flex items-center justify-center shrink-0 shadow-2xs group-hover:scale-105 transition-transform border ${subjectTheme.border}`}>
+                    <SubjectIcon size={20} />
                   </div>
 
-                  {/* Middle: Subject Title & Clean Metadata */}
+                  {/* Middle: Subject Title & Clean Subtitle */}
                   <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
-                      <h3 className="text-sm font-bold text-slate-950 group-hover:text-blue-600 transition-colors truncate">
-                        {subject.name}
-                      </h3>
-                    </div>
+                    <h3 className="text-sm font-bold text-slate-950 group-hover:text-blue-600 transition-colors truncate">
+                      {subject.name}
+                    </h3>
                     <p className="text-xs text-slate-500 mt-0.5 truncate font-normal">
                       {subjectAudios.length > 0
                         ? `${subjectAudios.length} ${subjectAudios.length === 1 ? 'lesson' : 'lessons'} · ${formatDuration(totalDuration)}`
@@ -1045,11 +1043,9 @@ export const LibraryTab: React.FC<LibraryTabProps> = ({
                     )}
                   </div>
 
-                  {/* Right: Sleek Apple Music Action / Chevron */}
-                  <div className="flex items-center gap-2 shrink-0">
-                    <div className="w-8 h-8 rounded-full bg-slate-50 border border-slate-100 group-hover:bg-slate-950 group-hover:text-white group-hover:border-slate-950 text-slate-400 flex items-center justify-center transition-all shadow-2xs">
-                      <ChevronRight size={15} className="group-hover:translate-x-0.5 transition-transform" />
-                    </div>
+                  {/* Right: Subtle Chevron */}
+                  <div className="flex items-center shrink-0 text-slate-300 group-hover:text-slate-600 transition-colors">
+                    <ChevronRight size={16} className="group-hover:translate-x-0.5 transition-transform" />
                   </div>
                 </div>
               );
