@@ -367,7 +367,7 @@ export const App: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-900 flex flex-col font-sans select-none">
+    <div className="min-h-screen bg-[#F8F9FD] text-slate-900 flex flex-col font-sans select-none">
       {/* Active Tab Screen */}
       <main className="flex-1 w-full max-w-md mx-auto">
         {currentTab === 'home' && (

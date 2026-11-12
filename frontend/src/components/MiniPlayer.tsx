@@ -25,12 +25,12 @@ export const MiniPlayer: React.FC<MiniPlayerProps> = ({
   const progressPercent = durationSeconds > 0 ? (positionSeconds / durationSeconds) * 100 : 0;
 
   return (
-    <div className="fixed bottom-16 left-0 right-0 z-30 px-3 pb-2 max-w-md mx-auto pointer-events-none">
-      <div className="pointer-events-auto bg-white/95 backdrop-blur-xl border border-slate-200/90 rounded-2xl shadow-[0_6px_24px_rgba(0,0,0,0.07)] overflow-hidden transition-all hover:border-slate-300">
+    <div className="fixed bottom-20 left-0 right-0 z-30 px-3 pb-1 max-w-md mx-auto pointer-events-none">
+      <div className="pointer-events-auto bg-white/95 backdrop-blur-xl border border-slate-200/90 rounded-2xl shadow-[0_8px_28px_rgba(0,0,0,0.08)] overflow-hidden transition-all hover:border-slate-300">
         {/* Thin top scrub/progress indicator */}
         <div className="w-full bg-slate-100 h-1">
           <div
-            className="bg-amber-500 h-full transition-all duration-200"
+            className="bg-blue-600 h-full transition-all duration-200"
             style={{ width: `${progressPercent}%` }}
           />
         </div>

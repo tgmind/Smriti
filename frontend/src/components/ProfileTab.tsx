@@ -8,7 +8,11 @@ import {
   CheckCircle2,
   LogOut,
   Sliders,
-  Database
+  Database,
+  Cloud,
+  ChevronRight,
+  Sparkles,
+  ArrowRight
 } from 'lucide-react';
 import { UserSettings, StorageOverview, AudioItem, RevisionItem, DailyStudyStats } from '../types';
 import { exportDataAsJSON, exportDataAsCSV } from '../services/supabase';
@@ -49,178 +53,234 @@ export const ProfileTab: React.FC<ProfileTabProps> = ({
     setTimeout(() => setCacheClearedSuccess(false), 3000);
   };
 
+  const localUsedMb = (
+    (storageInfo.cachedAudioBytes + storageInfo.explicitDownloadsBytes + storageInfo.metadataDbBytes) /
+    (1024 * 1024)
+  ).toFixed(1);
+
   return (
-    <div className="space-y-4 pb-28 pt-4 px-4 max-w-md mx-auto">
-      {/* Header */}
-      <div>
-        <span className="text-[11px] font-mono tracking-widest uppercase font-bold text-amber-700">
-          ACCOUNT & PREFERENCES
-        </span>
-        <h1 className="text-xl font-extrabold text-slate-950 tracking-tight">
-          Settings & Storage
+    <div className="space-y-4 pb-28 pt-3 px-4 max-w-md mx-auto">
+      {/* Top Header: Account */}
+      <div className="flex items-center justify-between pt-1">
+        <h1 className="text-xl font-black text-slate-950 tracking-tight">
+          Account
         </h1>
+        <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-500">
+          <ShieldCheck size={16} />
+        </div>
       </div>
 
-      {/* Google Drive Sovereign Storage Section */}
-      <div className="bg-white border border-slate-200/80 rounded-2xl p-4.5 shadow-[0_1px_3px_rgba(0,0,0,0.03)] space-y-3">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2.5">
-            <div className="w-9 h-9 rounded-xl bg-amber-50 text-amber-700 border border-amber-200/60 flex items-center justify-center">
-              <HardDrive size={18} />
+      {/* User Profile Card with Large Avatar */}
+      <div className="text-center py-2 space-y-1">
+        <div className="w-20 h-20 rounded-full ring-4 ring-emerald-300/60 bg-gradient-to-tr from-emerald-100 to-teal-100 flex items-center justify-center text-3xl font-black text-emerald-800 mx-auto shadow-sm">
+          स्म
+        </div>
+        <h2 className="text-lg font-black text-slate-950 tracking-tight mt-2">
+          Scholar
+        </h2>
+        <p className="text-xs text-slate-500 font-medium font-mono">
+          {isDriveConnected ? 'scholar@drive.connected' : 'scholar@smriti.local'}
+        </p>
+      </div>
+
+      {/* "Your Plan" / Storage Overview Card (Dropbox style in Image 1) */}
+      <div className="bg-white border border-slate-200/80 rounded-3xl p-4.5 shadow-2xs space-y-3.5">
+        <div className="flex items-start justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-11 h-11 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center shadow-2xs">
+              <Cloud size={22} strokeWidth={2.2} />
             </div>
             <div>
-              <h2 className="text-xs font-bold text-slate-900 uppercase tracking-wider">
-                Personal Audio Storage
-              </h2>
-              <span className="text-xs text-slate-500">Google Drive Integration</span>
+              <div className="flex items-center gap-1.5">
+                <h3 className="text-xs font-bold text-slate-950 uppercase tracking-wider">
+                  Your Storage
+                </h3>
+                <span className="px-2 py-0.2 rounded-full text-[10px] font-bold font-mono bg-blue-50 text-blue-700 border border-blue-200">
+                  {isDriveConnected ? 'Connected' : 'Free & Offline'}
+                </span>
+              </div>
+              <p className="text-xs font-semibold text-slate-800 mt-0.5">
+                {isDriveConnected ? 'Personal Google Drive Sync' : 'Local Offline Storage'}
+              </p>
             </div>
           </div>
-
-          <span
-            className={`px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold border ${
-              isDriveConnected
-                ? 'bg-emerald-50 text-emerald-700 border-emerald-200'
-                : 'bg-amber-50 text-amber-800 border-amber-200'
-            }`}
-          >
-            {isDriveConnected ? 'CONNECTED' : 'DISCONNECTED'}
-          </span>
         </div>
 
-        <p className="text-xs text-slate-600 leading-relaxed">
-          SMRITI saves audio into your personal Google Drive (<code className="text-slate-800 font-mono text-[10px] bg-slate-100 px-1 py-0.5 rounded">My Drive/Smriti/</code>) with narrow per-file permissions. You own 100% of your data with zero cloud bills.
-        </p>
-
-        {isDriveConnected ? (
-          <div className="pt-1 flex items-center justify-between">
-            <div className="text-[11px] font-mono text-slate-500">
-              Scope: <span className="text-emerald-700 font-semibold">drive.file (Strict)</span>
-            </div>
-            <button
-              onClick={onDisconnectDrive}
-              className="py-1 px-3 rounded-lg bg-slate-100 hover:bg-slate-200 border border-slate-200 text-rose-700 text-xs font-semibold flex items-center gap-1 active:scale-95 transition-all"
-            >
-              <LogOut size={13} />
-              <span>Disconnect</span>
-            </button>
+        {/* Storage Bar */}
+        <div className="space-y-1.5 pt-1">
+          <div className="flex justify-between text-[11px] font-mono text-slate-500">
+            <span>Used: <strong className="text-slate-900">{localUsedMb} MB</strong></span>
+            <span>Limit: {userSettings.cache_limit_mb} MB cache</span>
           </div>
+          <div className="w-full bg-slate-100 rounded-full h-2 overflow-hidden">
+            <div
+              className="bg-blue-600 h-full rounded-full transition-all duration-300"
+              style={{
+                width: `${Math.min(100, Math.max(8, (parseFloat(localUsedMb) / userSettings.cache_limit_mb) * 100))}%`
+              }}
+            />
+          </div>
+        </div>
+
+        {/* Action Button: Black Pill Button with Arrow */}
+        {isDriveConnected ? (
+          <button
+            onClick={onDisconnectDrive}
+            className="w-full py-2.5 px-4 rounded-2xl bg-slate-950 hover:bg-slate-800 text-white text-xs font-semibold flex items-center justify-between active:scale-98 transition-all cursor-pointer shadow-xs"
+          >
+            <span className="flex items-center gap-2">
+              <LogOut size={14} className="text-rose-400" />
+              <span>Disconnect Google Drive</span>
+            </span>
+            <ArrowRight size={14} />
+          </button>
         ) : (
           <button
             onClick={onConnectDrive}
-            className="w-full py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-semibold text-xs active:scale-95 transition-all flex items-center justify-center gap-2 shadow-xs"
+            className="w-full py-2.5 px-4 rounded-2xl bg-slate-950 hover:bg-slate-800 text-white text-xs font-semibold flex items-center justify-between active:scale-98 transition-all cursor-pointer shadow-xs"
           >
-            <HardDrive size={15} />
-            <span>Connect Personal Google Drive</span>
+            <span className="flex items-center gap-2">
+              <HardDrive size={14} className="text-blue-400" />
+              <span>Connect Personal Google Drive</span>
+            </span>
+            <ArrowRight size={14} />
           </button>
         )}
       </div>
 
-      {/* STORAGE MANAGEMENT BREAKDOWN */}
-      <div className="bg-white border border-slate-200/80 rounded-2xl p-4.5 shadow-[0_1px_3px_rgba(0,0,0,0.03)] space-y-3.5">
-        <div className="flex items-center justify-between border-b border-slate-100 pb-2.5">
-          <div className="flex items-center gap-1.5">
-            <Database size={16} className="text-amber-600" />
-            <h2 className="text-xs font-bold text-slate-900 uppercase tracking-wider">
-              Storage Control & Caches
-            </h2>
-          </div>
-          <span className="text-[11px] font-mono text-slate-500">
-            Limit: {userSettings.cache_limit_mb} MB
-          </span>
-        </div>
+      {/* Settings List Items with Squircles & Chevrons (Like Image 1) */}
+      <div className="space-y-2">
+        <span className="text-[10px] font-mono uppercase tracking-wider text-slate-400 font-bold px-1 block">
+          Storage & Preferences
+        </span>
 
-        {/* Detailed Breakdown */}
-        <div className="space-y-2 text-xs">
-          <div className="flex items-center justify-between py-1 border-b border-slate-100">
-            <span className="text-slate-600">Temporary Audio Streaming Cache</span>
-            <span className="font-mono font-bold text-slate-900">{formatMb(storageInfo.cachedAudioBytes)} MB</span>
-          </div>
-          <div className="flex items-center justify-between py-1 border-b border-slate-100">
-            <span className="text-slate-600">Pinned Offline Downloads</span>
-            <span className="font-mono font-bold text-emerald-700">{formatMb(storageInfo.explicitDownloadsBytes)} MB</span>
-          </div>
-          <div className="flex items-center justify-between py-1 border-b border-slate-100">
-            <span className="text-slate-600">Room SQLite Database & Metadata</span>
-            <span className="font-mono font-bold text-slate-900">{formatMb(storageInfo.metadataDbBytes)} MB</span>
-          </div>
-          <div className="flex items-center justify-between py-1">
-            <span className="text-slate-600">Pending Sync Events</span>
-            <span className="font-mono font-bold text-amber-700">{storageInfo.pendingSyncCount} pending</span>
-          </div>
-        </div>
+        {/* Cache Management Item */}
+        <div className="bg-white border border-slate-200/80 rounded-2xl p-3.5 space-y-3 shadow-2xs">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-2xl bg-amber-50 text-amber-700 flex items-center justify-center shrink-0">
+                <Database size={18} />
+              </div>
+              <div>
+                <h4 className="text-xs font-bold text-slate-900">
+                  Audio Streaming Cache
+                </h4>
+                <p className="text-[11px] text-slate-500 font-mono">
+                  {formatMb(storageInfo.cachedAudioBytes)} MB cached • {formatMb(storageInfo.explicitDownloadsBytes)} MB pinned offline
+                </p>
+              </div>
+            </div>
 
-        {/* Cache Limit Configuration */}
-        <div className="pt-1">
-          <label className="text-[11px] font-bold text-slate-700 block mb-1.5 flex items-center gap-1">
-            <Sliders size={12} /> Max Audio Streaming Cache Limit
-          </label>
-          <div className="grid grid-cols-4 gap-1.5">
-            {[50, 100, 250, 500].map((mb) => (
-              <button
-                key={mb}
-                onClick={() => onUpdateSettings({ cache_limit_mb: mb })}
-                className={`py-1.5 rounded-lg text-xs font-mono font-bold transition-all border shadow-2xs ${
-                  userSettings.cache_limit_mb === mb
-                    ? 'bg-slate-900 border-slate-900 text-white'
-                    : 'bg-white border-slate-200 text-slate-700 hover:border-slate-300'
-                }`}
-              >
-                {mb} MB
-              </button>
-            ))}
+            <button
+              onClick={handleClear}
+              className="px-2.5 py-1 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold flex items-center gap-1 active:scale-95 transition-all cursor-pointer"
+            >
+              <Trash2 size={12} />
+              <span>Clear</span>
+            </button>
           </div>
-        </div>
 
-        {/* Clear Temporary Cache Button */}
-        <div className="pt-0.5">
-          <button
-            onClick={handleClear}
-            className="w-full py-2.5 rounded-xl bg-slate-50 border border-slate-200 hover:bg-slate-100 text-slate-700 font-semibold text-xs flex items-center justify-center gap-1.5 active:scale-95 transition-all shadow-2xs"
-          >
-            <Trash2 size={13} />
-            <span>Clear Temporary Audio Cache</span>
-          </button>
           {cacheClearedSuccess && (
-            <p className="text-[11px] text-emerald-700 text-center mt-2 flex items-center justify-center gap-1 font-medium">
-              <CheckCircle2 size={13} /> Temporary cache cleared. Pinned offline downloads preserved!
+            <p className="text-[11px] text-emerald-700 flex items-center gap-1 font-medium bg-emerald-50 p-2 rounded-xl border border-emerald-200">
+              <CheckCircle2 size={13} /> Cache cleared. Pinned offline downloads preserved!
             </p>
           )}
+
+          {/* Cache Size Selector */}
+          <div className="pt-1 border-t border-slate-100 flex items-center justify-between">
+            <span className="text-[11px] text-slate-500 flex items-center gap-1 font-medium">
+              <Sliders size={12} /> Cache Limit:
+            </span>
+            <div className="flex gap-1">
+              {[50, 100, 250, 500].map((mb) => (
+                <button
+                  key={mb}
+                  onClick={() => onUpdateSettings({ cache_limit_mb: mb })}
+                  className={`px-2 py-0.5 rounded-lg text-[10px] font-mono font-bold transition-all border cursor-pointer ${
+                    userSettings.cache_limit_mb === mb
+                      ? 'bg-slate-950 border-slate-950 text-white'
+                      : 'bg-white border-slate-200 text-slate-600 hover:border-slate-300'
+                  }`}
+                >
+                  {mb}M
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {/* Export JSON */}
+        <div
+          onClick={() => exportDataAsJSON({ audioItems, revisions: revisionItems, dailyStats, settings: userSettings })}
+          className="bg-white border border-slate-200/80 hover:border-slate-300 rounded-2xl p-3 flex items-center justify-between gap-3 cursor-pointer transition-all shadow-2xs hover:shadow-xs group"
+        >
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-2xl bg-emerald-50 text-emerald-700 flex items-center justify-center shrink-0">
+              <FileJson size={18} />
+            </div>
+            <div>
+              <h4 className="text-xs font-bold text-slate-900 group-hover:text-emerald-700 transition-colors">
+                Export Study Catalog (JSON)
+              </h4>
+              <p className="text-[11px] text-slate-500">
+                Complete database backup with audio metadata
+              </p>
+            </div>
+          </div>
+          <ChevronRight size={16} className="text-slate-400 group-hover:translate-x-0.5 transition-transform" />
+        </div>
+
+        {/* Export CSV */}
+        <div
+          onClick={() => exportDataAsCSV(dailyStats)}
+          className="bg-white border border-slate-200/80 hover:border-slate-300 rounded-2xl p-3 flex items-center justify-between gap-3 cursor-pointer transition-all shadow-2xs hover:shadow-xs group"
+        >
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-2xl bg-sky-50 text-sky-700 flex items-center justify-center shrink-0">
+              <FileSpreadsheet size={18} />
+            </div>
+            <div>
+              <h4 className="text-xs font-bold text-slate-900 group-hover:text-sky-700 transition-colors">
+                Export Study Logs (CSV)
+              </h4>
+              <p className="text-[11px] text-slate-500">
+                Compatible with Excel, Numbers, and Sheets
+              </p>
+            </div>
+          </div>
+          <ChevronRight size={16} className="text-slate-400 group-hover:translate-x-0.5 transition-transform" />
+        </div>
+
+        {/* Wi-Fi Only Sync Preference */}
+        <div
+          onClick={() => onUpdateSettings({ offline_sync_wifi_only: !userSettings.offline_sync_wifi_only })}
+          className="bg-white border border-slate-200/80 hover:border-slate-300 rounded-2xl p-3 flex items-center justify-between gap-3 cursor-pointer transition-all shadow-2xs hover:shadow-xs group"
+        >
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-2xl bg-violet-50 text-violet-700 flex items-center justify-center shrink-0">
+              <Sparkles size={18} />
+            </div>
+            <div>
+              <h4 className="text-xs font-bold text-slate-900 group-hover:text-violet-700 transition-colors">
+                Wi-Fi Only Sync
+              </h4>
+              <p className="text-[11px] text-slate-500">
+                Prevent mobile data consumption for audio sync
+              </p>
+            </div>
+          </div>
+          <span className={`text-[10px] font-mono font-bold px-2 py-0.5 rounded-full ${
+            userSettings.offline_sync_wifi_only
+              ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+              : 'bg-slate-100 text-slate-500'
+          }`}>
+            {userSettings.offline_sync_wifi_only ? 'ENABLED' : 'DISABLED'}
+          </span>
         </div>
       </div>
 
-      {/* DATA EXPORT & FREEDOM */}
-      <div className="bg-white border border-slate-200/80 rounded-2xl p-4.5 shadow-[0_1px_3px_rgba(0,0,0,0.03)] space-y-2.5">
-        <div className="flex items-center gap-1.5">
-          <ShieldCheck size={16} className="text-sky-600" />
-          <h2 className="text-xs font-bold text-slate-900 uppercase tracking-wider">
-            Data Portability & Export
-          </h2>
-        </div>
-        <p className="text-xs text-slate-600 leading-relaxed">
-          Zero vendor lock-in. Export your complete study history, recall ratings, and spaced repetition schedules whenever you want.
-        </p>
-
-        <div className="grid grid-cols-2 gap-2 pt-1">
-          <button
-            onClick={() => exportDataAsJSON({ audioItems, revisions: revisionItems, dailyStats, settings: userSettings })}
-            className="py-2.5 px-3 rounded-xl bg-slate-50 border border-slate-200 hover:bg-slate-100 text-slate-800 text-xs font-semibold flex items-center justify-center gap-1.5 active:scale-95 transition-all shadow-2xs"
-          >
-            <FileJson size={14} className="text-amber-600" />
-            <span>Export JSON</span>
-          </button>
-
-          <button
-            onClick={() => exportDataAsCSV(dailyStats)}
-            className="py-2.5 px-3 rounded-xl bg-slate-50 border border-slate-200 hover:bg-slate-100 text-slate-800 text-xs font-semibold flex items-center justify-center gap-1.5 active:scale-95 transition-all shadow-2xs"
-          >
-            <FileSpreadsheet size={14} className="text-sky-600" />
-            <span>Export CSV</span>
-          </button>
-        </div>
-      </div>
-
-      {/* App Version & Environment */}
-      <div className="text-center text-[11px] text-slate-400 font-mono space-y-0.5">
+      {/* App Version Info */}
+      <div className="text-center text-[11px] text-slate-400 font-mono space-y-0.5 pt-2">
         <p>SMRITI Platform v1.0.0 (Production)</p>
         <p>Runtime: {bridge.isNativeApp() ? 'Native Android Hybrid Client' : 'Cloudflare Edge PWA'}</p>
       </div>

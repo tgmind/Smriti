@@ -1,5 +1,5 @@
 import React from 'react';
-import { Home, BookOpen, BarChart3, Mic, User } from 'lucide-react';
+import { Home, Folder, BarChart3, Mic, User } from 'lucide-react';
 
 export type TabType = 'home' | 'library' | 'progress' | 'record' | 'profile';
 
@@ -12,57 +12,75 @@ export const Navigation: React.FC<NavigationProps> = ({
   currentTab,
   onSelectTab
 }) => {
-  const tabs = [
+  const leftTabs = [
     { id: 'home' as TabType, label: 'Home', icon: Home },
-    { id: 'library' as TabType, label: 'Library', icon: BookOpen },
-    { id: 'record' as TabType, label: 'Record', icon: Mic, isSpecial: true },
+    { id: 'library' as TabType, label: 'Library', icon: Folder }
+  ];
+
+  const rightTabs = [
     { id: 'progress' as TabType, label: 'Progress', icon: BarChart3 },
-    { id: 'profile' as TabType, label: 'Profile', icon: User }
+    { id: 'profile' as TabType, label: 'Account', icon: User }
   ];
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 z-40 bg-white/90 backdrop-blur-xl border-t border-slate-200/80 shadow-[0_-4px_20px_rgba(0,0,0,0.03)] safe-bottom">
-      <div className="max-w-md mx-auto px-4 h-16 flex items-center justify-around">
-        {tabs.map((tab) => {
-          const Icon = tab.icon;
-          const isActive = currentTab === tab.id;
-
-          if (tab.isSpecial) {
+    <nav className="fixed bottom-4 left-0 right-0 z-40 px-4 pointer-events-none safe-bottom">
+      <div className="max-w-xs mx-auto pointer-events-auto bg-slate-950/95 backdrop-blur-2xl text-white rounded-full p-1.5 px-3 shadow-[0_16px_36px_rgba(0,0,0,0.35)] border border-white/10 flex items-center justify-between">
+        {/* Left Tabs */}
+        <div className="flex items-center gap-1">
+          {leftTabs.map((tab) => {
+            const Icon = tab.icon;
+            const isActive = currentTab === tab.id;
             return (
               <button
                 key={tab.id}
                 onClick={() => onSelectTab(tab.id)}
-                aria-label="Open Studio Recorder"
-                className={`relative -top-3 p-3.5 rounded-full shadow-lg transition-transform active:scale-90 cursor-pointer ${
+                aria-label={tab.label}
+                className={`w-10 h-10 rounded-full flex items-center justify-center transition-all duration-200 cursor-pointer ${
                   isActive
-                    ? 'bg-amber-500 text-slate-950 ring-4 ring-amber-500/20 shadow-amber-500/25'
-                    : 'bg-slate-900 text-white hover:bg-slate-800 shadow-slate-900/20'
+                    ? 'bg-white text-slate-950 shadow-sm scale-105'
+                    : 'text-slate-400 hover:text-white hover:bg-white/10'
                 }`}
               >
-                <Icon size={22} strokeWidth={2.4} />
+                <Icon size={19} strokeWidth={isActive ? 2.4 : 1.8} />
               </button>
             );
-          }
+          })}
+        </div>
 
-          return (
-            <button
-              key={tab.id}
-              onClick={() => onSelectTab(tab.id)}
-              className={`relative flex flex-col items-center justify-center w-14 py-1.5 rounded-xl transition-all cursor-pointer ${
-                isActive
-                  ? 'text-slate-950 font-semibold'
-                  : 'text-slate-500 hover:text-slate-800'
-              }`}
-            >
-              <div className="relative">
-                <Icon size={20} strokeWidth={isActive ? 2.3 : 1.7} />
-              </div>
-              <span className="text-[11px] mt-1 tracking-tight">
-                {tab.label}
-              </span>
-            </button>
-          );
-        })}
+        {/* Center Action Button (Record Studio) */}
+        <button
+          onClick={() => onSelectTab('record')}
+          aria-label="Record Audio Note"
+          className={`w-11 h-11 rounded-full flex items-center justify-center text-white transition-all duration-200 shadow-md active:scale-90 cursor-pointer ${
+            currentTab === 'record'
+              ? 'bg-amber-500 shadow-amber-500/40 ring-4 ring-amber-400/30 scale-105'
+              : 'bg-blue-600 hover:bg-blue-500 shadow-blue-600/30 hover:scale-105'
+          }`}
+        >
+          <Mic size={20} strokeWidth={2.4} />
+        </button>
+
+        {/* Right Tabs */}
+        <div className="flex items-center gap-1">
+          {rightTabs.map((tab) => {
+            const Icon = tab.icon;
+            const isActive = currentTab === tab.id;
+            return (
+              <button
+                key={tab.id}
+                onClick={() => onSelectTab(tab.id)}
+                aria-label={tab.label}
+                className={`w-10 h-10 rounded-full flex items-center justify-center transition-all duration-200 cursor-pointer ${
+                  isActive
+                    ? 'bg-white text-slate-950 shadow-sm scale-105'
+                    : 'text-slate-400 hover:text-white hover:bg-white/10'
+                }`}
+              >
+                <Icon size={19} strokeWidth={isActive ? 2.4 : 1.8} />
+              </button>
+            );
+          })}
+        </div>
       </div>
     </nav>
   );

@@ -243,14 +243,11 @@ export const RecordTab: React.FC<RecordTabProps> = ({
   };
 
   return (
-    <div className="space-y-4 pb-28 pt-4 px-4 max-w-md mx-auto">
+    <div className="space-y-4 pb-28 pt-3 px-4 max-w-md mx-auto">
       {/* Header */}
-      <div>
-        <span className="text-[11px] font-mono tracking-widest uppercase font-bold text-amber-700">
-          STUDIO RECORDER
-        </span>
-        <h1 className="text-xl font-extrabold text-slate-950 tracking-tight">
-          Record Audio Note
+      <div className="pt-1">
+        <h1 className="text-2xl font-black text-slate-950 tracking-tight">
+          Record Note
         </h1>
         <p className="text-xs text-slate-500 mt-0.5">
           Clean voice capture with on-device DSP noise suppression.
@@ -259,7 +256,7 @@ export const RecordTab: React.FC<RecordTabProps> = ({
 
       {/* RECORDING / IDLE STATE */}
       {recordingState !== 'review' ? (
-        <div className="bg-white border border-slate-200/90 rounded-3xl p-6 shadow-[0_2px_12px_rgba(0,0,0,0.03)] flex flex-col items-center justify-center space-y-5 min-h-[360px]">
+        <div className="bg-white border border-slate-200/80 rounded-3xl p-6 shadow-2xs flex flex-col items-center justify-center space-y-5 min-h-[380px]">
           {/* Status Indicator Pill */}
           <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-100 border border-slate-200 text-slate-700">
             <span
@@ -281,7 +278,7 @@ export const RecordTab: React.FC<RecordTabProps> = ({
           </div>
 
           {/* Large Digital Timer */}
-          <div className="text-4xl font-extrabold font-mono text-slate-950 tracking-tight">
+          <div className="text-5xl font-black font-mono text-slate-950 tracking-tight">
             {formatDuration(recordedDuration)}
           </div>
 
@@ -292,7 +289,7 @@ export const RecordTab: React.FC<RecordTabProps> = ({
                 key={idx}
                 className={`w-1.5 rounded-full transition-all duration-100 ${
                   recordingState === 'recording'
-                    ? 'bg-amber-500'
+                    ? 'bg-blue-600'
                     : 'bg-slate-200'
                 }`}
                 style={{
@@ -307,18 +304,18 @@ export const RecordTab: React.FC<RecordTabProps> = ({
             {recordingState === 'idle' ? (
               <button
                 onClick={handleStartRecording}
-                className="w-18 h-18 rounded-full bg-slate-900 text-white flex items-center justify-center shadow-lg shadow-slate-900/20 hover:scale-105 active:scale-95 transition-transform"
+                className="w-20 h-20 rounded-full bg-blue-600 hover:bg-blue-500 text-white flex items-center justify-center shadow-lg shadow-blue-600/30 hover:scale-105 active:scale-95 transition-all cursor-pointer"
                 aria-label="Start recording"
               >
-                <Mic size={28} />
+                <Mic size={30} strokeWidth={2.4} />
               </button>
             ) : (
               <button
                 onClick={handleStopRecording}
-                className="w-16 h-16 rounded-full bg-rose-600 hover:bg-rose-700 text-white flex items-center justify-center shadow-md shadow-rose-600/25 active:scale-95 transition-transform"
+                className="w-18 h-18 rounded-full bg-rose-600 hover:bg-rose-700 text-white flex items-center justify-center shadow-lg shadow-rose-600/30 active:scale-95 transition-all cursor-pointer"
                 aria-label="Stop and save recording"
               >
-                <Square size={22} fill="currentColor" />
+                <Square size={24} fill="currentColor" />
               </button>
             )}
           </div>
