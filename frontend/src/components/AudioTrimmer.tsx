@@ -42,6 +42,12 @@ export const AudioTrimmer: React.FC<AudioTrimmerProps> = ({
   const [currentTime, setCurrentTime] = useState(startSeconds);
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
+  // Keep references to current boundaries for audio event listeners
+  const startSecondsRef = useRef(startSeconds);
+  startSecondsRef.current = startSeconds;
+  const endSecondsRef = useRef(endSeconds);
+  endSecondsRef.current = endSeconds;
+
   // Dragging state
   const trackRef = useRef<HTMLDivElement | null>(null);
   const [activeDrag, setActiveDrag] = useState<'start' | 'end' | 'window' | null>(null);
@@ -52,7 +58,6 @@ export const AudioTrimmer: React.FC<AudioTrimmerProps> = ({
   // Normalized peaks: exactly 48 clean vertical bars
   const peaks = useMemo(() => {
     if (waveformPeaks.length >= 20) {
-      // Resample to 48 bars
       const targetCount = 48;
       const resampled: number[] = [];
       const step = waveformPeaks.length / targetCount;
@@ -76,9 +81,10 @@ export const AudioTrimmer: React.FC<AudioTrimmerProps> = ({
     onTrimChange(startSeconds, endSeconds, fadeIn, fadeOut);
   }, [startSeconds, endSeconds, fadeIn, fadeOut, onTrimChange]);
 
-  // Audio preview playback sync
+  // Audio preview playback sync: Recreated ONLY when audioUrl changes!
   useEffect(() => {
     if (!audioUrl) return;
+
     const audio = new Audio(audioUrl);
     audioRef.current = audio;
 
@@ -86,10 +92,11 @@ export const AudioTrimmer: React.FC<AudioTrimmerProps> = ({
       if (!audio) return;
       setCurrentTime(audio.currentTime);
 
-      if (audio.currentTime >= endSeconds) {
+      // Loop or pause when reaching current end boundary
+      if (audio.currentTime >= endSecondsRef.current) {
         audio.pause();
-        audio.currentTime = startSeconds;
-        setCurrentTime(startSeconds);
+        audio.currentTime = startSecondsRef.current;
+        setCurrentTime(startSecondsRef.current);
         setIsPlaying(false);
       }
     };
@@ -97,8 +104,8 @@ export const AudioTrimmer: React.FC<AudioTrimmerProps> = ({
     const handleEnded = () => {
       setIsPlaying(false);
       if (audio) {
-        audio.currentTime = startSeconds;
-        setCurrentTime(startSeconds);
+        audio.currentTime = startSecondsRef.current;
+        setCurrentTime(startSecondsRef.current);
       }
     };
 
@@ -111,7 +118,7 @@ export const AudioTrimmer: React.FC<AudioTrimmerProps> = ({
       audio.removeEventListener('ended', handleEnded);
       audioRef.current = null;
     };
-  }, [audioUrl, startSeconds, endSeconds]);
+  }, [audioUrl]);
 
   // Toggle Play / Pause preview of trimmed region
   const togglePlay = () => {
@@ -122,8 +129,10 @@ export const AudioTrimmer: React.FC<AudioTrimmerProps> = ({
       audio.pause();
       setIsPlaying(false);
     } else {
-      if (audio.currentTime < startSeconds || audio.currentTime >= endSeconds) {
-        audio.currentTime = startSeconds;
+      // If playhead is outside current trim range, cue to start
+      if (audio.currentTime < startSecondsRef.current || audio.currentTime >= endSecondsRef.current) {
+        audio.currentTime = startSecondsRef.current;
+        setCurrentTime(startSecondsRef.current);
       }
       audio.play().then(() => {
         setIsPlaying(true);

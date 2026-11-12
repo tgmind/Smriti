@@ -222,19 +222,20 @@ export const RecordTab: React.FC<RecordTabProps> = ({
         }
       }
 
-      let effectiveDuration = Math.max(1, (trimEndSeconds || recordedDuration) - trimStartSeconds);
+      const effectiveEnd = (trimEndSeconds && trimEndSeconds > 0) ? trimEndSeconds : recordedDuration;
+      let effectiveDuration = Math.max(1, Math.round(effectiveEnd - trimStartSeconds));
       let peaksToSave = liveAmplitudes;
 
       // CLIENT-SIDE AUDIO TRIMMING
       if (
         finalBlob &&
-        (trimStartSeconds > 0.05 || (trimEndSeconds && trimEndSeconds < recordedDuration - 0.2))
+        (trimStartSeconds > 0.05 || effectiveEnd < recordedDuration - 0.05 || trimFadeIn || trimFadeOut)
       ) {
         try {
           const trimmedResult = await trimAudioBlob(
             finalBlob,
             trimStartSeconds,
-            trimEndSeconds || recordedDuration,
+            effectiveEnd,
             {
               fadeIn: trimFadeIn,
               fadeOut: trimFadeOut
