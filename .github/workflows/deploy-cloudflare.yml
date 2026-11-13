@@ -30,6 +30,10 @@ jobs:
 
       - name: Run Test Suite
         run: cd frontend && npm test
+        env:
+          VITE_SUPABASE_URL: https://wppnfezoqpcgmowdkofp.supabase.co
+          VITE_SUPABASE_ANON_KEY: sb_publishable_Jv7t8irT0s7wTNheRXMUpQ_SrNOB-0n
+          VITE_GOOGLE_CLIENT_ID: 964954219665-jf8pdaq8n3aejm2hf45p68nmcmc710mb.apps.googleusercontent.com
 
       - name: Build Production Frontend
         run: cd frontend && npm run build

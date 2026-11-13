@@ -79,6 +79,7 @@ export function isDummyFolderArtifact(title?: string, mimeType?: string, fileNam
 }
 
 export const DEFAULT_SMRITI_FOLDER_ID = '1hFil8zHpWljgGhhcfUWvBLjqxs49Yeyn';
+export const DEFAULT_GOOGLE_CLIENT_ID = '964954219665-jf8pdaq8n3aejm2hf45p68nmcmc710mb.apps.googleusercontent.com';
 
 class GoogleDriveService {
   private accessToken: string | null = null;
@@ -248,8 +249,7 @@ class GoogleDriveService {
       try {
         if (typeof window === 'undefined') return null;
 
-        const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
-        if (!clientId) return null;
+        const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID || DEFAULT_GOOGLE_CLIENT_ID;
 
         await this.ensureGisLoaded();
 
@@ -433,7 +433,7 @@ class GoogleDriveService {
    * Uses prompt: 'select_account' to allow seamless multi-account switching on the same device.
    */
   public async authorize(clientId?: string): Promise<string> {
-    const finalClientId = clientId || import.meta.env.VITE_GOOGLE_CLIENT_ID;
+    const finalClientId = clientId || import.meta.env.VITE_GOOGLE_CLIENT_ID || DEFAULT_GOOGLE_CLIENT_ID;
 
     if (!finalClientId) {
       throw new Error('Google Client ID is missing. Please configure VITE_GOOGLE_CLIENT_ID.');
