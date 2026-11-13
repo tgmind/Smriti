@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
 import { googleDriveService, GOOGLE_DRIVE_SCOPES, isDummyFolderArtifact } from '../googleDrive';
 import { audioStorage } from '../audioStorage';
+import type { Subject } from '../../types';
 
 describe('Google Drive Automatic Cloud Data Retrieval on Connect', () => {
   const originalFetch = globalThis.fetch;
@@ -447,6 +448,7 @@ describe('Google Drive Automatic Cloud Data Retrieval on Connect', () => {
     const createdFolders: Array<{ name: string; parents?: string[] }> = [];
 
     globalThis.fetch = vi.fn().mockImplementation(async (_url: string, options?: any) => {
+      void _url;
       if (options?.method === 'POST') {
         const body = JSON.parse(options.body);
         createdFolders.push(body);
@@ -578,6 +580,122 @@ describe('Google Drive Automatic Cloud Data Retrieval on Connect', () => {
     expect(deletedUrls).toContain('https://www.googleapis.com/drive/v3/files/folder-bio-123');
   });
 
+  it('deleteSubjectFolder moves child files to General folder when deleteFiles is false', async () => {
+    googleDriveService.setAccessToken('mock-token-move-children', 3600);
+
+    const patchCalls: Array<{ url: string; method?: string }> = [];
+    const deleteCalls: string[] = [];
+
+    globalThis.fetch = vi.fn().mockImplementation(async (url: string, options?: any) => {
+      const urlStr = String(url);
+      const decoded = decodeURIComponent(urlStr);
+
+      if (options?.method === 'PATCH') {
+        patchCalls.push({ url: urlStr, method: 'PATCH' });
+        return { ok: true, status: 200, json: async () => ({}) };
+      }
+
+      if (options?.method === 'DELETE') {
+        deleteCalls.push(urlStr);
+        return { ok: true, status: 200, json: async () => ({}) };
+      }
+
+      if (decoded.includes("name = 'Smriti'")) {
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({ files: [{ id: 'smriti-root-id', name: 'Smriti' }] })
+        };
+      }
+
+      if (decoded.includes("name = 'Physics'")) {
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({
+            files: [{ id: 'folder-phy-100', name: 'Physics', parents: ['smriti-root-id'] }]
+          })
+        };
+      }
+
+      if (decoded.includes("'folder-phy-100' in parents")) {
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({
+            files: [
+              { id: 'phy-audio-1', name: 'Kinematics.m4a', mimeType: 'audio/mp4' }
+            ]
+          })
+        };
+      }
+
+      return { ok: true, status: 200, json: async () => ({ files: [] }) };
+    });
+
+    const success = await googleDriveService.deleteSubjectFolder('Physics', {
+      deleteFiles: false,
+      moveToFolderId: 'folder-general-id'
+    });
+
+    expect(success).toBe(true);
+    // The child file was moved to General via PATCH addParents
+    expect(patchCalls.some(p => p.url.includes('addParents=folder-general-id') && p.url.includes('phy-audio-1'))).toBe(true);
+    // The physics folder itself was deleted
+    expect(deleteCalls.some(d => d.includes('folder-phy-100'))).toBe(true);
+  });
+
+  it('deleteSubjectFolder handles case insensitivity and duplicate folders in Google Drive', async () => {
+    googleDriveService.setAccessToken('mock-token-case-insensitive', 3600);
+
+    const deletedFolderIds: string[] = [];
+
+    globalThis.fetch = vi.fn().mockImplementation(async (url: string, options?: any) => {
+      const urlStr = String(url);
+      const decoded = decodeURIComponent(urlStr);
+
+      if (options?.method === 'DELETE') {
+        deletedFolderIds.push(urlStr.split('/').pop() || '');
+        return { ok: true, status: 200, json: async () => ({}) };
+      }
+
+      if (decoded.includes("name = 'Smriti'")) {
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({ files: [{ id: 'smriti-root-id', name: 'Smriti' }] })
+        };
+      }
+
+      // Direct exact-name search returns empty (e.g. search was for "biology" but drive has "Biology" and "BIOLOGY")
+      if (decoded.includes("name = 'biology'")) {
+        return { ok: true, status: 200, json: async () => ({ files: [] }) };
+      }
+
+      // Subfolder listing under Smriti returns 2 duplicate biology folders
+      if (decoded.includes("'smriti-root-id' in parents and mimeType = 'application/vnd.google-apps.folder'")) {
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({
+            files: [
+              { id: 'folder-bio-dup1', name: 'Biology', parents: ['smriti-root-id'] },
+              { id: 'folder-bio-dup2', name: 'BIOLOGY', parents: ['smriti-root-id'] }
+            ]
+          })
+        };
+      }
+
+      return { ok: true, status: 200, json: async () => ({ files: [] }) };
+    });
+
+    const success = await googleDriveService.deleteSubjectFolder('biology');
+    expect(success).toBe(true);
+    // Both duplicate folders are deleted
+    expect(deletedFolderIds).toContain('folder-bio-dup1');
+    expect(deletedFolderIds).toContain('folder-bio-dup2');
+  });
+
   it('consolidateSubjectFolders merges duplicate folders and deletes empty duplicates', async () => {
     googleDriveService.setAccessToken('mock-token-consolidate', 3600);
 
@@ -674,6 +792,153 @@ describe('Google Drive Automatic Cloud Data Retrieval on Connect', () => {
     const res = await googleDriveService.deleteAudio('file-xyz-123');
     expect(res).toBe(true);
     expect(deleteRequestedUrl).toContain('/files/file-xyz-123');
+  });
+
+  it('deleteAudio supports fallback trashing if permanent delete fails with 403', async () => {
+    googleDriveService.setAccessToken('mock-token-trash-fallback', 3600);
+
+    let patchBody = '';
+
+    globalThis.fetch = vi.fn().mockImplementation(async (_url: string, options?: any) => {
+      void _url;
+      if (options?.method === 'DELETE') {
+        // Simulates Google Drive returning 403 on permanent DELETE
+        return { ok: false, status: 403, json: async () => ({ error: 'Insufficient permissions' }) };
+      }
+      if (options?.method === 'PATCH') {
+        patchBody = options.body;
+        return { ok: true, status: 200, json: async () => ({ trashed: true }) };
+      }
+      return { ok: true, status: 200, json: async () => ({}) };
+    });
+
+    const res = await googleDriveService.deleteAudio('file-protected-123');
+    expect(res).toBe(true);
+    expect(patchBody).toContain('"trashed":true');
+  });
+
+  it('deleteAudio locates and deletes by title if fileId was missing or failed', async () => {
+    googleDriveService.setAccessToken('mock-token-delete-by-title', 3600);
+
+    let deletedFileId = '';
+
+    globalThis.fetch = vi.fn().mockImplementation(async (url: string, options?: any) => {
+      const urlStr = String(url);
+      const decoded = decodeURIComponent(urlStr);
+
+      if (options?.method === 'DELETE') {
+        deletedFileId = urlStr.split('/').pop() || '';
+        return { ok: true, status: 200, json: async () => ({}) };
+      }
+
+      if (decoded.includes("name = 'Smriti'")) {
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({ files: [{ id: 'smriti-root', name: 'Smriti' }] })
+        };
+      }
+
+      if (decoded.includes("name contains 'Organic Synthesis'")) {
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({
+            files: [{ id: 'found-drive-audio-id', name: 'Organic Synthesis.m4a' }]
+          })
+        };
+      }
+
+      return { ok: true, status: 200, json: async () => ({ files: [] }) };
+    });
+
+    const res = await googleDriveService.deleteAudio('', { title: 'Organic Synthesis' });
+    expect(res).toBe(true);
+    expect(deletedFileId).toBe('found-drive-audio-id');
+  });
+
+  it('does not resurrect deleted folder when auto sync (fetchDriveData) runs', async () => {
+    googleDriveService.setAccessToken('mock-token-sync-no-resurrect', 3600);
+    googleDriveService.setRootFolderId('smriti-root');
+
+    globalThis.fetch = vi.fn().mockImplementation(async (url: string) => {
+      const urlStr = String(url);
+      const decoded = decodeURIComponent(urlStr);
+
+      // Smriti root
+      if (decoded.includes("name = 'Smriti'")) {
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({ files: [{ id: 'smriti-root', name: 'Smriti' }] })
+        };
+      }
+
+      // Catalog query: catalog only has General
+      if (decoded.includes("name = 'smriti_catalog.json'")) {
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({
+            files: [{
+              id: 'catalog-id',
+              name: 'smriti_catalog.json',
+              parents: ['smriti-root']
+            }]
+          })
+        };
+      }
+
+      // Catalog contents
+      if (urlStr.includes('/files/catalog-id?alt=media')) {
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({
+            version: 1,
+            subjects: [{ id: 'general', name: 'General' }],
+            audioItems: []
+          })
+        };
+      }
+
+      // Folders query under Smriti: only General exists in Google Drive
+      if (decoded.includes("mimeType = 'application/vnd.google-apps.folder'")) {
+        return {
+          ok: true,
+          status: 200,
+          json: async () => ({
+            files: [
+              { id: 'smriti-root', name: 'Smriti' },
+              { id: 'f-gen', name: 'General', parents: ['smriti-root'] }
+            ]
+          })
+        };
+      }
+
+      // No audio files in Drive
+      if (decoded.includes("name != 'smriti_catalog.json'")) {
+        return { ok: true, status: 200, json: async () => ({ files: [] }) };
+      }
+
+      return { ok: true, status: 200, json: async () => ({ files: [] }) };
+    });
+
+    // Caller passes old local subjects that included Physics and Chemistry (now deleted)
+    const oldSubjects: Subject[] = [
+      { id: 'general', name: 'General', icon_name: 'BookOpen', color_hex: '#38bdf8', sort_order: 1 },
+      { id: 'physics', name: 'Physics', icon_name: 'BookOpen', color_hex: '#38bdf8', sort_order: 2 },
+      { id: 'chemistry', name: 'Chemistry', icon_name: 'BookOpen', color_hex: '#f59e0b', sort_order: 3 }
+    ];
+
+    const result = await googleDriveService.fetchDriveData(oldSubjects);
+
+    expect(result.subjects).toBeDefined();
+    const subjectNames = result.subjects!.map(s => s.name);
+    // Only General is retained - deleted Physics and Chemistry are NOT resurrected!
+    expect(subjectNames).toEqual(['General']);
+    expect(subjectNames).not.toContain('Physics');
+    expect(subjectNames).not.toContain('Chemistry');
   });
 
   it('enforces strict privacy boundary: NEVER indexes or displays audio files outside the Smriti folder (e.g. BGM-CREDITS, SOUND, or personal drive files)', async () => {

@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import {
   Search,
   Star,
@@ -34,12 +34,22 @@ import {
   Languages,
   Trash2,
   Bell,
-  ShieldCheck
+  ShieldCheck,
+  Upload,
+  Mic,
+  AlertCircle
 } from 'lucide-react';
-import { AudioItem, Subject, PlaybackState, UserSettings } from '../types';
+import { AudioItem, Subject, PlaybackState, UserSettings, UploadProgressState } from '../types';
 import { formatDuration } from '../services/learningEngine';
 import { ACADEMIC_ICON_MAP } from '../utils/subjectVisuals';
 import { googleDriveService } from '../services/googleDrive';
+import { audioStorage } from '../services/audioStorage';
+import {
+  getAudioFileDuration,
+  sanitizeAudioTitle,
+  generateWaveformPeaks,
+  formatFileSize
+} from '../utils/audioUtils';
 import {
   Card,
   CardAction,
@@ -87,6 +97,12 @@ export interface LibraryTabProps {
   onCreateSubject?: (newSubject: Subject) => void;
   onDeleteSubject?: (subjectId: string, options?: { deleteRecordings?: boolean }) => Promise<void> | void;
   onDeleteAudio?: (audioId: string) => Promise<void> | void;
+  onSaveAudio?: (
+    partialItem: Partial<AudioItem>,
+    fileBlob?: Blob,
+    options?: { syncToDrive?: boolean },
+    onProgress?: (progress: UploadProgressState) => void
+  ) => Promise<AudioItem | void>;
   initialCreateFolderOpen?: boolean;
   userSettings?: UserSettings;
   onNavigateToAccount?: () => void;
@@ -142,6 +158,7 @@ export const LibraryTab: React.FC<LibraryTabProps> = ({
   onCreateSubject,
   onDeleteSubject,
   onDeleteAudio,
+  onSaveAudio,
   initialCreateFolderOpen = false,
   userSettings,
   onNavigateToAccount
@@ -154,6 +171,19 @@ export const LibraryTab: React.FC<LibraryTabProps> = ({
   const [selectedSubjectId, setSelectedSubjectId] = useState<string | null>(initialSubjectId || null);
   const [selectedAudioId, setSelectedAudioId] = useState<string | null>(initialAudioId || null);
   const [scrubValue, setScrubValue] = useState<number | null>(null);
+
+  // Audio File Upload State
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
+  const [uploadFiles, setUploadFiles] = useState<File[]>([]);
+  const [uploadTitle, setUploadTitle] = useState('');
+  const [uploadTargetSubjectId, setUploadTargetSubjectId] = useState<string>('');
+  const [uploadDuration, setUploadDuration] = useState<number>(60);
+  const [isExtractingDuration, setIsExtractingDuration] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState<UploadProgressState | null>(null);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+  const [uploadSuccessToast, setUploadSuccessToast] = useState<{ title: string; subjectName: string } | null>(null);
 
   // Subject Deletion modal state
   const [subjectToDelete, setSubjectToDelete] = useState<Subject | null>(null);
@@ -169,15 +199,176 @@ export const LibraryTab: React.FC<LibraryTabProps> = ({
 
   // Close modal on Escape
   useEffect(() => {
-    if (!isCreateFolderOpen) return;
+    if (!isCreateFolderOpen && !isUploadModalOpen) return;
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'Escape') {
-        setIsCreateFolderOpen(false);
+        if (isCreateFolderOpen) setIsCreateFolderOpen(false);
+        if (isUploadModalOpen && !isUploading) handleCloseUploadModal();
       }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isCreateFolderOpen]);
+  }, [isCreateFolderOpen, isUploadModalOpen, isUploading]);
+
+  const handleTriggerUpload = (presetSubjectId?: string) => {
+    const targetId = presetSubjectId || selectedSubjectId || deduplicatedSubjects[0]?.id || 'general';
+    setUploadTargetSubjectId(targetId);
+    setUploadError(null);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+      fileInputRef.current.click();
+    }
+  };
+
+  const handleFileInputChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    if (files.length === 0) return;
+
+    const validAudioFiles = files.filter(file => {
+      return (
+        file.type.startsWith('audio/') ||
+        /\.(mp3|m4a|wav|aac|ogg|flac|webm|m4b|opus|wma|aiff)$/i.test(file.name)
+      );
+    });
+
+    if (validAudioFiles.length === 0) {
+      alert('Please select valid audio files (.mp3, .m4a, .wav, .aac, .ogg, .flac).');
+      e.target.value = '';
+      return;
+    }
+
+    setUploadFiles(validAudioFiles);
+    setUploadError(null);
+
+    const activeSubId = selectedSubjectId || deduplicatedSubjects[0]?.id || 'general';
+    setUploadTargetSubjectId(prev => prev || activeSubId);
+
+    if (validAudioFiles.length === 1) {
+      const single = validAudioFiles[0];
+      const initialTitle = sanitizeAudioTitle(single.name);
+      setUploadTitle(initialTitle);
+      setIsExtractingDuration(true);
+      try {
+        const dur = await getAudioFileDuration(single);
+        setUploadDuration(dur);
+      } catch {
+        setUploadDuration(60);
+      } finally {
+        setIsExtractingDuration(false);
+      }
+    } else {
+      setUploadTitle('');
+      setUploadDuration(60);
+    }
+
+    setIsUploadModalOpen(true);
+  };
+
+  const handleCloseUploadModal = () => {
+    if (isUploading) return;
+    setIsUploadModalOpen(false);
+    setUploadFiles([]);
+    setUploadProgress(null);
+    setUploadError(null);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
+
+  const handleConfirmUpload = async () => {
+    if (uploadFiles.length === 0 || !uploadTargetSubjectId) return;
+
+    const targetSub = deduplicatedSubjects.find(s => s.id === uploadTargetSubjectId) || {
+      id: uploadTargetSubjectId,
+      name: 'General',
+      icon_name: 'Folder',
+      color_hex: '#38bdf8',
+      sort_order: 0
+    };
+
+    setIsUploading(true);
+    setUploadError(null);
+
+    try {
+      for (let i = 0; i < uploadFiles.length; i++) {
+        const file = uploadFiles[i];
+        const fileExt = file.name.split('.').pop()?.toLowerCase() || 'm4a';
+        const cleanTitle = uploadFiles.length === 1 && uploadTitle.trim()
+          ? uploadTitle.trim()
+          : sanitizeAudioTitle(file.name);
+
+        let duration = uploadDuration;
+        if (uploadFiles.length > 1) {
+          try {
+            duration = await getAudioFileDuration(file);
+          } catch {
+            duration = 60;
+          }
+        }
+
+        const peaks = generateWaveformPeaks(32);
+
+        if (onSaveAudio) {
+          await onSaveAudio(
+            {
+              title: cleanTitle,
+              subject_id: targetSub.id,
+              subject_name: targetSub.name,
+              duration_seconds: duration,
+              source_type: 'imported',
+              file_format: fileExt,
+              file_size_bytes: file.size,
+              waveform_peaks: peaks,
+              key_terms: [],
+              is_favorite: false,
+              is_downloaded_offline: true
+            },
+            file,
+            { syncToDrive: isDriveConnected },
+            (progress) => {
+              setUploadProgress({
+                ...progress,
+                message: uploadFiles.length > 1
+                  ? `[${i + 1}/${uploadFiles.length}] ${progress.message}`
+                  : progress.message
+              });
+            }
+          );
+        } else {
+          const fallbackId = `aud-${Date.now()}-${i}`;
+          await audioStorage.saveAudioBlob(fallbackId, file);
+        }
+      }
+
+      // Success!
+      setIsUploadModalOpen(false);
+      const uploadedCount = uploadFiles.length;
+      const uploadedName = uploadTitle.trim() || sanitizeAudioTitle(uploadFiles[0].name);
+      setUploadFiles([]);
+      setUploadProgress(null);
+
+      // Navigate to target subject folder so user sees the newly uploaded file(s)
+      setSelectedSubjectId(targetSub.id);
+      setViewMode('subject');
+
+      // Trigger toast
+      const toastTitle = uploadedCount === 1 ? `"${uploadedName}"` : `${uploadedCount} audio notes`;
+      setUploadSuccessToast({
+        title: toastTitle,
+        subjectName: targetSub.name
+      });
+
+      setTimeout(() => {
+        setUploadSuccessToast(null);
+      }, 5000);
+
+    } catch (err: any) {
+      console.error('Upload failed:', err);
+      setUploadError(err.message || 'Failed to upload audio file. Please try again.');
+    } finally {
+      setIsUploading(false);
+    }
+  };
 
   const handleCreateFolderSubmit = (e?: React.FormEvent) => {
     if (e) e.preventDefault();
@@ -654,6 +845,267 @@ export const LibraryTab: React.FC<LibraryTabProps> = ({
     );
   };
 
+  // Upload Audio Modal Dialog
+  const renderUploadModal = () => {
+    if (!isUploadModalOpen || uploadFiles.length === 0) return null;
+
+    const totalBytes = uploadFiles.reduce((acc, f) => acc + f.size, 0);
+    const targetSub = deduplicatedSubjects.find(s => s.id === uploadTargetSubjectId);
+
+    return (
+      <ModalPortal>
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="upload-audio-modal-title"
+          className="fixed inset-0 z-[70] flex items-center justify-center p-4 sm:p-6 bg-slate-950/75 backdrop-blur-md overflow-y-auto safe-top safe-bottom animate-in fade-in duration-200"
+          onClick={() => !isUploading && handleCloseUploadModal()}
+        >
+          <div
+            className="bg-white rounded-3xl p-5 sm:p-6 w-full max-w-md shadow-2xl border border-slate-200/90 space-y-4 my-auto max-h-[90vh] overflow-y-auto animate-in zoom-in-95 duration-200"
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Header */}
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex items-start gap-3">
+                <div className="w-11 h-11 rounded-2xl bg-emerald-50 border border-emerald-200 flex items-center justify-center text-emerald-600 shrink-0">
+                  <Upload size={22} />
+                </div>
+                <div>
+                  <h3 id="upload-audio-modal-title" className="text-base font-bold text-slate-900 leading-tight">
+                    {uploadFiles.length === 1 ? 'Upload Audio Note' : `Upload ${uploadFiles.length} Audio Notes`}
+                  </h3>
+                  <p className="text-xs text-slate-500 mt-0.5 font-medium">
+                    Choose destination subject folder and review details
+                  </p>
+                </div>
+              </div>
+              {!isUploading && (
+                <button
+                  type="button"
+                  onClick={handleCloseUploadModal}
+                  className="p-1 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors cursor-pointer"
+                  aria-label="Close"
+                >
+                  <X size={18} />
+                </button>
+              )}
+            </div>
+
+            {/* File info card */}
+            <div className="bg-slate-50 border border-slate-200/80 rounded-2xl p-3.5 space-y-2.5">
+              {uploadFiles.length === 1 ? (
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-8 h-8 rounded-lg bg-emerald-100/70 text-emerald-800 flex items-center justify-center shrink-0">
+                      <FileAudio size={18} />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-xs font-semibold text-slate-900 truncate">
+                        {uploadFiles[0].name}
+                      </p>
+                      <div className="flex items-center gap-1.5 text-[11px] font-mono text-slate-500 mt-0.5">
+                        <span className="uppercase font-bold text-slate-700">
+                          {uploadFiles[0].name.split('.').pop()?.toLowerCase() || 'audio'}
+                        </span>
+                        <span>·</span>
+                        <span>{formatFileSize(uploadFiles[0].size)}</span>
+                        <span>·</span>
+                        <span>
+                          {isExtractingDuration
+                            ? 'Detecting length...'
+                            : formatDuration(uploadDuration)}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Note Title Input */}
+                  <div className="space-y-1 pt-1">
+                    <label className="text-[11px] font-semibold text-slate-700">
+                      Note Title
+                    </label>
+                    <input
+                      type="text"
+                      value={uploadTitle}
+                      onChange={(e) => setUploadTitle(e.target.value)}
+                      disabled={isUploading}
+                      placeholder="Enter note title..."
+                      className="w-full text-xs font-semibold px-3 py-2 rounded-xl border border-slate-200 bg-white text-slate-900 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all"
+                    />
+                  </div>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between text-xs font-semibold text-slate-700">
+                    <span>Selected Files ({uploadFiles.length})</span>
+                    <span className="font-mono text-[11px] text-slate-500">
+                      {formatFileSize(totalBytes)} total
+                    </span>
+                  </div>
+                  <div className="max-h-36 overflow-y-auto space-y-1.5 pr-1">
+                    {uploadFiles.map((file, idx) => (
+                      <div
+                        key={idx}
+                        className="p-2 rounded-xl bg-white border border-slate-200/80 flex items-center justify-between gap-2 text-xs"
+                      >
+                        <div className="flex items-center gap-2 min-w-0">
+                          <FileAudio size={14} className="text-emerald-700 shrink-0" />
+                          <span className="truncate text-slate-800 font-medium">{file.name}</span>
+                        </div>
+                        <span className="font-mono text-[10px] text-slate-400 shrink-0">
+                          {formatFileSize(file.size)}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Target Subject Selector */}
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-bold uppercase tracking-wider text-slate-700">
+                  Target Subject Folder
+                </label>
+                <span className="text-[11px] font-mono text-slate-400 font-medium">
+                  {`(${deduplicatedSubjects.length})`}
+                </span>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-48 overflow-y-auto pr-0.5">
+                {deduplicatedSubjects.map((sub) => {
+                  const isSelected = uploadTargetSubjectId === sub.id;
+                  const SubIcon = getSubjectIcon(sub.icon_name);
+                  const subTheme = getSubjectTheme(sub.color_hex);
+                  const subAudios = audiosBySubject.get(sub.id) || audiosBySubject.get(sub.name.toLowerCase()) || [];
+
+                  return (
+                    <button
+                      key={sub.id}
+                      type="button"
+                      disabled={isUploading}
+                      onClick={() => setUploadTargetSubjectId(sub.id)}
+                      className={`p-2.5 rounded-2xl border text-left transition-all cursor-pointer flex items-center gap-2.5 ${
+                        isSelected
+                          ? 'border-emerald-500 bg-emerald-50/50 shadow-2xs ring-1 ring-emerald-500'
+                          : 'border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50/60'
+                      }`}
+                    >
+                      <div
+                        className={`w-8 h-8 rounded-xl ${subTheme.bg} border ${subTheme.border} flex items-center justify-center shrink-0 text-slate-800`}
+                      >
+                        <SubIcon size={16} />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="text-xs font-bold text-slate-900 truncate">
+                          {sub.name}
+                        </p>
+                        <p className="text-[10px] font-mono text-slate-500 truncate">
+                          {subAudios.length} {subAudios.length === 1 ? 'lesson' : 'lessons'}
+                        </p>
+                      </div>
+                      <div
+                        className={`w-4 h-4 rounded-full border flex items-center justify-center shrink-0 ${
+                          isSelected
+                            ? 'border-emerald-600 bg-emerald-600 text-white'
+                            : 'border-slate-300 bg-white'
+                        }`}
+                      >
+                        {isSelected && <Check size={10} strokeWidth={3} />}
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Cloud Sync info */}
+            <div className="p-3 rounded-2xl bg-sky-50/60 border border-sky-200/80 flex items-start gap-2.5 text-xs text-sky-900">
+              <Cloud size={16} className="text-sky-600 shrink-0 mt-0.5" />
+              <div className="leading-snug">
+                {isDriveConnected ? (
+                  <span>
+                    Audio will back up directly to Google Drive under{' '}
+                    <strong className="text-sky-950 font-semibold">
+                      Smriti / {targetSub?.name || 'General'}
+                    </strong>{' '}
+                    and will be saved for instant offline playback.
+                  </span>
+                ) : (
+                  <span>
+                    Audio will be stored safely in your device's <strong>offline vault</strong>.
+                  </span>
+                )}
+              </div>
+            </div>
+
+            {/* Progress bar if uploading */}
+            {isUploading && (
+              <div className="space-y-2 p-3 bg-slate-50 rounded-2xl border border-slate-200">
+                <div className="flex items-center justify-between text-xs">
+                  <span className="font-semibold text-slate-700 truncate pr-2">
+                    {uploadProgress?.message || 'Processing and saving audio note...'}
+                  </span>
+                  <span className="font-mono font-bold text-emerald-700 shrink-0">
+                    {uploadProgress?.percent ? `${uploadProgress.percent}%` : '...'}
+                  </span>
+                </div>
+                <div className="h-2 w-full bg-slate-200 rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-emerald-600 rounded-full transition-all duration-300"
+                    style={{ width: `${uploadProgress?.percent || 25}%` }}
+                  />
+                </div>
+              </div>
+            )}
+
+            {/* Error message */}
+            {uploadError && (
+              <div className="p-3 rounded-2xl bg-rose-50 border border-rose-200 flex items-center gap-2 text-xs text-rose-700">
+                <AlertCircle size={15} className="shrink-0" />
+                <span className="font-medium">{uploadError}</span>
+              </div>
+            )}
+
+            {/* Actions */}
+            <div className="flex items-center gap-2.5 pt-1">
+              <button
+                type="button"
+                disabled={isUploading}
+                onClick={handleCloseUploadModal}
+                className="flex-1 py-2.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold transition-all cursor-pointer disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={isUploading || !uploadTargetSubjectId || (uploadFiles.length === 1 && !uploadTitle.trim())}
+                onClick={handleConfirmUpload}
+                className="flex-1 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white text-xs font-bold transition-all shadow-sm flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
+              >
+                {isUploading ? (
+                  <>
+                    <RefreshCw size={14} className="animate-spin" />
+                    <span>Uploading...</span>
+                  </>
+                ) : (
+                  <>
+                    <Upload size={14} />
+                    <span>
+                      {uploadFiles.length === 1 ? 'Save & Upload' : `Upload All (${uploadFiles.length})`}
+                    </span>
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      </ModalPortal>
+    );
+  };
+
   // =========================================================================
   // RENDER LEVEL 3: AUDIO NOTE VIEW
   // =========================================================================
@@ -736,6 +1188,22 @@ export const LibraryTab: React.FC<LibraryTabProps> = ({
             >
               {selectedAudio.is_downloaded_offline ? <CheckCircle2 size={14} /> : <Download size={14} />}
             </button>
+
+            {onDeleteAudio && (
+              <button
+                type="button"
+                onClick={async () => {
+                  if (window.confirm(`Delete audio note "${selectedAudio.title}"?`)) {
+                    await onDeleteAudio(selectedAudio.id);
+                    handleBackToSubject();
+                  }
+                }}
+                className="p-2 rounded-xl border border-slate-200 text-slate-400 hover:text-rose-600 hover:bg-rose-50 hover:border-rose-200 transition-all cursor-pointer"
+                title="Delete audio note"
+              >
+                <Trash2 size={14} />
+              </button>
+            )}
           </div>
         </div>
 
@@ -968,7 +1436,7 @@ export const LibraryTab: React.FC<LibraryTabProps> = ({
           </div>
 
           <div className="flex items-center gap-1.5 shrink-0">
-            {onDeleteSubject && (
+            {onDeleteSubject && selectedSubject.name.toLowerCase() !== 'general' && (
               <button
                 type="button"
                 onClick={() => setSubjectToDelete(selectedSubject)}
@@ -979,6 +1447,16 @@ export const LibraryTab: React.FC<LibraryTabProps> = ({
                 <span>Delete</span>
               </button>
             )}
+
+            <button
+              type="button"
+              onClick={() => handleTriggerUpload(selectedSubject.id)}
+              className="py-1 px-2.5 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-800 hover:bg-emerald-100 font-semibold text-xs flex items-center gap-1 transition-all active:scale-95 shadow-2xs cursor-pointer"
+              title={`Upload audio to ${selectedSubject.name}`}
+            >
+              <Upload size={13} className="text-emerald-700" />
+              <span>Upload</span>
+            </button>
 
             <button
               onClick={onGoToRecord}
@@ -1127,9 +1605,27 @@ export const LibraryTab: React.FC<LibraryTabProps> = ({
                   No audio notes match criteria
                 </EmptyTitle>
                 <EmptyDescription className="text-[11px] text-slate-500">
-                  Clear active filters or record a new lesson for {selectedSubject.name}.
+                  {`Upload an audio file or record a new lesson for ${selectedSubject.name}.`}
                 </EmptyDescription>
               </EmptyHeader>
+              <div className="flex items-center justify-center gap-2 mt-3">
+                <button
+                  type="button"
+                  onClick={() => handleTriggerUpload(selectedSubject.id)}
+                  className="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold flex items-center gap-1.5 transition-all shadow-xs cursor-pointer"
+                >
+                  <Upload size={13} />
+                  <span>Upload Audio</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={onGoToRecord}
+                  className="px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer"
+                >
+                  <Mic size={13} />
+                  <span>Record Lesson</span>
+                </button>
+              </div>
             </Empty>
           ) : (
             subjectAudios.map((audio) => {
@@ -1273,6 +1769,16 @@ export const LibraryTab: React.FC<LibraryTabProps> = ({
           )}
         </div>
         {renderCreateFolderModal()}
+        {renderUploadModal()}
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="audio/*,.mp3,.m4a,.wav,.aac,.ogg,.flac,.webm,.m4b,.opus,.wma,.aiff"
+          multiple
+          className="hidden"
+          onChange={handleFileInputChange}
+          data-testid="audio-file-input"
+        />
       </div>
     );
   }
@@ -1385,11 +1891,38 @@ export const LibraryTab: React.FC<LibraryTabProps> = ({
         </div>
       )}
 
+      {/* Upload Success Feedback Toast */}
+      {uploadSuccessToast && (
+        <div className="p-3 bg-[#E8F8F0] border border-emerald-300 rounded-2xl flex items-center justify-between gap-3 shadow-xs animate-in slide-in-from-top-2 duration-200">
+          <div className="flex items-center gap-2.5 min-w-0">
+            <div className="w-8 h-8 rounded-xl bg-emerald-600 text-white flex items-center justify-center shrink-0 shadow-2xs">
+              <CheckCircle2 size={16} />
+            </div>
+            <div className="min-w-0">
+              <h4 className="text-xs font-bold text-emerald-950 truncate">Audio Note Uploaded</h4>
+              <p className="text-[11px] text-emerald-800 mt-0.5 leading-snug truncate">
+                {uploadSuccessToast.title} added to <strong className="font-semibold">{uploadSuccessToast.subjectName}</strong>.
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => setUploadSuccessToast(null)}
+            className="text-emerald-700 hover:text-emerald-900 p-1 cursor-pointer shrink-0"
+            aria-label="Dismiss toast"
+          >
+            <X size={15} />
+          </button>
+        </div>
+      )}
+
       {/* Action Chips Row (Upload, New Topic, Sync Drive) */}
       <div className="grid grid-cols-3 gap-2">
         <button
-          onClick={onGoToRecord}
+          type="button"
+          onClick={() => handleTriggerUpload()}
           className="bg-[#E8F8F0] hover:bg-[#DCF3E7] text-emerald-800 border border-emerald-200/70 p-2.5 rounded-2xl flex items-center justify-center gap-1.5 text-xs font-semibold active:scale-95 transition-all shadow-2xs cursor-pointer"
+          title="Upload audio notes from device"
         >
           <Plus size={15} className="text-emerald-700" />
           <span>Upload</span>
@@ -1470,7 +2003,7 @@ export const LibraryTab: React.FC<LibraryTabProps> = ({
 
                 {/* Right: Actions */}
                 <div className="flex items-center gap-1 shrink-0">
-                  {onDeleteSubject && (
+                  {onDeleteSubject && subject.name.toLowerCase() !== 'general' && (
                     <button
                       type="button"
                       onClick={(e) => {
@@ -1665,6 +2198,20 @@ export const LibraryTab: React.FC<LibraryTabProps> = ({
 
       {/* Subject Folder Creation Modal Dialog */}
       {renderCreateFolderModal()}
+
+      {/* Audio File Upload Modal Dialog */}
+      {renderUploadModal()}
+
+      {/* Hidden File Input for Native Audio Picker */}
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="audio/*,.mp3,.m4a,.wav,.aac,.ogg,.flac,.webm,.m4b,.opus,.wma,.aiff"
+        multiple
+        className="hidden"
+        onChange={handleFileInputChange}
+        data-testid="audio-file-input"
+      />
     </div>
   );
 };

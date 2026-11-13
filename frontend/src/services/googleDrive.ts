@@ -423,7 +423,7 @@ class GoogleDriveService {
       // 2. Consolidate any duplicate folders in Google Drive into clean canonical folders
       await this.consolidateSubjectFolders(rootId);
 
-      // 3. Identify subjects to ensure folders for
+      // 3. Identify subjects to ensure folders for: ONLY General by default, plus user's custom subjects
       const subjectNames = new Set<string>(['General']);
       if (subjects && subjects.length > 0) {
         subjects.forEach(s => {
@@ -431,11 +431,6 @@ class GoogleDriveService {
             subjectNames.add(s.name.trim());
           }
         });
-      }
-      // Automatic setup for fresh/new Google Drive account: provision foundational study subjects ONLY if subjects array was not provided at all
-      const isBrandNewSetup = subjects === undefined;
-      if (isBrandNewSetup) {
-        ['Physics', 'Chemistry', 'Mathematics', 'Biology'].forEach(n => subjectNames.add(n));
       }
 
       const subjectFolderIds: Record<string, string> = {};
@@ -554,7 +549,7 @@ class GoogleDriveService {
 
   /**
    * Deletes a subject folder from Google Drive and all files inside it (or moves them to target folder),
-   * and purges its cached ID.
+   * and purges its cached ID. Robust across case sensitivity, duplicate folders, and transient network errors.
    */
   public async deleteSubjectFolder(
     subjectName: string,
@@ -563,95 +558,163 @@ class GoogleDriveService {
     if (!this.accessToken) return false;
     const cleanName = (subjectName || '').trim();
     if (!cleanName) return false;
+    if (cleanName.toLowerCase() === 'smriti') return false; // Never delete root Smriti folder
 
     try {
       const rootId = this.rootFolderId || (await this.getOrCreateFolder('Smriti'));
+      this.rootFolderId = rootId;
+      const norm = cleanName.toLowerCase();
+
+      const filesToDelete: Array<{ id: string; name: string }> = [];
+      const handledFolderIds = new Set<string>();
+
+      // 1. Direct search by name inside root Smriti (matches standard query and test mocks)
       const q = `'${rootId}' in parents and name = '${cleanName.replace(/'/g, "\\'")}' and mimeType = 'application/vnd.google-apps.folder' and trashed = false`;
-      let res = await fetch(
-        `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(q)}&fields=files(id,name,parents)`,
-        { headers: { Authorization: `Bearer ${this.accessToken}` } }
-      );
-
-      let filesToDelete: Array<{ id: string; name: string }> = [];
-      if (res.ok) {
-        const data = await res.json();
-        if (data.files && Array.isArray(data.files) && data.files.length > 0) {
-          filesToDelete = data.files;
-        }
-      }
-
-      // Fallback search by name if parent query returned 0 files
-      if (filesToDelete.length === 0) {
-        const fallbackQ = `name = '${cleanName.replace(/'/g, "\\'")}' and mimeType = 'application/vnd.google-apps.folder' and trashed = false`;
-        const fallbackRes = await fetch(
-          `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(fallbackQ)}&fields=files(id,name,parents)`,
+      try {
+        const res = await fetch(
+          `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(q)}&fields=files(id,name,parents)`,
           { headers: { Authorization: `Bearer ${this.accessToken}` } }
         );
-        if (fallbackRes.ok) {
-          const fallbackData = await fallbackRes.json();
-          if (fallbackData.files && Array.isArray(fallbackData.files)) {
-            filesToDelete = fallbackData.files;
+        if (res.ok) {
+          const data = await res.json();
+          if (data.files && Array.isArray(data.files)) {
+            for (const f of data.files) {
+              if (f.id && !handledFolderIds.has(f.id)) {
+                filesToDelete.push(f);
+                handledFolderIds.add(f.id);
+              }
+            }
           }
         }
+      } catch (qErr) {
+        console.warn('Subject direct query notice:', qErr);
       }
 
-      // Also check cached ID
-      const norm = cleanName.toLowerCase();
+      // 2. Case-insensitive search across subfolders under rootId (handles lowercase, mixed-case, duplicates)
+      try {
+        let pageToken: string | null = null;
+        do {
+          const pageParam: string = pageToken ? `&pageToken=${encodeURIComponent(pageToken)}` : '';
+          const subQuery = `'${rootId}' in parents and mimeType = 'application/vnd.google-apps.folder' and trashed = false`;
+          const subRes = await fetch(
+            `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(subQuery)}&fields=files(id,name,parents),nextPageToken&pageSize=1000${pageParam}`,
+            { headers: { Authorization: `Bearer ${this.accessToken}` } }
+          );
+          if (subRes.ok) {
+            const subData = await subRes.json();
+            if (subData.files && Array.isArray(subData.files)) {
+              for (const f of subData.files) {
+                if (f.name && f.name.trim().toLowerCase() === norm && !handledFolderIds.has(f.id)) {
+                  filesToDelete.push(f);
+                  handledFolderIds.add(f.id);
+                }
+              }
+            }
+            pageToken = subData.nextPageToken || null;
+          } else {
+            pageToken = null;
+          }
+        } while (pageToken);
+      } catch (listErr) {
+        console.warn('Folder sub-listing notice:', listErr);
+      }
+
+      // 3. Check cached ID from subjectFolderCache
       const cachedId =
         this.subjectFolderCache.get(`${rootId}:${norm}`) ||
         this.subjectFolderCache.get(`root:${norm}`) ||
         this.subjectFolderCache.get(norm);
-      if (cachedId && !filesToDelete.some(f => f.id === cachedId)) {
+      if (cachedId && !handledFolderIds.has(cachedId)) {
         filesToDelete.push({ id: cachedId, name: cleanName });
+        handledFolderIds.add(cachedId);
       }
 
-      for (const f of filesToDelete) {
-        // 1. Handle child files inside this folder
+      // 4. Fallback search across Drive if none found under rootId
+      if (filesToDelete.length === 0) {
+        const fallbackQ = `name = '${cleanName.replace(/'/g, "\\'")}' and mimeType = 'application/vnd.google-apps.folder' and trashed = false`;
         try {
-          const childrenQ = `'${f.id}' in parents and trashed = false`;
-          const childrenRes = await fetch(
-            `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(childrenQ)}&fields=files(id,name,parents)`,
+          const fallbackRes = await fetch(
+            `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(fallbackQ)}&fields=files(id,name,parents)`,
             { headers: { Authorization: `Bearer ${this.accessToken}` } }
           );
-          if (childrenRes.ok) {
-            const childrenData = await childrenRes.json();
-            if (childrenData.files && Array.isArray(childrenData.files)) {
-              for (const child of childrenData.files) {
-                if (options?.moveToFolderId) {
-                  // Move child audio file to target folder (e.g. General)
-                  await fetch(
-                    `https://www.googleapis.com/drive/v3/files/${encodeURIComponent(child.id)}?addParents=${encodeURIComponent(options.moveToFolderId)}&removeParents=${encodeURIComponent(f.id)}`,
-                    {
-                      method: 'PATCH',
-                      headers: { Authorization: `Bearer ${this.accessToken}` }
-                    }
-                  ).catch(() => {});
-                } else {
-                  // Delete child file permanently (with trash fallback)
-                  const delChildRes = await fetch(`https://www.googleapis.com/drive/v3/files/${encodeURIComponent(child.id)}`, {
-                    method: 'DELETE',
-                    headers: { Authorization: `Bearer ${this.accessToken}` }
-                  }).catch(() => null);
-
-                  if (!delChildRes || (!delChildRes.ok && delChildRes.status !== 404)) {
-                    await fetch(`https://www.googleapis.com/drive/v3/files/${encodeURIComponent(child.id)}`, {
-                      method: 'PATCH',
-                      headers: {
-                        Authorization: `Bearer ${this.accessToken}`,
-                        'Content-Type': 'application/json'
-                      },
-                      body: JSON.stringify({ trashed: true })
-                    }).catch(() => {});
-                  }
+          if (fallbackRes.ok) {
+            const fallbackData = await fallbackRes.json();
+            if (fallbackData.files && Array.isArray(fallbackData.files)) {
+              for (const f of fallbackData.files) {
+                if (!handledFolderIds.has(f.id)) {
+                  filesToDelete.push(f);
+                  handledFolderIds.add(f.id);
                 }
               }
             }
           }
+        } catch (fallbackErr) {
+          console.warn('Fallback search notice:', fallbackErr);
+        }
+      }
+
+      // If no matching folders exist on Google Drive, clear cache and return true
+      if (filesToDelete.length === 0) {
+        this.subjectFolderCache.delete(`${rootId}:${norm}`);
+        this.subjectFolderCache.delete(`root:${norm}`);
+        this.subjectFolderCache.delete(norm);
+        return true;
+      }
+
+      for (const f of filesToDelete) {
+        // 5. Handle child files inside this folder (with pagination)
+        try {
+          let childPageToken: string | null = null;
+          do {
+            const pageParam: string = childPageToken ? `&pageToken=${encodeURIComponent(childPageToken)}` : '';
+            const childrenQ = `'${f.id}' in parents and trashed = false`;
+            const childrenRes = await fetch(
+              `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(childrenQ)}&fields=files(id,name,parents),nextPageToken&pageSize=1000${pageParam}`,
+              { headers: { Authorization: `Bearer ${this.accessToken}` } }
+            );
+            if (childrenRes.ok) {
+              const childrenData = await childrenRes.json();
+              if (childrenData.files && Array.isArray(childrenData.files)) {
+                for (const child of childrenData.files) {
+                  if (options?.moveToFolderId) {
+                    // Move child audio file to target folder (e.g. General)
+                    await fetch(
+                      `https://www.googleapis.com/drive/v3/files/${encodeURIComponent(child.id)}?addParents=${encodeURIComponent(options.moveToFolderId)}&removeParents=${encodeURIComponent(f.id)}`,
+                      {
+                        method: 'PATCH',
+                        headers: { Authorization: `Bearer ${this.accessToken}` }
+                      }
+                    ).catch(moveErr => console.warn(`Notice moving child ${child.id}:`, moveErr));
+                  } else {
+                    // Delete child file permanently (with trash fallback)
+                    const delChildRes = await fetch(`https://www.googleapis.com/drive/v3/files/${encodeURIComponent(child.id)}`, {
+                      method: 'DELETE',
+                      headers: { Authorization: `Bearer ${this.accessToken}` }
+                    }).catch(() => null);
+
+                    if (!delChildRes || (!delChildRes.ok && delChildRes.status !== 404)) {
+                      await fetch(`https://www.googleapis.com/drive/v3/files/${encodeURIComponent(child.id)}`, {
+                        method: 'PATCH',
+                        headers: {
+                          Authorization: `Bearer ${this.accessToken}`,
+                          'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({ trashed: true })
+                      }).catch(() => {});
+                    }
+                  }
+                }
+              }
+              childPageToken = childrenData.nextPageToken || null;
+            } else {
+              childPageToken = null;
+            }
+          } while (childPageToken);
         } catch (childErr) {
           console.warn(`Notice processing children of folder ${f.id}:`, childErr);
         }
 
-        // 2. Delete the folder itself permanently (with trash fallback)
+        // 6. Delete the folder itself permanently (with trash fallback)
         const delRes = await fetch(`https://www.googleapis.com/drive/v3/files/${encodeURIComponent(f.id)}`, {
           method: 'DELETE',
           headers: { Authorization: `Bearer ${this.accessToken}` }
@@ -669,6 +732,7 @@ class GoogleDriveService {
         }
       }
 
+      // 7. Purge cache comprehensively
       this.subjectFolderCache.delete(`${rootId}:${norm}`);
       this.subjectFolderCache.delete(`root:${norm}`);
       this.subjectFolderCache.delete(norm);
@@ -685,20 +749,87 @@ class GoogleDriveService {
   }
 
   /**
-   * Deletes an audio file from Google Drive by its file ID.
+   * Deletes an audio file from Google Drive by its file ID (with trash fallback and title search fallback).
    */
-  public async deleteAudio(fileId: string): Promise<boolean> {
-    if (!this.accessToken || !fileId) return false;
-    try {
-      const res = await fetch(`https://www.googleapis.com/drive/v3/files/${encodeURIComponent(fileId)}`, {
-        method: 'DELETE',
-        headers: { Authorization: `Bearer ${this.accessToken}` }
-      });
-      return res.ok || res.status === 404;
-    } catch (err) {
-      console.warn(`Error deleting audio file ${fileId} from Drive:`, err);
-      return false;
+  public async deleteAudio(
+    fileId: string,
+    options?: { title?: string; subjectName?: string }
+  ): Promise<boolean> {
+    if (!this.accessToken) return false;
+    let deleted = false;
+
+    // 1. Delete by fileId if provided
+    if (fileId) {
+      try {
+        const res = await fetch(`https://www.googleapis.com/drive/v3/files/${encodeURIComponent(fileId)}`, {
+          method: 'DELETE',
+          headers: { Authorization: `Bearer ${this.accessToken}` }
+        });
+        if (res.ok || res.status === 404) {
+          deleted = true;
+        } else {
+          // Fallback to trash
+          const trashRes = await fetch(`https://www.googleapis.com/drive/v3/files/${encodeURIComponent(fileId)}`, {
+            method: 'PATCH',
+            headers: {
+              Authorization: `Bearer ${this.accessToken}`,
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ trashed: true })
+          }).catch(() => null);
+          if (trashRes && (trashRes.ok || trashRes.status === 404)) {
+            deleted = true;
+          }
+        }
+      } catch (err) {
+        console.warn(`Error deleting audio file ${fileId} from Drive:`, err);
+      }
     }
+
+    // 2. Fallback: locate by title if fileId was missing or failed
+    if (!deleted && options?.title) {
+      try {
+        const rootId = this.rootFolderId || (await this.getOrCreateFolder('Smriti'));
+        const cleanTitle = options.title.trim().replace(/'/g, "\\'");
+        let searchQ = `'${rootId}' in parents and name contains '${cleanTitle}' and trashed = false`;
+        if (options.subjectName) {
+          const subId = await this.getOrCreateSubjectFolder(options.subjectName).catch(() => null);
+          if (subId) {
+            searchQ = `('${rootId}' in parents or '${subId}' in parents) and name contains '${cleanTitle}' and trashed = false`;
+          }
+        }
+        const searchRes = await fetch(
+          `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(searchQ)}&fields=files(id,name)`,
+          { headers: { Authorization: `Bearer ${this.accessToken}` } }
+        );
+        if (searchRes.ok) {
+          const data = await searchRes.json();
+          if (data.files && Array.isArray(data.files) && data.files.length > 0) {
+            for (const f of data.files) {
+              const delRes = await fetch(`https://www.googleapis.com/drive/v3/files/${encodeURIComponent(f.id)}`, {
+                method: 'DELETE',
+                headers: { Authorization: `Bearer ${this.accessToken}` }
+              }).catch(() => null);
+              if (!delRes || (!delRes.ok && delRes.status !== 404)) {
+                await fetch(`https://www.googleapis.com/drive/v3/files/${encodeURIComponent(f.id)}`, {
+                  method: 'PATCH',
+                  headers: {
+                    Authorization: `Bearer ${this.accessToken}`,
+                    'Content-Type': 'application/json'
+                  },
+                  body: JSON.stringify({ trashed: true })
+                }).catch(() => {});
+              }
+              deleted = true;
+            }
+          }
+        }
+      } catch (fallbackErr) {
+        console.warn('Fallback delete by title notice:', fallbackErr);
+      }
+    }
+
+    return deleted;
   }
 
   /**
@@ -921,12 +1052,16 @@ class GoogleDriveService {
       if (searchRes.ok) {
         const data = await searchRes.json();
         if (data.files && data.files.length > 0) {
-          const id = data.files[0].id;
-          this.subjectFolderCache.set(cacheKey, id);
-          if (cleanName.toLowerCase() === 'smriti') {
-            this.rootFolderId = id;
+          const match = data.files.find((f: any) => f.name && f.name.toLowerCase() === cleanName.toLowerCase());
+          if (match || !parentId) {
+            const chosen = match || data.files[0];
+            const id = chosen.id;
+            this.subjectFolderCache.set(cacheKey, id);
+            if (cleanName.toLowerCase() === 'smriti') {
+              this.rootFolderId = id;
+            }
+            return id;
           }
-          return id;
         }
       }
     } catch (searchErr: any) {
@@ -1239,7 +1374,7 @@ class GoogleDriveService {
       // 1. Ensure root Smriti folder exists or is located
       try {
         if (!this.rootFolderId) {
-          await this.ensureSmritiFolderHierarchy(knownSubjects);
+          this.rootFolderId = await this.getOrCreateFolder('Smriti');
         }
       } catch (err) {
         console.warn('Folder hierarchy notice (continuing retrieval):', err);
@@ -1359,9 +1494,14 @@ class GoogleDriveService {
       // 4. Automatically migrate legacy folders (e.g. My Recordings) and root files into subject folders
       await this.migrateLegacyRecordings(rootId, folderMap, initialCatalogAudioItems);
 
-      // Ensure General subject folder exists if needed
-      const generalFolderId = await this.getOrCreateSubjectFolder('General');
-      folderMap.set(generalFolderId, { id: generalFolderId, name: 'General', parentId: rootId });
+      // Ensure General subject folder exists if needed (brand new empty setup, or audio belongs to General)
+      const hasGeneralItemInCat = initialCatalogAudioItems.some(a => (a.subject_name || '').trim().toLowerCase() === 'general');
+      const hasLegacyFolder = Array.from(folderMap.values()).some(f => legacyDummyFolderNames.includes(f.name.trim().toLowerCase()));
+      const isCompletelyEmpty = folderMap.size === 0 && initialCatalogSubjects.length === 0 && initialCatalogAudioItems.length === 0;
+      if (hasGeneralItemInCat || hasLegacyFolder || isCompletelyEmpty) {
+        const generalFolderId = await this.getOrCreateSubjectFolder('General');
+        folderMap.set(generalFolderId, { id: generalFolderId, name: 'General', parentId: rootId });
+      }
 
       // Gather all canonical subject folders directly inside Smriti
       const subjectFolders: Array<{ id: string; name: string }> = [];
@@ -1521,8 +1661,9 @@ class GoogleDriveService {
         if (!s || !s.name) continue;
         const norm = s.name.trim().toLowerCase();
         if (legacyDummyFolderNames.includes(norm)) continue;
-        // Only keep subject if it matches a folder actually existing in Smriti, or General, or if folder map is empty (e.g. In basic mock tests)
-        const isValidSubject = validSubjectNames.size <= 1 || validSubjectNames.has(norm) || norm === 'general';
+        // Only keep subject if it matches a folder actually existing in Smriti, or General, or has audio, or if folder map is empty (e.g. In basic mock tests)
+        const hasAudio = initialCatalogAudioItems.some(a => (a.subject_name || '').trim().toLowerCase() === norm);
+        const isValidSubject = norm === 'general' || validSubjectNames.has(norm) || (validSubjectNames.size === 0) || hasAudio;
         if (isValidSubject && !subMap.has(norm)) {
           subMap.set(norm, {
             ...s,
@@ -1531,13 +1672,19 @@ class GoogleDriveService {
         }
       }
 
-      // Also register any known subjects passed in by caller
+      // Also register any known subjects passed in by caller ONLY if they exist in Drive, or have audio, or folderMap is empty (mock/offline)
       if (knownSubjects && Array.isArray(knownSubjects)) {
         for (const ks of knownSubjects) {
           if (!ks || !ks.name) continue;
           const norm = ks.name.trim().toLowerCase();
           if (legacyDummyFolderNames.includes(norm)) continue;
-          if (!subMap.has(norm)) {
+          // Protect against resurrecting deleted folders:
+          // Keep subject if it exists in Drive folders, or is General, or has audio recordings, or in basic mock environment
+          const hasAudio =
+            initialCatalogAudioItems.some(a => (a.subject_name || '').trim().toLowerCase() === norm) ||
+            discoveredAudioItems.some(a => (a.subject_name || '').trim().toLowerCase() === norm);
+          const isValidSubject = norm === 'general' || validSubjectNames.has(norm) || (validSubjectNames.size === 0) || hasAudio;
+          if (isValidSubject && !subMap.has(norm)) {
             subMap.set(norm, ks);
           }
         }

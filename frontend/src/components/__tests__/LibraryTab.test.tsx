@@ -311,4 +311,50 @@ describe('LibraryTab Apple Music Redesign', () => {
     expect(html).not.toContain('Concept &amp; Formula Summary');
     expect(html).not.toContain('Concept & Formula Summary');
   });
+
+  it('renders audio file input and Upload button configured for device audio uploads', () => {
+    const html = renderToString(
+      <LibraryTab
+        audioItems={mockAudioItems}
+        subjects={mockSubjects}
+        onPlayAudio={vi.fn()}
+        onToggleFavorite={vi.fn()}
+        onToggleOffline={vi.fn()}
+        onGoToRecord={vi.fn()}
+        onSaveAudio={vi.fn()}
+      />
+    );
+
+    // 1. Upload action chip is present
+    expect(html).toContain('Upload');
+    expect(html).toContain('title="Upload audio notes from device"');
+
+    // 2. Hidden file input for native audio file picker is present
+    expect(html).toContain('data-testid="audio-file-input"');
+    expect(html).toContain('type="file"');
+    expect(html).toContain('accept="audio/*,.mp3,.m4a,.wav,.aac,.ogg,.flac,.webm,.m4b,.opus,.wma,.aiff"');
+  });
+
+  it('renders Upload button inside subject folder header and empty state', () => {
+    const html = renderToString(
+      <LibraryTab
+        audioItems={[]} // Empty items to test folder view
+        subjects={mockSubjects}
+        initialSubjectId="sub-phys"
+        onPlayAudio={vi.fn()}
+        onToggleFavorite={vi.fn()}
+        onToggleOffline={vi.fn()}
+        onGoToRecord={vi.fn()}
+        onSaveAudio={vi.fn()}
+      />
+    );
+
+    // 1. Header has Upload button scoped to Physics
+    expect(html).toContain('title="Upload audio to Physics"');
+
+    // 2. Empty state has both Upload Audio and Record Lesson actions
+    expect(html).toContain('Upload Audio');
+    expect(html).toContain('Record Lesson');
+    expect(html).toContain('Upload an audio file or record a new lesson for Physics');
+  });
 });

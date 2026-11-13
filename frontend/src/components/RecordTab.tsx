@@ -28,7 +28,7 @@ interface RecordTabProps {
     fileBlob?: Blob,
     options?: { syncToDrive?: boolean },
     onProgress?: (progress: UploadProgressState) => void
-  ) => Promise<void>;
+  ) => Promise<AudioItem | void>;
   onCancel: () => void;
   isDriveConnected?: boolean;
   onConnectDrive?: () => Promise<void>;

@@ -189,7 +189,7 @@ describe('Multi-Account Google Drive & Local Storage Privacy Architecture', () =
     expect(dataB.audioItems.some(n => n.title.includes('Account A'))).toBe(false);
   });
 
-  it('automatically sets up brand new Google Drive account with Smriti root folder, all subject folders, and catalog without user opening Drive', async () => {
+  it('automatically sets up brand new Google Drive account with Smriti root folder, ONLY General subject folder, and catalog without user opening Drive', async () => {
     googleDriveService.setAccessToken('mock-token-brand-new-account', 3600);
 
     const createdFolders: Array<{ name: string; parents?: string[] }> = [];
@@ -262,23 +262,23 @@ describe('Multi-Account Google Drive & Local Storage Privacy Architecture', () =
     expect(hierarchy.rootId).toBe('id-Smriti');
     expect(createdFolders.some(f => f.name === 'Smriti')).toBe(true);
 
-    // 2. All canonical subject folders were created inside Smriti
+    // 2. ONLY the General subject folder was created inside Smriti (no default PCMB folders)
     const subjectFolderNames = createdFolders.filter(f => f.parents && f.parents.includes('id-Smriti')).map(f => f.name);
-    expect(subjectFolderNames).toContain('General');
-    expect(subjectFolderNames).toContain('Physics');
-    expect(subjectFolderNames).toContain('Chemistry');
-    expect(subjectFolderNames).toContain('Mathematics');
-    expect(subjectFolderNames).toContain('Biology');
+    expect(subjectFolderNames).toEqual(['General']);
+    expect(subjectFolderNames).not.toContain('Physics');
+    expect(subjectFolderNames).not.toContain('Chemistry');
+    expect(subjectFolderNames).not.toContain('Mathematics');
+    expect(subjectFolderNames).not.toContain('Biology');
 
-    // 3. fetchDriveData runs smoothly and auto-creates catalog
+    // 3. fetchDriveData runs smoothly and auto-creates catalog with only General
     const driveData = await googleDriveService.fetchDriveData();
     expect(driveData.subjects).toBeDefined();
     const retrievedSubjectNames = driveData.subjects!.map(s => s.name);
-    expect(retrievedSubjectNames).toContain('General');
-    expect(retrievedSubjectNames).toContain('Physics');
-    expect(retrievedSubjectNames).toContain('Chemistry');
-    expect(retrievedSubjectNames).toContain('Mathematics');
-    expect(retrievedSubjectNames).toContain('Biology');
+    expect(retrievedSubjectNames).toEqual(['General']);
+    expect(retrievedSubjectNames).not.toContain('Physics');
+    expect(retrievedSubjectNames).not.toContain('Chemistry');
+    expect(retrievedSubjectNames).not.toContain('Mathematics');
+    expect(retrievedSubjectNames).not.toContain('Biology');
     expect(driveData.audioItems).toEqual([]);
     expect(catalogCreated).toBe(true);
   });

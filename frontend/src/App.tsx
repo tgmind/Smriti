@@ -484,29 +484,30 @@ export const App: React.FC = () => {
     }
   }, []);
 
-  // Save new recording with real-time progress reporting
+  // Save new recording or uploaded audio with real-time progress reporting
   const handleSaveAudio = async (
     partialItem: Partial<AudioItem>,
     fileBlob?: Blob,
     options?: { syncToDrive?: boolean },
     onProgress?: (progress: UploadProgressState) => void
-  ) => {
+  ): Promise<AudioItem> => {
     const newId = `aud-${Date.now()}`;
     const totalBytes = fileBlob ? fileBlob.size : (partialItem.file_size_bytes || 2000000);
+    const isImported = partialItem.source_type === 'imported';
     const newItem: AudioItem = {
       id: newId,
       title: partialItem.title || 'Untitled Lecture Note',
       subject_id: partialItem.subject_id,
       subject_name: partialItem.subject_name || 'General',
       duration_seconds: partialItem.duration_seconds || 60,
-      source_type: 'recorded',
-      file_format: 'm4a',
+      source_type: partialItem.source_type || 'recorded',
+      file_format: partialItem.file_format || 'm4a',
       file_size_bytes: totalBytes,
       audio_enhancement_applied: !!partialItem.audio_enhancement_applied,
       waveform_peaks: partialItem.waveform_peaks || [20, 40, 60, 80, 50],
       key_terms: partialItem.key_terms || [],
       is_favorite: false,
-      is_downloaded_offline: false, // Default to Google Drive cloud storage; user taps download arrow to cache locally
+      is_downloaded_offline: partialItem.is_downloaded_offline !== undefined ? partialItem.is_downloaded_offline : isImported,
       created_at: new Date().toISOString()
     };
 
@@ -552,7 +553,7 @@ export const App: React.FC = () => {
 
         const uploaded = await googleDriveService.uploadAudio(
           fileBlob,
-          `${newItem.title}.m4a`,
+          `${newItem.title}.${newItem.file_format || 'm4a'}`,
           newItem.subject_name || 'General',
           (drivePercent, loadedBytes, fileTotal) => {
             // Map 0-100% drive upload into 30%-98% range for overall, or report actual drive percentage
@@ -615,9 +616,7 @@ export const App: React.FC = () => {
       return next;
     });
 
-    // Give the user a moment to see the 100% completed status bar
-    await new Promise(r => setTimeout(r, 650));
-    setCurrentTab('library');
+    return newItem;
   };
 
   // Google Drive connection trigger: Authorizes account, fetches account cloud data, and displays it
@@ -821,6 +820,10 @@ export const App: React.FC = () => {
     if (!targetSubject) return;
 
     const subjectName = targetSubject.name;
+    if (subjectName.toLowerCase() === 'general') {
+      console.warn('The General folder is the core default folder and cannot be deleted.');
+      return;
+    }
     const deleteRecordings = !!options?.deleteRecordings;
 
     // 1. Optimistic UI update
@@ -866,9 +869,10 @@ export const App: React.FC = () => {
       setAudioItems(nextAudioItems);
     }
 
-    // 2. Google Drive two-way handshake
+    // 2. Google Drive two-way handshake & auto-sync
     if (googleDriveService.isConnected()) {
       try {
+        setIsSyncingDrive(true);
         let generalFolderId: string | undefined;
         if (!deleteRecordings) {
           generalFolderId = await googleDriveService.getOrCreateSubjectFolder('General');
@@ -882,8 +886,21 @@ export const App: React.FC = () => {
           subjects: nextSubjects,
           audioItems: nextAudioItems
         });
+
+        // 3. Auto-sync to update Google Drive Folders and Files
+        const driveData = await googleDriveService.fetchDriveData(nextSubjects);
+        if (driveData) {
+          if (driveData.audioItems) {
+            setAudioItems(driveData.audioItems);
+          }
+          if (driveData.subjects && driveData.subjects.length > 0) {
+            setSubjects(driveData.subjects);
+          }
+        }
       } catch (e) {
         console.warn('Google Drive delete subject notice:', e);
+      } finally {
+        setIsSyncingDrive(false);
       }
     }
 
@@ -905,9 +922,30 @@ export const App: React.FC = () => {
     audioStorage.deleteAudioBlob(audioId).catch(() => {});
     bridge.removeOfflineDownload(audioId);
 
-    if (googleDriveService.isConnected() && itemToDelete.google_drive_file_id) {
-      googleDriveService.deleteAudio(itemToDelete.google_drive_file_id).catch(console.warn);
-      googleDriveService.saveCatalog({ subjects, audioItems: nextAudioItems }).catch(console.warn);
+    if (googleDriveService.isConnected()) {
+      try {
+        setIsSyncingDrive(true);
+        await googleDriveService.deleteAudio(itemToDelete.google_drive_file_id || '', {
+          title: itemToDelete.title,
+          subjectName: itemToDelete.subject_name
+        });
+        await googleDriveService.saveCatalog({ subjects, audioItems: nextAudioItems });
+
+        // Auto-sync to update Google Drive Folders and Files
+        const driveData = await googleDriveService.fetchDriveData(subjects);
+        if (driveData) {
+          if (driveData.audioItems) {
+            setAudioItems(driveData.audioItems);
+          }
+          if (driveData.subjects && driveData.subjects.length > 0) {
+            setSubjects(driveData.subjects);
+          }
+        }
+      } catch (e) {
+        console.warn('Google Drive delete audio notice:', e);
+      } finally {
+        setIsSyncingDrive(false);
+      }
     }
 
     const info = await bridge.getStorageInfoAsync();
@@ -944,6 +982,7 @@ export const App: React.FC = () => {
             onCreateSubject={handleCreateSubject}
             onDeleteSubject={handleDeleteSubject}
             onDeleteAudio={handleDeleteAudio}
+            onSaveAudio={handleSaveAudio}
           />
         )}
 
