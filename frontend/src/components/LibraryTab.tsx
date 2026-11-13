@@ -400,21 +400,23 @@ export const LibraryTab: React.FC<LibraryTabProps> = ({
     handleOpenSubject(newId);
   };
 
-  const handleConfirmDeleteSubject = async () => {
+  const handleConfirmDeleteSubject = () => {
     if (!subjectToDelete || !onDeleteSubject) return;
-    try {
-      setIsDeletingSubject(true);
-      await onDeleteSubject(subjectToDelete.id, { deleteRecordings: deleteRecordingsOption });
-      if (selectedSubjectId === subjectToDelete.id || selectedSubjectId?.toLowerCase() === subjectToDelete.name.toLowerCase()) {
-        handleBackToTopics();
-      }
-      setSubjectToDelete(null);
-      setDeleteRecordingsOption(false);
-    } catch (e) {
-      console.warn('Failed to delete subject folder:', e);
-    } finally {
-      setIsDeletingSubject(false);
+    const target = subjectToDelete;
+    const deleteRecordings = deleteRecordingsOption;
+
+    // 1. Immediately dismiss modal so the screen is NEVER obstructed or blocked
+    setSubjectToDelete(null);
+    setDeleteRecordingsOption(false);
+    setIsDeletingSubject(false);
+
+    // 2. Immediately navigate back to topics if currently inside this deleted folder
+    if (selectedSubjectId === target.id || selectedSubjectId?.toLowerCase() === target.name.toLowerCase()) {
+      handleBackToTopics();
     }
+
+    // 3. Asynchronously execute sturdy Google Drive and local storage deletion in the background
+    onDeleteSubject(target.id, { deleteRecordings });
   };
 
   // Sync initialSubjectId changes from external navigation (e.g. Home tab cards)
@@ -1192,10 +1194,11 @@ export const LibraryTab: React.FC<LibraryTabProps> = ({
             {onDeleteAudio && (
               <button
                 type="button"
-                onClick={async () => {
+                onClick={() => {
                   if (window.confirm(`Delete audio note "${selectedAudio.title}"?`)) {
-                    await onDeleteAudio(selectedAudio.id);
+                    const id = selectedAudio.id;
                     handleBackToSubject();
+                    onDeleteAudio(id);
                   }
                 }}
                 className="p-2 rounded-xl border border-slate-200 text-slate-400 hover:text-rose-600 hover:bg-rose-50 hover:border-rose-200 transition-all cursor-pointer"

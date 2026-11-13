@@ -25,6 +25,7 @@ import { bridge } from './services/bridge';
 import { evaluateCompletedPlay } from './services/learningEngine';
 import { googleDriveService } from './services/googleDrive';
 import { audioStorage } from './services/audioStorage';
+import { BackgroundSyncBanner, ActiveSyncTask } from './components/BackgroundSyncBanner';
 
 export const App: React.FC = () => {
   const [currentTab, setCurrentTab] = useState<TabType>('library');
@@ -113,6 +114,44 @@ export const App: React.FC = () => {
   const [storageInfo, setStorageInfo] = useState<StorageOverview>(() => bridge.getStorageInfo());
   const [isDriveConnected, setIsDriveConnected] = useState<boolean>(() => googleDriveService.isConnected());
   const [isSyncingDrive, setIsSyncingDrive] = useState<boolean>(false);
+
+  // Background non-blocking sync tasks (e.g., folder deletion, audio deletion, Drive sync)
+  const [activeSyncTasks, setActiveSyncTasks] = useState<ActiveSyncTask[]>([]);
+
+  const updateSyncTask = (taskId: string, updates: Partial<ActiveSyncTask>) => {
+    setActiveSyncTasks(prev =>
+      prev.map(t => (t.id === taskId ? { ...t, ...updates } : t))
+    );
+  };
+
+  const dismissSyncTask = (taskId: string) => {
+    setActiveSyncTasks(prev => prev.filter(t => t.id !== taskId));
+  };
+
+  const handleRetryTask = (task: ActiveSyncTask) => {
+    if (task.type === 'delete_folder' || task.type === 'delete_audio' || task.type === 'sync') {
+      updateSyncTask(task.id, {
+        status: 'running',
+        progressPercent: 20,
+        stageMessage: 'Retrying sync with Google Drive...'
+      });
+      handleSyncDrive()
+        .then(() => {
+          updateSyncTask(task.id, {
+            status: 'completed',
+            progressPercent: 100,
+            stageMessage: 'Drive synchronized successfully'
+          });
+          setTimeout(() => dismissSyncTask(task.id), 2500);
+        })
+        .catch(err => {
+          updateSyncTask(task.id, {
+            status: 'error',
+            stageMessage: `Retry failed: ${err.message || 'Drive unavailable'}`
+          });
+        });
+    }
+  };
 
   // Playback & UI Modals
   const [isFullScreenPlayerOpen, setIsFullScreenPlayerOpen] = useState(false);
@@ -812,6 +851,98 @@ export const App: React.FC = () => {
     }
   };
 
+  const runSubjectDeletionInBackground = async (
+    taskId: string,
+    subjectName: string,
+    deleteRecordings: boolean,
+    nextSubjects: Subject[],
+    nextAudioItems: AudioItem[],
+    toDeleteAudio: AudioItem[]
+  ) => {
+    try {
+      // 1. Local IndexedDB clean up if deleting recordings
+      if (deleteRecordings && toDeleteAudio.length > 0) {
+        updateSyncTask(taskId, {
+          stageMessage: `Cleaning up ${toDeleteAudio.length} local audio note${toDeleteAudio.length > 1 ? 's' : ''}...`,
+          progressPercent: 35
+        });
+        for (const item of toDeleteAudio) {
+          audioStorage.deleteAudioBlob(item.id).catch(() => {});
+          bridge.removeOfflineDownload(item.id);
+        }
+      }
+
+      // 2. Google Drive two-way deletion and sync
+      if (googleDriveService.isConnected()) {
+        updateSyncTask(taskId, {
+          stageMessage: 'Deleting folder from Google Drive...',
+          progressPercent: deleteRecordings ? 55 : 45
+        });
+
+        let generalFolderId: string | undefined;
+        if (!deleteRecordings) {
+          generalFolderId = await googleDriveService.getOrCreateSubjectFolder('General');
+        }
+
+        await googleDriveService.deleteSubjectFolder(subjectName, {
+          deleteFiles: deleteRecordings,
+          moveToFolderId: generalFolderId
+        });
+
+        updateSyncTask(taskId, {
+          stageMessage: 'Updating cloud catalog...',
+          progressPercent: 78
+        });
+
+        await googleDriveService.saveCatalog({
+          subjects: nextSubjects,
+          audioItems: nextAudioItems
+        });
+
+        updateSyncTask(taskId, {
+          stageMessage: 'Syncing Drive changes...',
+          progressPercent: 92
+        });
+
+        const driveData = await googleDriveService.fetchDriveData(nextSubjects);
+        if (driveData) {
+          if (driveData.audioItems) {
+            setAudioItems(driveData.audioItems);
+          }
+          if (driveData.subjects && driveData.subjects.length > 0) {
+            setSubjects(driveData.subjects);
+          }
+        }
+      } else {
+        updateSyncTask(taskId, {
+          progressPercent: 100
+        });
+      }
+
+      const info = await bridge.getStorageInfoAsync();
+      setStorageInfo(info);
+
+      updateSyncTask(taskId, {
+        stageMessage: 'Folder deleted and Drive synchronized',
+        progressPercent: 100,
+        status: 'completed'
+      });
+
+      // Auto-dismiss after 3.2 seconds
+      setTimeout(() => {
+        dismissSyncTask(taskId);
+      }, 3200);
+    } catch (err: any) {
+      console.error('Error during background subject deletion:', err);
+      updateSyncTask(taskId, {
+        stageMessage: `Drive deletion error: ${err.message || 'Check connection'}`,
+        progressPercent: 100,
+        status: 'error',
+        errorMessage: err.message || 'Deletion failed'
+      });
+    }
+  };
+
   const handleDeleteSubject = async (
     subjectId: string,
     options?: { deleteRecordings?: boolean }
@@ -828,7 +959,7 @@ export const App: React.FC = () => {
     }
     const deleteRecordings = !!options?.deleteRecordings;
 
-    // 1. Optimistic UI update
+    // 1. Immediate optimistic UI and local persistence update (instant feedback, never blocks UI)
     let nextSubjects = subjects.filter(
       s => s.id !== targetSubject.id && s.name.toLowerCase() !== subjectName.toLowerCase()
     );
@@ -840,23 +971,15 @@ export const App: React.FC = () => {
     setSubjects(nextSubjects);
 
     let nextAudioItems: AudioItem[] = [];
+    const toDeleteAudio = audioItems.filter(
+      a => a.subject_id === targetSubject.id || a.subject_name?.toLowerCase() === subjectName.toLowerCase()
+    );
+
     if (deleteRecordings) {
-      const toDelete = audioItems.filter(
-        a => a.subject_id === targetSubject.id || a.subject_name?.toLowerCase() === subjectName.toLowerCase()
-      );
       nextAudioItems = audioItems.filter(
         a => a.subject_id !== targetSubject.id && a.subject_name?.toLowerCase() !== subjectName.toLowerCase()
       );
       setAudioItems(nextAudioItems);
-
-      // Async local & drive cleanup
-      for (const item of toDelete) {
-        audioStorage.deleteAudioBlob(item.id).catch(() => {});
-        bridge.removeOfflineDownload(item.id);
-        if (googleDriveService.isConnected() && item.google_drive_file_id) {
-          googleDriveService.deleteAudio(item.google_drive_file_id).catch(() => {});
-        }
-      }
     } else {
       nextAudioItems = audioItems.map(a => {
         if (a.subject_id === targetSubject.id || a.subject_name?.toLowerCase() === subjectName.toLowerCase()) {
@@ -871,69 +994,66 @@ export const App: React.FC = () => {
       setAudioItems(nextAudioItems);
     }
 
-    // 2. Google Drive two-way handshake & auto-sync
-    if (googleDriveService.isConnected()) {
-      try {
-        setIsSyncingDrive(true);
-        let generalFolderId: string | undefined;
-        if (!deleteRecordings) {
-          generalFolderId = await googleDriveService.getOrCreateSubjectFolder('General');
-        }
+    localStorage.setItem('smriti_subjects', JSON.stringify(nextSubjects));
+    localStorage.setItem('smriti_audio_items', JSON.stringify(nextAudioItems));
 
-        await googleDriveService.deleteSubjectFolder(subjectName, {
-          deleteFiles: deleteRecordings,
-          moveToFolderId: generalFolderId
-        });
-        await googleDriveService.saveCatalog({
-          subjects: nextSubjects,
-          audioItems: nextAudioItems
-        });
+    // 2. Register non-blocking active sync task with progress bar
+    const taskId = `task-del-subj-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
+    const initialTask: ActiveSyncTask = {
+      id: taskId,
+      type: 'delete_folder',
+      title: `Deleting "${subjectName}"`,
+      targetName: subjectName,
+      stageMessage: 'Removing folder and cleaning up offline notes...',
+      progressPercent: 20,
+      status: 'running',
+      timestamp: Date.now()
+    };
+    setActiveSyncTasks(prev => [initialTask, ...prev]);
 
-        // 3. Auto-sync to update Google Drive Folders and Files
-        const driveData = await googleDriveService.fetchDriveData(nextSubjects);
-        if (driveData) {
-          if (driveData.audioItems) {
-            setAudioItems(driveData.audioItems);
-          }
-          if (driveData.subjects && driveData.subjects.length > 0) {
-            setSubjects(driveData.subjects);
-          }
-        }
-      } catch (e) {
-        console.warn('Google Drive delete subject notice:', e);
-      } finally {
-        setIsSyncingDrive(false);
-      }
-    }
-
-    const info = await bridge.getStorageInfoAsync();
-    setStorageInfo(info);
+    // 3. Sturdily complete deletion & Drive synchronization in the background
+    return runSubjectDeletionInBackground(
+      taskId,
+      subjectName,
+      deleteRecordings,
+      nextSubjects,
+      nextAudioItems,
+      toDeleteAudio
+    );
   };
 
-  const handleDeleteAudio = async (audioId: string) => {
-    const itemToDelete = audioItems.find(a => a.id === audioId);
-    if (!itemToDelete) return;
+  const runAudioDeletionInBackground = async (
+    taskId: string,
+    itemToDelete: AudioItem,
+    nextAudioItems: AudioItem[]
+  ) => {
+    try {
+      await audioStorage.deleteAudioBlob(itemToDelete.id).catch(() => {});
+      bridge.removeOfflineDownload(itemToDelete.id);
 
-    const nextAudioItems = audioItems.filter(a => a.id !== audioId);
-    setAudioItems(nextAudioItems);
+      if (googleDriveService.isConnected()) {
+        updateSyncTask(taskId, {
+          stageMessage: 'Deleting audio note from Google Drive...',
+          progressPercent: 55
+        });
 
-    if (playbackState.currentAudio?.id === audioId) {
-      handleDismissPlayer();
-    }
-
-    audioStorage.deleteAudioBlob(audioId).catch(() => {});
-    bridge.removeOfflineDownload(audioId);
-
-    if (googleDriveService.isConnected()) {
-      try {
-        setIsSyncingDrive(true);
         await googleDriveService.deleteAudio(itemToDelete.google_drive_file_id || '', {
           title: itemToDelete.title,
           subjectName: itemToDelete.subject_name
         });
+
+        updateSyncTask(taskId, {
+          stageMessage: 'Updating cloud catalog...',
+          progressPercent: 82
+        });
+
         await googleDriveService.saveCatalog({ subjects, audioItems: nextAudioItems });
 
-        // Auto-sync to update Google Drive Folders and Files
+        updateSyncTask(taskId, {
+          stageMessage: 'Syncing Drive changes...',
+          progressPercent: 92
+        });
+
         const driveData = await googleDriveService.fetchDriveData(subjects);
         if (driveData) {
           if (driveData.audioItems) {
@@ -943,15 +1063,63 @@ export const App: React.FC = () => {
             setSubjects(driveData.subjects);
           }
         }
-      } catch (e) {
-        console.warn('Google Drive delete audio notice:', e);
-      } finally {
-        setIsSyncingDrive(false);
+      } else {
+        updateSyncTask(taskId, {
+          progressPercent: 100
+        });
       }
+
+      const info = await bridge.getStorageInfoAsync();
+      setStorageInfo(info);
+
+      updateSyncTask(taskId, {
+        stageMessage: 'Audio note deleted and Drive synchronized',
+        progressPercent: 100,
+        status: 'completed'
+      });
+
+      setTimeout(() => {
+        dismissSyncTask(taskId);
+      }, 3000);
+    } catch (err: any) {
+      console.error('Error during background audio deletion:', err);
+      updateSyncTask(taskId, {
+        stageMessage: `Drive deletion error: ${err.message || 'Check connection'}`,
+        progressPercent: 100,
+        status: 'error',
+        errorMessage: err.message || 'Deletion failed'
+      });
+    }
+  };
+
+  const handleDeleteAudio = async (audioId: string) => {
+    const itemToDelete = audioItems.find(a => a.id === audioId);
+    if (!itemToDelete) return;
+
+    // 1. Optimistic UI and local storage update
+    const nextAudioItems = audioItems.filter(a => a.id !== audioId);
+    setAudioItems(nextAudioItems);
+    localStorage.setItem('smriti_audio_items', JSON.stringify(nextAudioItems));
+
+    if (playbackState.currentAudio?.id === audioId) {
+      handleDismissPlayer();
     }
 
-    const info = await bridge.getStorageInfoAsync();
-    setStorageInfo(info);
+    // 2. Register non-blocking active sync task with progress bar
+    const taskId = `task-del-audio-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
+    const initialTask: ActiveSyncTask = {
+      id: taskId,
+      type: 'delete_audio',
+      title: `Deleting "${itemToDelete.title}"`,
+      targetName: itemToDelete.title,
+      stageMessage: 'Removing note from device storage...',
+      progressPercent: 25,
+      status: 'running',
+      timestamp: Date.now()
+    };
+    setActiveSyncTasks(prev => [initialTask, ...prev]);
+
+    return runAudioDeletionInBackground(taskId, itemToDelete, nextAudioItems);
   };
 
   const handleNavigateToAccount = () => {
@@ -960,6 +1128,13 @@ export const App: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-[#F8F9FD] text-slate-900 flex flex-col font-sans select-none">
+      {/* Sleek, Non-Blocking Background Sync Banner with animated progress */}
+      <BackgroundSyncBanner
+        tasks={activeSyncTasks}
+        onDismissTask={dismissSyncTask}
+        onRetryTask={handleRetryTask}
+      />
+
       {/* Active Tab Screen */}
       <main className={`flex-1 w-full max-w-md mx-auto ${playbackState.currentAudio ? 'pb-36 sm:pb-40' : 'pb-24'}`}>
         {(currentTab === 'library' || currentTab === 'home') && (

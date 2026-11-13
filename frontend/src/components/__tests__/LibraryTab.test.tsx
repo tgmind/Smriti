@@ -218,6 +218,24 @@ describe('LibraryTab Apple Music Redesign', () => {
     expect(html).toContain('title="Delete Chemistry folder"');
   });
 
+  it('does not display obstructive modal backdrop by default and allows free navigation', () => {
+    const html = renderToString(
+      <LibraryTab
+        audioItems={mockAudioItems}
+        subjects={mockSubjects}
+        onPlayAudio={vi.fn()}
+        onToggleFavorite={vi.fn()}
+        onToggleOffline={vi.fn()}
+        onGoToRecord={vi.fn()}
+        onDeleteSubject={vi.fn()}
+      />
+    );
+
+    // Modal is not active; UI remains completely unobstructed
+    expect(html).not.toContain('Delete Folder &amp; Notes');
+    expect(html).not.toContain('Deleting...');
+  });
+
   it('strictly deduplicates subjects by name so duplicate folders are merged and not shown twice', () => {
     const duplicatedSubjects: Subject[] = [
       { id: 'sub-1', name: 'Chemistry', icon_name: 'BookOpen', color_hex: '#f59e0b', sort_order: 1 },
