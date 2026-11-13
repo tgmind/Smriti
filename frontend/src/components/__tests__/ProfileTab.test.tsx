@@ -99,4 +99,27 @@ describe('ProfileTab UI Component', () => {
     expect(html).toContain('Connected');
     expect(html).toContain('Disconnect Google Drive');
   });
+
+  it('renders Wi-Fi Only Sync preference with live network status indicator', () => {
+    const html = renderToString(
+      <ProfileTab
+        userSettings={mockSettings}
+        storageInfo={mockStorage}
+        audioItems={mockAudioItems}
+        revisionItems={[]}
+        dailyStats={[]}
+        isDriveConnected={true}
+        onUpdateSettings={vi.fn()}
+        onConnectDrive={vi.fn()}
+        onDisconnectDrive={vi.fn()}
+        onClearCache={vi.fn()}
+      />
+    );
+
+    // Wi-Fi Only card is present with ENABLED badge
+    expect(html).toContain('Wi-Fi Only Sync');
+    expect(html).toContain('Prevent mobile data consumption for audio sync');
+    expect(html).toContain('ENABLED');
+    expect(html).toContain('Wi-Fi active');
+  });
 });

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Trash2,
   FileSpreadsheet,
@@ -16,6 +16,7 @@ import { exportDataAsJSON, exportDataAsCSV } from '../services/supabase';
 import { bridge } from '../services/bridge';
 import { GoogleDriveStorage } from './GoogleDriveStorage';
 import { googleDriveService } from '../services/googleDrive';
+import { networkService, NetworkStatus } from '../services/networkService';
 
 interface ProfileTabProps {
   userSettings: UserSettings;
@@ -49,6 +50,13 @@ export const ProfileTab: React.FC<ProfileTabProps> = ({
   onClearCache
 }) => {
   const [cacheClearedSuccess, setCacheClearedSuccess] = useState(false);
+  const [networkStatus, setNetworkStatus] = useState<NetworkStatus>(() => networkService.getStatus());
+
+  useEffect(() => {
+    return networkService.subscribe(status => {
+      setNetworkStatus(status);
+    });
+  }, []);
 
   const formatMb = (bytes: number) => (bytes / (1024 * 1024)).toFixed(1);
 
@@ -225,23 +233,44 @@ export const ProfileTab: React.FC<ProfileTabProps> = ({
 
         {/* Wi-Fi Only Sync Preference */}
         <div
-          onClick={() => onUpdateSettings({ offline_sync_wifi_only: !userSettings.offline_sync_wifi_only })}
+          onClick={() => {
+            bridge.triggerHaptic('medium');
+            onUpdateSettings({ offline_sync_wifi_only: !userSettings.offline_sync_wifi_only });
+          }}
           className="bg-white border border-slate-200/80 hover:border-slate-300 rounded-2xl p-3 flex items-center justify-between gap-3 cursor-pointer transition-all shadow-2xs hover:shadow-xs group"
         >
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 min-w-0 flex-1">
             <div className="w-10 h-10 rounded-2xl bg-violet-50 text-violet-700 flex items-center justify-center shrink-0">
               <Sparkles size={18} />
             </div>
-            <div>
+            <div className="min-w-0 flex-1">
               <h4 className="text-xs font-bold text-slate-900 group-hover:text-violet-700 transition-colors">
                 Wi-Fi Only Sync
               </h4>
               <p className="text-[11px] text-slate-500">
                 Prevent mobile data consumption for audio sync
               </p>
+              <div className="mt-1 flex items-center gap-1.5">
+                <span
+                  className={`w-1.5 h-1.5 rounded-full shrink-0 ${
+                    !networkStatus.isOnline
+                      ? 'bg-slate-400'
+                      : networkStatus.isCellular
+                      ? (userSettings.offline_sync_wifi_only ? 'bg-amber-500 animate-pulse' : 'bg-slate-400')
+                      : 'bg-emerald-500'
+                  }`}
+                />
+                <span className="text-[10px] text-slate-500 font-medium truncate">
+                  {!networkStatus.isOnline
+                    ? 'Offline • Local storage active'
+                    : networkStatus.isCellular
+                    ? (userSettings.offline_sync_wifi_only ? 'Mobile Data active • Sync paused' : 'Mobile Data active • Sync allowed')
+                    : 'Wi-Fi active • Ready to sync'}
+                </span>
+              </div>
             </div>
           </div>
-          <span className={`text-[10px] font-mono font-bold px-2 py-0.5 rounded-full ${
+          <span className={`text-[10px] font-mono font-bold px-2 py-0.5 rounded-full shrink-0 ${
             userSettings.offline_sync_wifi_only
               ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
               : 'bg-slate-100 text-slate-500'

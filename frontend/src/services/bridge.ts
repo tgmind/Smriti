@@ -22,6 +22,7 @@ interface ISmritiBridgeNative {
   clearTemporaryCache(): void;
   purgeAllLocalData(): void;
   triggerHapticFeedback(patternType: string): void;
+  getNetworkStatus?(): string;
 }
 
 declare global {
@@ -53,6 +54,23 @@ class BridgeManager {
 
   public isNativeApp(): boolean {
     return typeof window !== 'undefined' && !!window.SmritiBridge;
+  }
+
+  public getNetworkStatus(): {
+    isOnline: boolean;
+    connectionType: 'wifi' | 'cellular' | 'ethernet' | 'other' | 'none' | 'unknown';
+    isWifi: boolean;
+    isCellular: boolean;
+  } | null {
+    if (this.isNativeApp() && window.SmritiBridge?.getNetworkStatus) {
+      try {
+        const raw = window.SmritiBridge.getNetworkStatus();
+        if (raw) return JSON.parse(raw);
+      } catch (e) {
+        console.warn('[Bridge] Failed getting native network status', e);
+      }
+    }
+    return null;
   }
 
   private initNativeListener() {

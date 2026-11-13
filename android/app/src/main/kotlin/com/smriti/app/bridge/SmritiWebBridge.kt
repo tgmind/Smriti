@@ -1,6 +1,10 @@
 package com.smriti.app.bridge
 
 import android.content.Context
+import android.net.ConnectivityManager
+import android.net.Network
+import android.net.NetworkCapabilities
+import android.net.NetworkRequest
 import android.os.Build
 import android.os.Handler
 import android.os.Looper
@@ -35,6 +39,9 @@ class SmritiWebBridge(
         sendEventToJs("recordingAmplitudeSample", JSONObject().put("amplitude", amp).toString())
     }
 
+    private val connectivityManager = context.getSystemService(Context.CONNECTIVITY_SERVICE) as? ConnectivityManager
+    private var networkCallback: ConnectivityManager.NetworkCallback? = null
+
     init {
         // Setup listener on ExoPlayer if active
         mainHandler.postDelayed(object : Runnable {
@@ -51,6 +58,81 @@ class SmritiWebBridge(
                 mainHandler.postDelayed(this, 300)
             }
         }, 300)
+
+        // Setup real-time network connectivity listener
+        try {
+            val callback = object : ConnectivityManager.NetworkCallback() {
+                override fun onAvailable(network: Network) {
+                    sendNetworkUpdate()
+                }
+                override fun onLost(network: Network) {
+                    sendNetworkUpdate()
+                }
+                override fun onCapabilitiesChanged(network: Network, networkCapabilities: NetworkCapabilities) {
+                    sendNetworkUpdate()
+                }
+            }
+            networkCallback = callback
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+                connectivityManager?.registerDefaultNetworkCallback(callback)
+            } else {
+                val builder = NetworkRequest.Builder()
+                    .addCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
+                connectivityManager?.registerNetworkCallback(builder.build(), callback)
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+    }
+
+    private fun sendNetworkUpdate() {
+        val status = checkNetworkStatus()
+        sendEventToJs("networkStatusChanged", status.toString())
+    }
+
+    fun checkNetworkStatus(): JSONObject {
+        val result = JSONObject()
+        val cm = connectivityManager
+        if (cm == null) {
+            result.put("isOnline", true)
+            result.put("connectionType", "wifi")
+            result.put("isWifi", true)
+            result.put("isCellular", false)
+            return result
+        }
+
+        val activeNetwork = cm.activeNetwork
+        val caps = cm.getNetworkCapabilities(activeNetwork)
+        if (activeNetwork == null || caps == null) {
+            result.put("isOnline", false)
+            result.put("connectionType", "none")
+            result.put("isWifi", false)
+            result.put("isCellular", false)
+            return result
+        }
+
+        val isWifi = caps.hasTransport(NetworkCapabilities.TRANSPORT_WIFI)
+        val isCellular = caps.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR)
+        val isEthernet = caps.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET)
+        val hasInternet = caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
+
+        val connectionType = when {
+            isWifi -> "wifi"
+            isCellular -> "cellular"
+            isEthernet -> "ethernet"
+            else -> "other"
+        }
+
+        result.put("isOnline", hasInternet)
+        result.put("connectionType", connectionType)
+        result.put("isWifi", isWifi || isEthernet)
+        result.put("isCellular", isCellular)
+        return result
+    }
+
+    @JavascriptInterface
+    fun getNetworkStatus(): String {
+        return checkNetworkStatus().toString()
     }
 
     fun sendEventToJs(eventName: String, jsonPayload: String) {

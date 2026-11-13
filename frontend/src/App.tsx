@@ -25,7 +25,9 @@ import { bridge } from './services/bridge';
 import { evaluateCompletedPlay } from './services/learningEngine';
 import { googleDriveService } from './services/googleDrive';
 import { audioStorage } from './services/audioStorage';
+import { networkService } from './services/networkService';
 import { BackgroundSyncBanner, ActiveSyncTask } from './components/BackgroundSyncBanner';
+import { SyncStatusToast, SyncToastState } from './components/SyncStatusToast';
 
 export const App: React.FC = () => {
   const [currentTab, setCurrentTab] = useState<TabType>('library');
@@ -118,6 +120,16 @@ export const App: React.FC = () => {
   // Background non-blocking sync tasks (e.g., folder deletion, audio deletion, Drive sync)
   const [activeSyncTasks, setActiveSyncTasks] = useState<ActiveSyncTask[]>([]);
 
+  // Wi-Fi Only Sync & Network Status Toast
+  const [syncToast, setSyncToast] = useState<SyncToastState | null>(null);
+
+  const showSyncToast = (toast: Omit<SyncToastState, 'id'>) => {
+    setSyncToast({
+      id: `toast-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+      ...toast
+    });
+  };
+
   const updateSyncTask = (taskId: string, updates: Partial<ActiveSyncTask>) => {
     setActiveSyncTasks(prev =>
       prev.map(t => (t.id === taskId ? { ...t, ...updates } : t))
@@ -193,6 +205,37 @@ export const App: React.FC = () => {
   useEffect(() => {
     localStorage.setItem('smriti_settings', JSON.stringify(userSettings));
   }, [userSettings]);
+
+  // Real-time Network Monitoring & Wi-Fi Only Sync Handshake
+  useEffect(() => {
+    return networkService.subscribe((current, prev) => {
+      // 1. Transitioned to Cellular with Wi-Fi Only Sync enabled
+      if (current.isOnline && current.isCellular && !prev.isCellular && userSettings.offline_sync_wifi_only) {
+        showSyncToast({
+          type: 'wifi_only_paused',
+          title: 'Wi-Fi Only Sync Active',
+          message: 'Connected via mobile data. Google Drive sync is paused to preserve your cellular allowance.',
+          actionLabel: 'Settings',
+          onAction: () => handleNavigateToAccount(),
+          durationMs: 6500
+        });
+      }
+
+      // 2. Transitioned from Cellular / Offline to Wi-Fi
+      if (current.isOnline && current.isWifi && (!prev.isWifi || !prev.isOnline)) {
+        if (googleDriveService.isConnected()) {
+          showSyncToast({
+            type: 'wifi_connected',
+            title: 'Wi-Fi Connected',
+            message: 'Google Drive sync resumed automatically over Wi-Fi.',
+            durationMs: 4000
+          });
+          // Auto-sync library safely
+          handleSyncDrive({ silent: true, forceSync: true }).catch(() => {});
+        }
+      }
+    });
+  }, [userSettings.offline_sync_wifi_only, isDriveConnected]);
 
   // Subscribe to Bridge events
   useEffect(() => {
@@ -577,12 +620,36 @@ export const App: React.FC = () => {
       }
     }
 
-    // 2. If Google Drive connected and sync enabled, upload directly to Drive
+    // 2. If Google Drive connected and sync enabled, check Wi-Fi only restriction
     const shouldSyncDrive =
       options?.syncToDrive !== false &&
       (googleDriveService.isConnected() || options?.syncToDrive === true);
 
-    if (shouldSyncDrive && fileBlob) {
+    const syncPermission = networkService.canSync(userSettings.offline_sync_wifi_only);
+
+    if (shouldSyncDrive && fileBlob && !syncPermission.allowed) {
+      // Saved offline; Drive sync deferred to avoid consuming cellular data
+      onProgress?.({
+        stage: 'done',
+        percent: 100,
+        loadedBytes: totalBytes,
+        totalBytes,
+        message: 'Saved offline on device. Drive sync will resume on Wi-Fi.'
+      });
+
+      if (syncPermission.reason === 'wifi_only_on_cellular') {
+        showSyncToast({
+          type: 'wifi_only_paused',
+          title: 'Saved to Device Offline',
+          message: `Note "${newItem.title}" saved offline. Drive upload paused on mobile data per your Wi-Fi Only setting.`,
+          actionLabel: 'Upload Anyway',
+          onAction: () => {
+            handleSyncItemToDrive(newItem, true);
+          },
+          durationMs: 7000
+        });
+      }
+    } else if (shouldSyncDrive && fileBlob) {
       try {
         onProgress?.({
           stage: 'uploading',
@@ -712,11 +779,40 @@ export const App: React.FC = () => {
   };
 
   // Re-sync cloud data from Google Drive
-  const handleSyncDrive = async () => {
+  const handleSyncDrive = async (options?: { silent?: boolean; forceSync?: boolean }) => {
     if (!googleDriveService.isConnected()) {
       await handleConnectDrive();
       return;
     }
+
+    // Check Wi-Fi Only restriction
+    if (!options?.forceSync) {
+      const permission = networkService.canSync(userSettings.offline_sync_wifi_only);
+      if (!permission.allowed) {
+        if (permission.reason === 'wifi_only_on_cellular') {
+          showSyncToast({
+            type: 'wifi_only_paused',
+            title: 'Sync Paused on Mobile Data',
+            message: 'Wi-Fi Only Sync is active. Sync paused to avoid cellular data usage.',
+            actionLabel: 'Sync Anyway',
+            onAction: () => {
+              handleSyncDrive({ forceSync: true });
+            },
+            durationMs: 7000
+          });
+          return;
+        } else if (permission.reason === 'offline') {
+          showSyncToast({
+            type: 'offline',
+            title: 'Offline Mode',
+            message: 'No internet connection detected. Library is safely preserved on device.',
+            durationMs: 4000
+          });
+          return;
+        }
+      }
+    }
+
     try {
       setIsSyncingDrive(true);
       const driveData = await googleDriveService.fetchDriveData(subjects);
@@ -724,6 +820,14 @@ export const App: React.FC = () => {
         setAudioItems(driveData.audioItems || []);
         if (driveData.subjects && driveData.subjects.length > 0) {
           setSubjects(driveData.subjects);
+        }
+        if (!options?.silent) {
+          showSyncToast({
+            type: 'synced',
+            title: 'Library Synchronized',
+            message: 'Google Drive folders and notes are up to date.',
+            durationMs: 3000
+          });
         }
       }
       const info = await bridge.getStorageInfoAsync();
@@ -780,12 +884,37 @@ export const App: React.FC = () => {
     }
   };
 
-  const handleSyncItemToDrive = async (audio: AudioItem) => {
+  const handleSyncItemToDrive = async (audio: AudioItem, forceSync = false) => {
     try {
       if (!googleDriveService.isConnected()) {
         await handleConnectDrive();
         return;
       }
+
+      if (!forceSync) {
+        const permission = networkService.canSync(userSettings.offline_sync_wifi_only);
+        if (!permission.allowed) {
+          if (permission.reason === 'wifi_only_on_cellular') {
+            showSyncToast({
+              type: 'wifi_only_paused',
+              title: 'Upload Paused on Mobile Data',
+              message: `Wi-Fi Only Sync active: Uploading "${audio.title}" is paused to save mobile data.`,
+              actionLabel: 'Upload Anyway',
+              onAction: () => handleSyncItemToDrive(audio, true),
+              durationMs: 7000
+            });
+            return;
+          } else if (permission.reason === 'offline') {
+            showSyncToast({
+              type: 'offline',
+              title: 'Offline Mode',
+              message: 'Connect to internet to back up this note to Google Drive.'
+            });
+            return;
+          }
+        }
+      }
+
       const blob = await audioStorage.getAudioBlob(audio.id);
       if (blob && googleDriveService.isConnected()) {
         const uploaded = await googleDriveService.uploadAudio(
@@ -800,18 +929,40 @@ export const App: React.FC = () => {
               : item
           )
         );
+        showSyncToast({
+          type: 'synced',
+          title: 'Backed Up to Drive',
+          message: `"${audio.title}" safely backed up to Google Drive.`,
+          durationMs: 3000
+        });
       }
     } catch (e) {
       console.warn('Sync to drive error:', e);
     }
   };
 
-  const handleDownloadItemFromDrive = async (audio: AudioItem) => {
+  const handleDownloadItemFromDrive = async (audio: AudioItem, forceDownload = false) => {
     try {
       if (!googleDriveService.isConnected()) {
         await handleConnectDrive();
         return;
       }
+
+      if (!forceDownload) {
+        const permission = networkService.canSync(userSettings.offline_sync_wifi_only);
+        if (!permission.allowed && permission.reason === 'wifi_only_on_cellular') {
+          showSyncToast({
+            type: 'wifi_only_paused',
+            title: 'Download Paused on Mobile Data',
+            message: `Wi-Fi Only Sync active: Downloading "${audio.title}" is paused on mobile data.`,
+            actionLabel: 'Download Anyway',
+            onAction: () => handleDownloadItemFromDrive(audio, true),
+            durationMs: 7000
+          });
+          return;
+        }
+      }
+
       if (audio.google_drive_file_id && googleDriveService.isConnected()) {
         const blob = await googleDriveService.downloadAudio(audio.google_drive_file_id, audio.title);
         if (blob) {
@@ -819,6 +970,12 @@ export const App: React.FC = () => {
           setAudioItems(prev =>
             prev.map(item => (item.id === audio.id ? { ...item, is_downloaded_offline: true } : item))
           );
+          showSyncToast({
+            type: 'synced',
+            title: 'Downloaded for Offline',
+            message: `"${audio.title}" is ready for 100% offline playback.`,
+            durationMs: 3000
+          });
         }
       }
     } catch (e) {
@@ -873,7 +1030,20 @@ export const App: React.FC = () => {
       }
 
       // 2. Google Drive two-way deletion and sync
-      if (googleDriveService.isConnected()) {
+      const syncCheck = networkService.canSync(userSettings.offline_sync_wifi_only);
+      if (googleDriveService.isConnected() && !syncCheck.allowed && syncCheck.reason === 'wifi_only_on_cellular') {
+        updateSyncTask(taskId, {
+          stageMessage: 'Folder deleted locally. Cloud sync deferred for Wi-Fi...',
+          progressPercent: 100,
+          status: 'completed'
+        });
+        showSyncToast({
+          type: 'wifi_only_paused',
+          title: 'Folder Deleted Locally',
+          message: `Folder "${subjectName}" deleted on device. Drive sync deferred until connected to Wi-Fi.`,
+          durationMs: 5000
+        });
+      } else if (googleDriveService.isConnected()) {
         updateSyncTask(taskId, {
           stageMessage: 'Deleting folder from Google Drive...',
           progressPercent: deleteRecordings ? 55 : 45
@@ -1031,7 +1201,20 @@ export const App: React.FC = () => {
       await audioStorage.deleteAudioBlob(itemToDelete.id).catch(() => {});
       bridge.removeOfflineDownload(itemToDelete.id);
 
-      if (googleDriveService.isConnected()) {
+      const syncCheck = networkService.canSync(userSettings.offline_sync_wifi_only);
+      if (googleDriveService.isConnected() && !syncCheck.allowed && syncCheck.reason === 'wifi_only_on_cellular') {
+        updateSyncTask(taskId, {
+          stageMessage: 'Audio deleted locally. Cloud sync deferred for Wi-Fi...',
+          progressPercent: 100,
+          status: 'completed'
+        });
+        showSyncToast({
+          type: 'wifi_only_paused',
+          title: 'Audio Deleted Locally',
+          message: `Note "${itemToDelete.title}" deleted on device. Drive sync deferred until connected to Wi-Fi.`,
+          durationMs: 5000
+        });
+      } else if (googleDriveService.isConnected()) {
         updateSyncTask(taskId, {
           stageMessage: 'Deleting audio note from Google Drive...',
           progressPercent: 55
@@ -1133,6 +1316,12 @@ export const App: React.FC = () => {
         tasks={activeSyncTasks}
         onDismissTask={dismissSyncTask}
         onRetryTask={handleRetryTask}
+      />
+
+      {/* Real-time Wi-Fi & Cellular Sync Status Toast */}
+      <SyncStatusToast
+        toast={syncToast}
+        onDismiss={() => setSyncToast(null)}
       />
 
       {/* Active Tab Screen */}
