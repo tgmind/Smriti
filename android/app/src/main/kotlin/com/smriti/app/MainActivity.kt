@@ -96,6 +96,15 @@ class MainActivity : ComponentActivity() {
                                 databaseEnabled = true
                                 cacheMode = WebSettings.LOAD_DEFAULT
                                 mixedContentMode = WebSettings.MIXED_CONTENT_ALWAYS_ALLOW
+                                javaScriptCanOpenWindowsAutomatically = true
+                                setSupportMultipleWindows(true)
+                            }
+
+                            // Preserve Google authentication cookies & tokens across app restarts
+                            val cookieManager = android.webkit.CookieManager.getInstance()
+                            cookieManager.setAcceptCookie(true)
+                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+                                cookieManager.setAcceptThirdPartyCookies(this, true)
                             }
 
                             val nativeBridge = SmritiWebBridge(context, this)
@@ -108,6 +117,33 @@ class MainActivity : ComponentActivity() {
                                         "SmritiWebView",
                                         "${consoleMessage?.message()} -- From line ${consoleMessage?.lineNumber()} of ${consoleMessage?.sourceId()}"
                                     )
+                                    return true
+                                }
+
+                                override fun onCreateWindow(
+                                    view: WebView?,
+                                    isDialog: Boolean,
+                                    isUserGesture: Boolean,
+                                    resultMsg: android.os.Message?
+                                ): Boolean {
+                                    if (resultMsg == null) return false
+                                    val newWebView = WebView(this@MainActivity).apply {
+                                        settings.javaScriptEnabled = true
+                                        settings.domStorageEnabled = true
+                                        val cookieMgr = android.webkit.CookieManager.getInstance()
+                                        cookieMgr.setAcceptCookie(true)
+                                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+                                            cookieMgr.setAcceptThirdPartyCookies(this, true)
+                                        }
+                                        webViewClient = object : WebViewClient() {
+                                            override fun shouldOverrideUrlLoading(view: WebView?, request: WebResourceRequest?): Boolean {
+                                                return false
+                                            }
+                                        }
+                                    }
+                                    val transport = resultMsg.obj as? WebView.WebViewTransport ?: return false
+                                    transport.webView = newWebView
+                                    resultMsg.sendToTarget()
                                     return true
                                 }
                             }
@@ -175,6 +211,11 @@ class MainActivity : ComponentActivity() {
     }
 
 
+
+    override fun onPause() {
+        super.onPause()
+        android.webkit.CookieManager.getInstance().flush()
+    }
 
     override fun onDestroy() {
         controllerFuture?.let { MediaController.releaseFuture(it) }

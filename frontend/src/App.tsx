@@ -468,12 +468,14 @@ export const App: React.FC = () => {
     if (googleDriveService.isConnected()) {
       setIsDriveConnected(true);
       googleDriveService.fetchUserProfile().catch(() => {});
-      setIsSyncingDrive(true);
-      googleDriveService.fetchDriveData().then(data => {
-        if (data.audioItems) {
+      googleDriveService.ensureFreshAccessToken().then(() => {
+        setIsSyncingDrive(true);
+        return googleDriveService.fetchDriveData(subjects);
+      }).then(data => {
+        if (data && data.audioItems && data.audioItems.length > 0) {
           setAudioItems(data.audioItems);
         }
-        if (data.subjects && data.subjects.length > 0) {
+        if (data && data.subjects && data.subjects.length > 0) {
           setSubjects(data.subjects);
         }
       }).catch(err => {

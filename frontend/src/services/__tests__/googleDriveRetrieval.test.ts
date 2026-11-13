@@ -296,7 +296,7 @@ describe('Google Drive Automatic Cloud Data Retrieval on Connect', () => {
     expect(item2?.is_downloaded_offline).toBe(false);
   });
 
-  it('disconnects and throws clear error when Google Drive returns 401 Unauthorized', async () => {
+  it('does not disconnect user account when Google Drive returns 401 Unauthorized (preserves connected state until explicit user disconnect)', async () => {
     googleDriveService.setAccessToken('expired-token', 3600);
     expect(googleDriveService.isConnected()).toBe(true);
 
@@ -309,9 +309,9 @@ describe('Google Drive Automatic Cloud Data Retrieval on Connect', () => {
     });
 
     const result = await googleDriveService.fetchDriveData();
-    // Returns empty array and cleans up session
+    // Returns empty array gracefully without unilaterally wiping or disconnecting the user session
     expect(result.audioItems).toEqual([]);
-    expect(googleDriveService.isConnected()).toBe(false);
+    expect(googleDriveService.isConnected()).toBe(true);
   });
 
   it('isDummyFolderArtifact identifies dummy folder records and differentiates real audio files', () => {
@@ -1449,5 +1449,62 @@ describe('Google Drive Automatic Cloud Data Retrieval on Connect', () => {
     expect(subjectNames).toContain('physics');
     expect(result.subjects).toHaveLength(5);
     expect(updatedCatalogSaved).toBeDefined();
+  });
+
+  describe('Session Persistence & Anti-Disconnection Architecture', () => {
+    it('maintains isConnected=true even after access token expires', () => {
+      // User connected with token that expired 10 minutes ago
+      googleDriveService.setAccessToken('past-token', -600);
+      expect(googleDriveService.isTokenExpired()).toBe(true);
+      // isConnected is STILL TRUE because user has not explicitly clicked disconnect
+      expect(googleDriveService.isConnected()).toBe(true);
+      expect(localStorage.getItem('smriti_google_connected')).toBe('true');
+    });
+
+    it('clears isConnected ONLY when disconnect() is explicitly called from Accounts page', () => {
+      googleDriveService.setAccessToken('active-token', 3600);
+      expect(googleDriveService.isConnected()).toBe(true);
+      expect(localStorage.getItem('smriti_google_connected')).toBe('true');
+
+      // User explicitly disconnects
+      googleDriveService.disconnect();
+
+      expect(googleDriveService.isConnected()).toBe(false);
+      expect(googleDriveService.getAccessToken()).toBeNull();
+      expect(localStorage.getItem('smriti_google_connected')).toBeNull();
+      expect(localStorage.getItem('smriti_google_access_token')).toBeNull();
+    });
+
+    it('silently refreshes access token using GIS client if available', async () => {
+      googleDriveService.setAccessToken('old-token', -10);
+      expect(googleDriveService.isTokenExpired()).toBe(true);
+
+      const mockTokenClient = {
+        requestAccessToken: vi.fn((_opts?: any) => {
+          // GIS executes callback immediately with new token
+          mockTokenClient._callback({
+            access_token: 'new-refreshed-token',
+            expires_in: 3600
+          });
+        }),
+        _callback: (_res: any) => {}
+      };
+
+      (window as any).google = {
+        accounts: {
+          oauth2: {
+            initTokenClient: vi.fn((config: any) => {
+              mockTokenClient._callback = config.callback;
+              return mockTokenClient;
+            })
+          }
+        }
+      };
+
+      const freshToken = await googleDriveService.refreshAccessTokenSilent();
+      expect(freshToken).toBe('new-refreshed-token');
+      expect(googleDriveService.getAccessToken()).toBe('new-refreshed-token');
+      expect(googleDriveService.isTokenExpired()).toBe(false);
+    });
   });
 });

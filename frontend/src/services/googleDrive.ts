@@ -193,24 +193,176 @@ class GoogleDriveService {
     this.notifyTransfers();
   }
 
+  private refreshPromise: Promise<string | null> | null = null;
+
+  /**
+   * Checks whether the current access token is expired or expiring within 60 seconds.
+   */
+  public isTokenExpired(): boolean {
+    if (!this.accessToken) return true;
+    if (typeof window === 'undefined') return false;
+    const expiry = localStorage.getItem('smriti_google_token_expiry');
+    if (!expiry) return false;
+    return Date.now() >= (Number(expiry) - 60 * 1000);
+  }
+
+  /**
+   * Ensures the Google Identity Services (GIS) client script is loaded in the browser.
+   */
+  private async ensureGisLoaded(): Promise<boolean> {
+    if (typeof window === 'undefined' || typeof document === 'undefined') return false;
+    if ((window as any).google?.accounts?.oauth2) return true;
+
+    return new Promise((resolve) => {
+      let script = document.querySelector('script[src*="accounts.google.com/gsi/client"]') as HTMLScriptElement;
+      if (!script) {
+        script = document.createElement('script');
+        script.src = 'https://accounts.google.com/gsi/client';
+        script.async = true;
+        script.defer = true;
+        document.head.appendChild(script);
+      }
+      const startTime = Date.now();
+      const check = setInterval(() => {
+        if ((window as any).google?.accounts?.oauth2) {
+          clearInterval(check);
+          resolve(true);
+        } else if (Date.now() - startTime > 5000) {
+          clearInterval(check);
+          resolve(false);
+        }
+      }, 100);
+    });
+  }
+
+  /**
+   * Requests a fresh access token silently using Google Identity Services (GIS)
+   * without interrupting or prompting the user, preserving their active session.
+   */
+  public async refreshAccessTokenSilent(): Promise<string | null> {
+    if (this.refreshPromise) {
+      return this.refreshPromise;
+    }
+
+    this.refreshPromise = (async () => {
+      try {
+        if (typeof window === 'undefined') return null;
+
+        const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
+        if (!clientId) return null;
+
+        await this.ensureGisLoaded();
+
+        if ((window as any).google?.accounts?.oauth2) {
+          return await new Promise<string | null>((resolve) => {
+            let settled = false;
+            const timer = setTimeout(() => {
+              if (!settled) {
+                settled = true;
+                resolve(null);
+              }
+            }, 8000);
+
+            try {
+              const client = (window as any).google.accounts.oauth2.initTokenClient({
+                client_id: clientId,
+                scope: GOOGLE_DRIVE_SCOPES,
+                callback: async (tokenResponse: any) => {
+                  if (settled) return;
+                  settled = true;
+                  clearTimeout(timer);
+
+                  if (tokenResponse?.access_token) {
+                    const expiresIn = tokenResponse.expires_in ? Number(tokenResponse.expires_in) : 3600;
+                    this.setAccessToken(tokenResponse.access_token, expiresIn);
+                    if (!this.userProfile) {
+                      this.fetchUserProfile().catch(() => {});
+                    }
+                    resolve(tokenResponse.access_token);
+                  } else {
+                    resolve(null);
+                  }
+                },
+                error_callback: () => {
+                  if (!settled) {
+                    settled = true;
+                    clearTimeout(timer);
+                    resolve(null);
+                  }
+                }
+              });
+
+              // Silent token request: empty prompt with hint targeting the user's account
+              client.requestAccessToken({
+                prompt: '',
+                hint: this.userProfile?.email || undefined
+              });
+            } catch {
+              if (!settled) {
+                settled = true;
+                clearTimeout(timer);
+                resolve(null);
+              }
+            }
+          });
+        }
+        return null;
+      } finally {
+        this.refreshPromise = null;
+      }
+    })();
+
+    return this.refreshPromise;
+  }
+
+  /**
+   * Proactively verifies that the access token is fresh before any Google Drive operation.
+   * If the token is missing or expired, triggers a silent background refresh.
+   */
+  public async ensureFreshAccessToken(): Promise<string | null> {
+    if (this.accessToken && !this.isTokenExpired()) {
+      return this.accessToken;
+    }
+
+    if (this.isConnected()) {
+      const refreshed = await this.refreshAccessTokenSilent();
+      if (refreshed) {
+        return refreshed;
+      }
+    }
+
+    return this.accessToken;
+  }
+
   private restoreToken() {
     if (typeof window === 'undefined') return;
+    const isConnected = localStorage.getItem('smriti_google_connected') === 'true';
     const token = localStorage.getItem('smriti_google_access_token');
-    const expiry = localStorage.getItem('smriti_google_token_expiry');
+    const profile = localStorage.getItem('smriti_google_profile');
+    const rootId = localStorage.getItem('smriti_drive_root_folder_id');
 
-    if (token && expiry) {
-      if (Date.now() < Number(expiry)) {
-        this.accessToken = token;
-        const profile = localStorage.getItem('smriti_google_profile');
-        if (profile) {
-          try {
-            this.userProfile = JSON.parse(profile);
-          } catch (e) {
-            // ignore
-          }
-        }
-      } else {
-        this.disconnect();
+    if (profile) {
+      try {
+        this.userProfile = JSON.parse(profile);
+      } catch (e) {
+        // ignore
+      }
+    }
+
+    if (rootId) {
+      this.rootFolderId = rootId;
+    }
+
+    if (token) {
+      this.accessToken = token;
+    }
+
+    // Never auto-disconnect! User remains connected until explicitly disconnecting from Accounts page.
+    if (isConnected || profile || token) {
+      const expiry = localStorage.getItem('smriti_google_token_expiry');
+      if (!token || !expiry || Date.now() >= (Number(expiry) - 2 * 60 * 1000)) {
+        // Attempt silent renewal in the background without disturbing the user
+        this.refreshAccessTokenSilent().catch(() => {});
       }
     }
   }
@@ -220,6 +372,7 @@ class GoogleDriveService {
     if (typeof window !== 'undefined') {
       localStorage.setItem('smriti_google_access_token', token);
       localStorage.setItem('smriti_google_token_expiry', String(Date.now() + expiresInSeconds * 1000));
+      localStorage.setItem('smriti_google_connected', 'true');
     }
   }
 
@@ -236,7 +389,12 @@ class GoogleDriveService {
   }
 
   public isConnected(): boolean {
-    return !!this.accessToken;
+    if (typeof window === 'undefined') {
+      return !!this.accessToken;
+    }
+    const isConnectedFlag = localStorage.getItem('smriti_google_connected') === 'true';
+    const hasProfile = !!this.userProfile || !!localStorage.getItem('smriti_google_profile');
+    return !!this.accessToken || isConnectedFlag || hasProfile;
   }
 
   public disconnect() {
@@ -249,6 +407,7 @@ class GoogleDriveService {
       localStorage.removeItem('smriti_google_access_token');
       localStorage.removeItem('smriti_google_token_expiry');
       localStorage.removeItem('smriti_google_profile');
+      localStorage.removeItem('smriti_google_connected');
       localStorage.removeItem('smriti_drive_transfers');
       localStorage.removeItem('smriti_drive_root_folder_id');
     }
@@ -280,8 +439,16 @@ class GoogleDriveService {
       throw new Error('Google Client ID is missing. Please configure VITE_GOOGLE_CLIENT_ID.');
     }
 
+    if (this.accessToken && !this.isTokenExpired()) {
+      return this.accessToken;
+    }
+
+    // Try silent renewal first if account is connected
     if (this.isConnected()) {
-      return this.accessToken!;
+      const silentToken = await this.refreshAccessTokenSilent();
+      if (silentToken) {
+        return silentToken;
+      }
     }
 
     return new Promise((resolve, reject) => {
@@ -411,6 +578,9 @@ class GoogleDriveService {
    *   └── <User Custom Subjects>/
    */
   public async ensureSmritiFolderHierarchy(subjects?: Subject[]): Promise<{ rootId: string; subjectFolderIds: Record<string, string> }> {
+    if (!this.accessToken || this.isTokenExpired()) {
+      await this.ensureFreshAccessToken();
+    }
     if (!this.accessToken) {
       throw new Error('Google Drive not authorized');
     }
@@ -555,6 +725,9 @@ class GoogleDriveService {
     subjectName: string,
     options?: { deleteFiles?: boolean; moveToFolderId?: string }
   ): Promise<boolean> {
+    if (!this.accessToken || this.isTokenExpired()) {
+      await this.ensureFreshAccessToken();
+    }
     if (!this.accessToken) return false;
     const cleanName = (subjectName || '').trim();
     if (!cleanName) return false;
@@ -755,6 +928,9 @@ class GoogleDriveService {
     fileId: string,
     options?: { title?: string; subjectName?: string }
   ): Promise<boolean> {
+    if (!this.accessToken || this.isTokenExpired()) {
+      await this.ensureFreshAccessToken();
+    }
     if (!this.accessToken) return false;
     let deleted = false;
 
@@ -996,6 +1172,10 @@ class GoogleDriveService {
   }
 
   public async getOrCreateFolder(name: string, parentId?: string): Promise<string> {
+    if (!this.accessToken || this.isTokenExpired()) {
+      await this.ensureFreshAccessToken();
+    }
+
     const cleanName = (name || '').trim();
     const cacheKey = `${parentId || 'root'}:${cleanName.toLowerCase()}`;
     if (this.subjectFolderCache.has(cacheKey)) {
@@ -1009,13 +1189,21 @@ class GoogleDriveService {
 
       if (candidateId) {
         try {
-          const verifyRes = await fetch(
+          let verifyRes = await fetch(
             `https://www.googleapis.com/drive/v3/files/${encodeURIComponent(candidateId)}?fields=id,name,mimeType,trashed,capabilities(canAddChildren)`,
             { headers: { Authorization: `Bearer ${this.accessToken}` } }
           );
           if (verifyRes.status === 401) {
-            this.disconnect();
-            throw new Error('Google Drive access token expired. Please connect again.');
+            const refreshed = await this.refreshAccessTokenSilent();
+            if (refreshed) {
+              verifyRes = await fetch(
+                `https://www.googleapis.com/drive/v3/files/${encodeURIComponent(candidateId)}?fields=id,name,mimeType,trashed,capabilities(canAddChildren)`,
+                { headers: { Authorization: `Bearer ${refreshed}` } }
+              );
+            }
+          }
+          if (verifyRes.status === 401) {
+            throw new Error('Google Drive access token expired. Please click Sync or Reconnect to refresh your session.');
           }
           if (verifyRes.ok) {
             const fileData = await verifyRes.json();
@@ -1037,7 +1225,7 @@ class GoogleDriveService {
     const q = `${parentQuery}name = '${cleanName.replace(/'/g, "\\'")}' and mimeType = 'application/vnd.google-apps.folder' and trashed = false`;
 
     try {
-      const searchRes = await fetch(
+      let searchRes = await fetch(
         `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(q)}&fields=files(id,name,parents)`,
         {
           headers: { Authorization: `Bearer ${this.accessToken}` }
@@ -1045,8 +1233,19 @@ class GoogleDriveService {
       );
 
       if (searchRes.status === 401) {
-        this.disconnect();
-        throw new Error('Google Drive access token expired. Please connect again.');
+        const refreshed = await this.refreshAccessTokenSilent();
+        if (refreshed) {
+          searchRes = await fetch(
+            `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(q)}&fields=files(id,name,parents)`,
+            {
+              headers: { Authorization: `Bearer ${refreshed}` }
+            }
+          );
+        }
+      }
+
+      if (searchRes.status === 401) {
+        throw new Error('Google Drive access token expired. Please click Sync or Reconnect to refresh your session.');
       }
 
       if (searchRes.ok) {
@@ -1078,7 +1277,7 @@ class GoogleDriveService {
       metadata.parents = [parentId];
     }
 
-    const createRes = await fetch('https://www.googleapis.com/drive/v3/files', {
+    let createRes = await fetch('https://www.googleapis.com/drive/v3/files', {
       method: 'POST',
       headers: {
         Authorization: `Bearer ${this.accessToken}`,
@@ -1087,10 +1286,23 @@ class GoogleDriveService {
       body: JSON.stringify(metadata)
     });
 
+    if (createRes.status === 401) {
+      const refreshed = await this.refreshAccessTokenSilent();
+      if (refreshed) {
+        createRes = await fetch('https://www.googleapis.com/drive/v3/files', {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${refreshed}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(metadata)
+        });
+      }
+    }
+
     if (!createRes.ok) {
       if (createRes.status === 401) {
-        this.disconnect();
-        throw new Error('Google Drive access token expired. Please connect again.');
+        throw new Error('Google Drive access token expired. Please click Sync or Reconnect to refresh your session.');
       }
       const err = await createRes.text();
       throw new Error(`Failed to create Google Drive folder: ${name} (${err})`);
@@ -1113,6 +1325,9 @@ class GoogleDriveService {
     folderIdOrSubjectName?: string,
     onProgress?: (percent: number, loadedBytes: number, totalBytes: number) => void
   ): Promise<GoogleDriveFile> {
+    if (!this.accessToken || this.isTokenExpired()) {
+      await this.ensureFreshAccessToken();
+    }
     if (!this.accessToken) {
       throw new Error('Google Drive not authorized');
     }
@@ -1262,6 +1477,9 @@ class GoogleDriveService {
    * Uses alt=media query parameter to stream binary content with authorization.
    */
   public async downloadAudio(fileId: string, title?: string): Promise<Blob> {
+    if (!this.accessToken || this.isTokenExpired()) {
+      await this.ensureFreshAccessToken();
+    }
     if (!this.accessToken) {
       throw new Error('Google Drive not authorized');
     }
@@ -1366,6 +1584,10 @@ class GoogleDriveService {
    * Preserves the selective download model (is_downloaded_offline: true only if blob is locally cached).
    */
   public async fetchDriveData(knownSubjects?: Subject[]): Promise<{ subjects?: Subject[]; audioItems: AudioItem[] }> {
+    if (!this.accessToken || this.isTokenExpired()) {
+      await this.ensureFreshAccessToken();
+    }
+
     if (!this.accessToken) {
       return { subjects: undefined, audioItems: [] };
     }
@@ -1399,8 +1621,17 @@ class GoogleDriveService {
         );
 
         if (searchRes.status === 401) {
-          this.disconnect();
-          throw new Error('Google Drive access token expired. Please connect again.');
+          const refreshed = await this.refreshAccessTokenSilent();
+          if (refreshed) {
+            searchRes = await fetch(
+              `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(catalogQuery)}&fields=files(id,name,parents,modifiedTime)&orderBy=modifiedTime desc`,
+              { headers: { Authorization: `Bearer ${refreshed}` } }
+            );
+          }
+        }
+
+        if (searchRes.status === 401) {
+          throw new Error('Google Drive access token expired. Please click Sync or Reconnect to refresh your session.');
         }
 
         let searchData = searchRes.ok ? await searchRes.json() : null;
@@ -1449,8 +1680,17 @@ class GoogleDriveService {
         );
 
         if (foldersRes.status === 401) {
-          this.disconnect();
-          throw new Error('Google Drive access token expired.');
+          const refreshed = await this.refreshAccessTokenSilent();
+          if (refreshed) {
+            foldersRes = await fetch(
+              `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(foldersQuery)}&fields=files(id,name,parents)&pageSize=100`,
+              { headers: { Authorization: `Bearer ${refreshed}` } }
+            );
+          }
+        }
+
+        if (foldersRes.status === 401) {
+          throw new Error('Google Drive access token expired. Please click Sync or Reconnect to refresh your session.');
         }
 
         let foldersData = foldersRes.ok ? await foldersRes.json() : null;
@@ -1559,8 +1799,16 @@ class GoogleDriveService {
           });
 
           if (filesRes.status === 401) {
-            this.disconnect();
-            throw new Error('Google Drive access token expired.');
+            const refreshed = await this.refreshAccessTokenSilent();
+            if (refreshed) {
+              filesRes = await fetch(filesUrl, {
+                headers: { Authorization: `Bearer ${refreshed}` }
+              });
+            }
+          }
+
+          if (filesRes.status === 401) {
+            throw new Error('Google Drive access token expired. Please click Sync or Reconnect to refresh your session.');
           }
 
           // Fallback if test mock or environment doesn't recognize complex parent clause
@@ -1822,6 +2070,9 @@ class GoogleDriveService {
    * Saves or updates the account's catalog (smriti_catalog.json) in Google Drive
    */
   public async saveCatalog(catalog: { subjects?: Subject[]; audioItems: AudioItem[] }): Promise<void> {
+    if (!this.accessToken || this.isTokenExpired()) {
+      await this.ensureFreshAccessToken();
+    }
     if (!this.accessToken) return;
 
     try {
@@ -1909,6 +2160,9 @@ class GoogleDriveService {
    * Returns null if not connected or if request fails, preventing fake mock data.
    */
   public async getStorageQuota(): Promise<GoogleDriveStorageQuota | null> {
+    if (!this.accessToken || this.isTokenExpired()) {
+      await this.ensureFreshAccessToken();
+    }
     if (!this.accessToken) {
       return null;
     }
