@@ -1178,7 +1178,8 @@ class GoogleDriveService {
   }
 
   /**
-   * Grants public read permission ("anyone with link") to a file or folder and returns its webViewLink.
+   * Grants public read permission ("anyone with link") to a file or folder and returns its verified webViewLink.
+   * Strictly returns null if unauthenticated, if the item does not exist, or if permission cannot be granted.
    */
   public async shareDriveItemPublic(fileId: string): Promise<{ webViewLink: string } | null> {
     if (!this.accessToken || this.isTokenExpired()) {
@@ -1186,7 +1187,7 @@ class GoogleDriveService {
     }
     if (!this.accessToken || !fileId) return null;
     try {
-      await fetch(
+      const permRes = await fetch(
         `https://www.googleapis.com/drive/v3/files/${encodeURIComponent(fileId)}/permissions`,
         {
           method: 'POST',
@@ -1198,8 +1199,14 @@ class GoogleDriveService {
         }
       );
 
+      // If Drive permissions fail (e.g. 404 Not Found, 403 Forbidden), never return a fake link
+      if (!permRes.ok) {
+        console.warn(`[GoogleDrive] shareDriveItemPublic permissions returned ${permRes.status} for ${fileId}`);
+        return null;
+      }
+
       const res = await fetch(
-        `https://www.googleapis.com/drive/v3/files/${encodeURIComponent(fileId)}?fields=id,name,webViewLink`,
+        `https://www.googleapis.com/drive/v3/files/${encodeURIComponent(fileId)}?fields=id,name,mimeType,webViewLink`,
         {
           headers: {
             Authorization: `Bearer ${this.accessToken}`
@@ -1208,14 +1215,212 @@ class GoogleDriveService {
       );
       if (res.ok) {
         const data = await res.json();
+        const isFolder = data.mimeType === 'application/vnd.google-apps.folder';
+        const link = data.webViewLink || (isFolder
+          ? `https://drive.google.com/drive/folders/${encodeURIComponent(fileId)}?usp=sharing`
+          : `https://drive.google.com/file/d/${encodeURIComponent(fileId)}/view?usp=sharing`);
         return {
-          webViewLink: data.webViewLink || `https://drive.google.com/file/d/${fileId}/view`
+          webViewLink: link
         };
       }
-      return { webViewLink: `https://drive.google.com/file/d/${fileId}/view` };
+      return null;
     } catch (e) {
       console.error('[GoogleDrive] shareDriveItemPublic error:', e);
-      return { webViewLink: `https://drive.google.com/file/d/${fileId}/view` };
+      return null;
+    }
+  }
+
+  /**
+   * Locates or creates a dedicated Subject folder directly under My Drive/Smriti/<folderName>
+   */
+  public async ensureSubjectFolder(folderName: string): Promise<string> {
+    if (!this.accessToken || this.isTokenExpired()) {
+      await this.ensureFreshAccessToken();
+    }
+    return this.getOrCreateSubjectFolder(folderName);
+  }
+
+  /**
+   * Resolves a verified Google Drive folder ID for a Subject.
+   * If the ID is missing, a local slug (e.g. "general"), or unverified in Drive,
+   * it ensures the folder exists in Google Drive under My Drive/Smriti/<folderName>,
+   * updates the local subject state and smriti_catalog.json, and returns the real Drive folder ID.
+   */
+  public async resolveDriveFolderId(
+    subjectOrFolder: Subject | { id?: string; name?: string; google_drive_folder_id?: string }
+  ): Promise<string | null> {
+    if (!this.accessToken || this.isTokenExpired()) {
+      await this.ensureFreshAccessToken();
+    }
+    if (!this.accessToken) return null;
+
+    const folderName = (subjectOrFolder.name || 'General').trim() || 'General';
+    const candidateId = subjectOrFolder.google_drive_folder_id;
+
+    const isLocalSlug = (id?: string) => {
+      if (!id) return true;
+      const lower = id.toLowerCase();
+      if (lower === 'general' || lower.startsWith('local-') || lower.startsWith('temp-')) return true;
+      if (id.includes(' ') || id.length < 15) return true;
+      return false;
+    };
+
+    if (candidateId && !isLocalSlug(candidateId)) {
+      try {
+        let verifyRes = await fetch(
+          `https://www.googleapis.com/drive/v3/files/${encodeURIComponent(candidateId)}?fields=id,name,mimeType,trashed`,
+          { headers: { Authorization: `Bearer ${this.accessToken}` } }
+        );
+        if (verifyRes.status === 401) {
+          const refreshed = await this.refreshAccessTokenSilent();
+          if (refreshed) {
+            verifyRes = await fetch(
+              `https://www.googleapis.com/drive/v3/files/${encodeURIComponent(candidateId)}?fields=id,name,mimeType,trashed`,
+              { headers: { Authorization: `Bearer ${refreshed}` } }
+            );
+          }
+        }
+        if (verifyRes.ok) {
+          const fileData = await verifyRes.json();
+          if (fileData.id && !fileData.trashed && fileData.mimeType === 'application/vnd.google-apps.folder') {
+            return fileData.id;
+          }
+        }
+      } catch (e) {
+        console.warn('[GoogleDrive] resolveDriveFolderId candidate verification notice:', e);
+      }
+    }
+
+    // Locate or create real folder via ensureSubjectFolder
+    try {
+      const realId = await this.ensureSubjectFolder(folderName);
+      if (realId) {
+        subjectOrFolder.google_drive_folder_id = realId;
+
+        // Persist into localStorage
+        if (typeof window !== 'undefined' && window.localStorage) {
+          try {
+            const raw = localStorage.getItem('smriti_subjects');
+            if (raw) {
+              const list: Subject[] = JSON.parse(raw);
+              if (Array.isArray(list)) {
+                let changed = false;
+                for (const s of list) {
+                  if (
+                    (subjectOrFolder.id && s.id === subjectOrFolder.id) ||
+                    (s.name && s.name.trim().toLowerCase() === folderName.toLowerCase())
+                  ) {
+                    s.google_drive_folder_id = realId;
+                    changed = true;
+                  }
+                }
+                if (changed) {
+                  localStorage.setItem('smriti_subjects', JSON.stringify(list));
+                }
+              }
+            }
+          } catch (e) {
+            console.warn('[GoogleDrive] resolveDriveFolderId localStorage update notice:', e);
+          }
+        }
+
+        // Update smriti_catalog.json in Google Drive
+        this.updateCatalogSubjectFolderId(subjectOrFolder.id, folderName, realId).catch(() => {});
+
+        return realId;
+      }
+    } catch (e) {
+      console.error('[GoogleDrive] resolveDriveFolderId error:', e);
+    }
+
+    return null;
+  }
+
+  /**
+   * Shares a Subject folder publicly ("anyone with link") after verifying/resolving its real Google Drive folder ID.
+   * Returns { webViewLink, folderId } or null if sharing fails or is unsupported.
+   */
+  public async shareDriveFolderPublic(
+    subjectOrFolder: Subject | { id?: string; name?: string; google_drive_folder_id?: string }
+  ): Promise<{ webViewLink: string; folderId: string } | null> {
+    if (!this.accessToken || this.isTokenExpired()) {
+      await this.ensureFreshAccessToken();
+    }
+    if (!this.accessToken) return null;
+
+    const realFolderId = await this.resolveDriveFolderId(subjectOrFolder);
+    if (!realFolderId) {
+      console.warn('[GoogleDrive] shareDriveFolderPublic: Could not resolve real Drive folder ID for', subjectOrFolder);
+      return null;
+    }
+
+    const shareResult = await this.shareDriveItemPublic(realFolderId);
+    if (!shareResult?.webViewLink) {
+      return null;
+    }
+
+    return {
+      webViewLink: shareResult.webViewLink,
+      folderId: realFolderId
+    };
+  }
+
+  /**
+   * Safely updates a subject's google_drive_folder_id inside smriti_catalog.json in Google Drive
+   */
+  private async updateCatalogSubjectFolderId(
+    subjectId: string | undefined,
+    subjectName: string,
+    driveFolderId: string
+  ): Promise<void> {
+    if (!this.accessToken) return;
+    try {
+      const rootId = this.rootFolderId || (await this.getOrCreateFolder('Smriti'));
+      const q = `'${rootId}' in parents and name = 'smriti_catalog.json' and trashed = false`;
+      const searchRes = await fetch(
+        `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(q)}&fields=files(id,name)&pageSize=1`,
+        { headers: { Authorization: `Bearer ${this.accessToken}` } }
+      );
+      if (!searchRes.ok) return;
+      const data = await searchRes.json();
+      if (!data.files || data.files.length === 0) return;
+
+      const fileId = data.files[0].id;
+      const contentRes = await fetch(
+        `https://www.googleapis.com/drive/v3/files/${encodeURIComponent(fileId)}?alt=media`,
+        { headers: { Authorization: `Bearer ${this.accessToken}` } }
+      );
+      if (!contentRes.ok) return;
+      const catalog = await contentRes.json();
+      if (!Array.isArray(catalog.subjects)) return;
+
+      let changed = false;
+      for (const s of catalog.subjects) {
+        if (
+          (subjectId && s.id === subjectId) ||
+          (s.name && s.name.trim().toLowerCase() === subjectName.toLowerCase())
+        ) {
+          s.google_drive_folder_id = driveFolderId;
+          changed = true;
+        }
+      }
+      if (changed) {
+        catalog.updatedAt = new Date().toISOString();
+        const blob = new Blob([JSON.stringify(catalog, null, 2)], { type: 'application/json' });
+        await fetch(
+          `https://www.googleapis.com/upload/drive/v3/files/${encodeURIComponent(fileId)}?uploadType=media`,
+          {
+            method: 'PATCH',
+            headers: {
+              Authorization: `Bearer ${this.accessToken}`,
+              'Content-Type': 'application/json'
+            },
+            body: blob
+          }
+        );
+      }
+    } catch (e) {
+      console.warn('[GoogleDrive] updateCatalogSubjectFolderId notice:', e);
     }
   }
 

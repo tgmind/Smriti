@@ -1,5 +1,4 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
-import { createPortal } from 'react-dom';
 import {
   Search,
   Star,
@@ -54,6 +53,7 @@ import { formatDuration } from '../services/learningEngine';
 import { ACADEMIC_ICON_MAP } from '../utils/subjectVisuals';
 import { googleDriveService } from '../services/googleDrive';
 import { toastService } from '../services/toastService';
+import { networkService } from '../services/networkService';
 import { audioStorage } from '../services/audioStorage';
 import {
   getAudioFileDuration,
@@ -124,6 +124,7 @@ export interface LibraryTabProps {
   onCopyAudio?: (audioId: string) => Promise<void> | void;
   onMoveAudio?: (audioId: string, targetSubjectId: string) => Promise<void> | void;
   forceResetRootKey?: number;
+  initialActiveMenuFolderId?: string | null;
 }
 
 type LibraryViewMode = 'topics' | 'subject';
@@ -180,6 +181,7 @@ export const LibraryTab: React.FC<LibraryTabProps> = ({
   onDeleteAudio,
   onSaveAudio,
   initialCreateFolderOpen = false,
+  initialActiveMenuFolderId = null,
   userSettings,
   onUpdateSettings,
   onNavigateToAccount,
@@ -220,12 +222,12 @@ export const LibraryTab: React.FC<LibraryTabProps> = ({
   const [trimmingAudio, setTrimmingAudio] = useState<AudioItem | null>(null);
 
   // Folder Overflow Menu State
-  const [activeMenuFolderId, setActiveMenuFolderId] = useState<string | null>(null);
+  const [activeMenuFolderId, setActiveMenuFolderId] = useState<string | null>(initialActiveMenuFolderId);
   const [folderMenuPosition, setFolderMenuPosition] = useState<{
     top?: number;
     bottom?: number;
     right: number;
-  } | null>(null);
+  } | null>(initialActiveMenuFolderId ? { top: 100, right: 20 } : null);
 
   // Drive Actions Modal State (Rename, Move, Permanent Delete)
   type ActionModalType =
@@ -485,25 +487,62 @@ export const LibraryTab: React.FC<LibraryTabProps> = ({
     }
   }, [forceResetRootKey]);
 
-  // Share Public Link (Folder or Track)
-  const handleShareItem = async (title: string, fileIdOrFolderId?: string) => {
-    showDriveToast('Creating public link...');
+  // Share Public Link for Subject Folders (with real Drive folder ID resolution)
+  const handleShareFolder = async (folder: Subject) => {
+    if (!isDriveConnected || !networkService.isOnline()) {
+      toastService.danger('Google Drive Disconnected', 'Please connect Google Drive to share folders.');
+      return;
+    }
+
+    toastService.drive('Creating folder link...', `Resolving public link for "${folder.name}"...`);
     try {
-      let webViewLink = `https://drive.google.com/drive/u/0/my-drive`;
-      if (fileIdOrFolderId && isDriveConnected) {
-        const res = await googleDriveService.shareDriveItemPublic(fileIdOrFolderId);
-        if (res?.webViewLink) {
-          webViewLink = res.webViewLink;
-        }
+      const res = await googleDriveService.shareDriveFolderPublic(folder);
+      if (!res?.webViewLink) {
+        toastService.danger('Could not create public link', 'Google Drive could not share this folder.');
+        return;
       }
+
+      const webViewLink = res.webViewLink;
       if (typeof navigator !== 'undefined' && navigator.clipboard) {
         await navigator.clipboard.writeText(webViewLink).catch(() => {});
       }
-      await bridge.shareText(title, webViewLink);
-      showDriveToast('Public link copied to clipboard', 'success');
+      await bridge.shareText(`Study Folder: ${folder.name}`, webViewLink);
+      toastService.downloads('Folder link copied to clipboard', webViewLink);
     } catch (e: any) {
-      console.warn('Share item error:', e);
-      showDriveToast('Could not create public link', 'error');
+      console.warn('Share folder error:', e);
+      toastService.danger('Could not create public link');
+    }
+  };
+
+  // Share Public Link for Audio Tracks
+  const handleShareTrack = async (track: AudioItem) => {
+    if (!isDriveConnected || !networkService.isOnline()) {
+      toastService.danger('Google Drive Disconnected', 'Please connect Google Drive to share audio lessons.');
+      return;
+    }
+
+    if (!track.google_drive_file_id) {
+      toastService.danger('Track not synced to Google Drive', 'This audio note has not synced to Google Drive yet.');
+      return;
+    }
+
+    toastService.drive('Creating audio link...', `Preparing public link for "${track.title}"...`);
+    try {
+      const res = await googleDriveService.shareDriveItemPublic(track.google_drive_file_id);
+      if (!res?.webViewLink) {
+        toastService.danger('Could not create public link', 'Google Drive permissions failed.');
+        return;
+      }
+
+      const webViewLink = res.webViewLink;
+      if (typeof navigator !== 'undefined' && navigator.clipboard) {
+        await navigator.clipboard.writeText(webViewLink).catch(() => {});
+      }
+      await bridge.shareText(`Audio Lesson: ${track.title}`, webViewLink);
+      toastService.downloads('Track link copied to clipboard', webViewLink);
+    } catch (e: any) {
+      console.warn('Share track error:', e);
+      toastService.danger('Could not create public link');
     }
   };
 
@@ -1625,8 +1664,8 @@ export const LibraryTab: React.FC<LibraryTabProps> = ({
     const activeAudio = audioItems.find(a => a.id === activeMenuAudioId);
     if (!activeAudio) return null;
 
-    return createPortal(
-      <>
+    return (
+      <ModalPortal>
         {/* Transparent backdrop overlay: intercepts clicks and prevents accidental track play */}
         <div
           className="fixed inset-0 z-40 bg-transparent"
@@ -1748,21 +1787,23 @@ export const LibraryTab: React.FC<LibraryTabProps> = ({
             <span>Move to Folder</span>
           </button>
 
-          {/* 6. Share Public Link */}
-          <button
-            type="button"
-            role="menuitem"
-            onClick={(e) => {
-              e.stopPropagation();
-              setActiveMenuAudioId(null);
-              setMenuPosition(null);
-              handleShareItem(`Audio Lesson: ${activeAudio.title}`, activeAudio.google_drive_file_id || activeAudio.id);
-            }}
-            className="w-full min-h-11 px-3.5 text-left text-sm font-semibold text-slate-700 hover:bg-slate-100/80 active:bg-slate-200/80 flex items-center gap-2.5 cursor-pointer transition-colors"
-          >
-            <Share2 size={16} className="text-emerald-600 shrink-0" />
-            <span>Share Public Link</span>
-          </button>
+          {/* 6. Share Public Link - Only when connected to Google Drive and device is online */}
+          {Boolean(isDriveConnected && (typeof navigator !== 'undefined' ? (navigator.onLine ?? true) : true) && networkService.isOnline()) && (
+            <button
+              type="button"
+              role="menuitem"
+              onClick={(e) => {
+                e.stopPropagation();
+                setActiveMenuAudioId(null);
+                setMenuPosition(null);
+                handleShareTrack(activeAudio);
+              }}
+              className="w-full min-h-11 px-3.5 text-left text-sm font-semibold text-slate-700 hover:bg-slate-100/80 active:bg-slate-200/80 flex items-center gap-2.5 cursor-pointer transition-colors"
+            >
+              <Share2 size={16} className="text-emerald-600 shrink-0" />
+              <span>Share Public Link</span>
+            </button>
+          )}
 
           {/* Subtle divider */}
           <div className="my-1 border-t border-slate-100" />
@@ -1785,22 +1826,21 @@ export const LibraryTab: React.FC<LibraryTabProps> = ({
             </button>
           )}
         </div>
-      </>,
-      document.body
+      </ModalPortal>
     );
   };
 
   // Floating Viewport-Safe Folder Overflow Menu Portal
   const renderFolderMenu = () => {
-    if (!activeMenuFolderId || !folderMenuPosition || typeof document === 'undefined') {
+    if (!activeMenuFolderId || !folderMenuPosition) {
       return null;
     }
 
     const activeFolder = deduplicatedSubjects.find(s => s.id === activeMenuFolderId);
     if (!activeFolder) return null;
 
-    return createPortal(
-      <>
+    return (
+      <ModalPortal>
         {/* Transparent backdrop overlay */}
         <div
           className="fixed inset-0 z-40 bg-transparent"
@@ -1863,21 +1903,23 @@ export const LibraryTab: React.FC<LibraryTabProps> = ({
             <span>Make a Copy</span>
           </button>
 
-          {/* 3. Share Public Link */}
-          <button
-            type="button"
-            role="menuitem"
-            onClick={(e) => {
-              e.stopPropagation();
-              setActiveMenuFolderId(null);
-              setFolderMenuPosition(null);
-              handleShareItem(`Study Folder: ${activeFolder.name}`, activeFolder.google_drive_folder_id || activeFolder.id);
-            }}
-            className="w-full min-h-11 px-3.5 text-left text-sm font-semibold text-slate-700 hover:bg-slate-100/80 active:bg-slate-200/80 flex items-center gap-2.5 cursor-pointer transition-colors"
-          >
-            <Share2 size={16} className="text-emerald-600 shrink-0" />
-            <span>Share Public Link</span>
-          </button>
+          {/* 3. Share Public Link - Only when connected to Google Drive and device is online */}
+          {Boolean(isDriveConnected && (typeof navigator !== 'undefined' ? (navigator.onLine ?? true) : true) && networkService.isOnline()) && (
+            <button
+              type="button"
+              role="menuitem"
+              onClick={(e) => {
+                e.stopPropagation();
+                setActiveMenuFolderId(null);
+                setFolderMenuPosition(null);
+                handleShareFolder(activeFolder);
+              }}
+              className="w-full min-h-11 px-3.5 text-left text-sm font-semibold text-slate-700 hover:bg-slate-100/80 active:bg-slate-200/80 flex items-center gap-2.5 cursor-pointer transition-colors"
+            >
+              <Share2 size={16} className="text-emerald-600 shrink-0" />
+              <span>Share Public Link</span>
+            </button>
+          )}
 
           {/* Subtle divider */}
           <div className="my-1 border-t border-slate-100" />
@@ -1901,8 +1943,7 @@ export const LibraryTab: React.FC<LibraryTabProps> = ({
             </button>
           )}
         </div>
-      </>,
-      document.body
+      </ModalPortal>
     );
   };
 
