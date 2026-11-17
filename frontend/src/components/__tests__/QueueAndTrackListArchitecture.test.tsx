@@ -145,7 +145,7 @@ describe('Folder Track List & Unified Playback Queue Architecture', () => {
       );
 
       expect(html).toContain('Play All');
-      expect(html).toContain('4 lessons');
+      expect(html).toContain('4 Notes');
       expect(html).toContain('14:00'); // total duration: 120 + 240 + 180 + 300 = 840s = 14m
     });
 

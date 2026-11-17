@@ -72,12 +72,6 @@ import {
 } from '@/components/ui/card';
 import { ModalPortal } from '@/components/ui/modal-portal';
 import {
-  Breadcrumb,
-  BreadcrumbList,
-  BreadcrumbItem,
-  BreadcrumbLink,
-} from '@/components/ui/breadcrumb';
-import {
   Empty,
   EmptyHeader,
   EmptyMedia,
@@ -2095,39 +2089,41 @@ export const LibraryTab: React.FC<LibraryTabProps> = ({
     const subjectTheme = getSubjectTheme(selectedSubject.color_hex);
     const SubjectIcon = getSubjectIcon(selectedSubject.icon_name);
     const totalSubjectDuration = subjectAudios.reduce((acc, curr) => acc + curr.duration_seconds, 0);
+    const offlineCount = subjectAudios.filter(a => a.is_downloaded_offline).length;
 
     return (
-      <div className="space-y-4 pb-36 pt-3 px-4 max-w-md mx-auto animate-in">
-        {/* 1. Sleek Navigation Header with Back Button and Top Actions */}
-        <div className="border-b border-slate-200/80 pb-2.5">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2 min-w-0">
+      <div className="space-y-3.5 pb-36 pt-3 px-4 max-w-md mx-auto animate-in">
+        {/* 1. Unified Top Navigation Header: Back Arrow + Subject Icon + Bold Folder Name + Right Actions */}
+        <div className="space-y-2.5">
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2.5 min-w-0 flex-1">
               <button
                 type="button"
                 onClick={handleBackToTopics}
-                className="w-8 h-8 rounded-full bg-white border border-slate-200/80 hover:bg-slate-100 active:scale-95 text-slate-700 flex items-center justify-center transition-all shadow-2xs cursor-pointer shrink-0"
+                className="w-9 h-9 rounded-full bg-white border border-slate-200/80 hover:bg-slate-100 active:scale-95 text-slate-700 flex items-center justify-center transition-all shadow-2xs cursor-pointer shrink-0"
                 title="Back to all folders"
                 aria-label="Back to folders"
               >
-                <ArrowLeft size={16} strokeWidth={2.2} />
+                <ArrowLeft size={17} strokeWidth={2.2} />
               </button>
-              <Breadcrumb className="min-w-0">
-                <BreadcrumbList>
-                  <BreadcrumbItem>
-                    <BreadcrumbLink onClick={handleBackToTopics} className="cursor-pointer font-medium text-slate-500 hover:text-slate-900 text-xs">
-                      Library
-                    </BreadcrumbLink>
-                  </BreadcrumbItem>
-                </BreadcrumbList>
-              </Breadcrumb>
+
+              {/* Subject Symbol/Icon in refined size-9 compact badge */}
+              <div className={`size-9 rounded-xl ${subjectTheme.bg} border ${subjectTheme.border} text-slate-800 flex items-center justify-center shadow-2xs shrink-0`}>
+                <SubjectIcon size={18} strokeWidth={2.2} />
+              </div>
+
+              {/* Folder Name in big, bold, prominent typography */}
+              <h1 className="text-2xl font-extrabold tracking-tight text-slate-900 truncate leading-none">
+                {selectedSubject.name}
+              </h1>
             </div>
 
-            {/* Header Action: Search Lens + Delete Folder */}
-            <div className="flex items-center gap-1 shrink-0">
+            {/* Right Action Icons: Search Lens + Delete Folder */}
+            <div className="shrink-0 flex items-center gap-1">
               <button
                 type="button"
                 onClick={handleToggleSearch}
-                className={`size-8 rounded-full flex items-center justify-center transition-all active:scale-95 cursor-pointer ${
+                className={`size-9 rounded-full flex items-center justify-center transition-all active:scale-95 cursor-pointer ${
                   isSearchOpen
                     ? 'bg-slate-900 text-white shadow-xs'
                     : 'text-slate-500 hover:text-slate-900 hover:bg-slate-100'
@@ -2135,17 +2131,17 @@ export const LibraryTab: React.FC<LibraryTabProps> = ({
                 title={isSearchOpen ? 'Close search' : `Search ${selectedSubject.name}`}
                 aria-label={isSearchOpen ? 'Close search' : 'Search folder'}
               >
-                <Search size={15} />
+                <Search size={16} />
               </button>
               {onDeleteSubject && (
                 <button
                   type="button"
                   onClick={() => setSubjectToDelete(selectedSubject)}
-                  className="size-8 rounded-full text-slate-400 hover:text-rose-600 hover:bg-rose-50 flex items-center justify-center transition-all active:scale-95 cursor-pointer"
+                  className="size-9 rounded-full text-slate-400 hover:text-rose-600 hover:bg-rose-50 flex items-center justify-center transition-all active:scale-95 cursor-pointer"
                   title={`Delete ${selectedSubject.name} folder`}
                   aria-label={`Delete ${selectedSubject.name} folder`}
                 >
-                  <Trash2 size={15} />
+                  <Trash2 size={16} />
                 </button>
               )}
             </div>
@@ -2153,7 +2149,7 @@ export const LibraryTab: React.FC<LibraryTabProps> = ({
 
           {/* Collapsible Search Input */}
           {isSearchOpen && (
-            <div className="relative mt-2.5 animate-in fade-in slide-in-from-top-1 duration-150">
+            <div className="relative pt-0.5 animate-in fade-in slide-in-from-top-1 duration-150">
               <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
               <input
                 ref={searchInputRef}
@@ -2168,7 +2164,7 @@ export const LibraryTab: React.FC<LibraryTabProps> = ({
                   }
                 }}
                 placeholder={`Search ${selectedSubject.name} notes & formulas...`}
-                className="w-full bg-slate-100/90 focus:bg-white border border-slate-200/90 focus:border-slate-300 rounded-xl pl-8.5 pr-8 py-1.5 text-xs text-slate-900 placeholder:text-slate-400 focus:outline-none transition-all shadow-2xs font-medium"
+                className="w-full bg-slate-100/90 focus:bg-white border border-slate-200/90 focus:border-slate-300 rounded-xl pl-8.5 pr-8 py-2 text-xs text-slate-900 placeholder:text-slate-400 focus:outline-none transition-all shadow-2xs font-medium"
               />
               <button
                 type="button"
@@ -2186,93 +2182,76 @@ export const LibraryTab: React.FC<LibraryTabProps> = ({
           )}
         </div>
 
-        {/* 2. Compact, Symbol-Driven Folder Hero Header */}
-        <div className="space-y-3 pt-0.5">
-          <div className="flex items-center gap-3.5">
-            {/* Refined size-11 Subject Icon Badge */}
-            <div className={`size-11 rounded-2xl ${subjectTheme.bg} border ${subjectTheme.border} text-slate-800 flex items-center justify-center shadow-xs shrink-0`}>
-              <SubjectIcon size={20} />
-            </div>
+        {/* 2. Aesthetic Folder Info Strip (Symbols + Minimalistic Text Labels) */}
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 py-1.5 text-xs font-medium text-slate-600 tabular-nums">
+          <span
+            className="flex items-center gap-1.5 text-slate-600"
+            title={`${subjectAudios.length} ${subjectAudios.length === 1 ? 'Note' : 'Notes'}`}
+            aria-label={`${subjectAudios.length} ${subjectAudios.length === 1 ? 'Note' : 'Notes'}`}
+          >
+            <AudioLines size={14} className="text-slate-400 shrink-0" />
+            <span>{subjectAudios.length} {subjectAudios.length === 1 ? 'Note' : 'Notes'}</span>
+          </span>
 
-            {/* Folder Information */}
-            <div className="min-w-0 flex-1">
-              <h1 className="text-2xl font-bold text-slate-900 tracking-tight truncate leading-tight">
-                {selectedSubject.name}
-              </h1>
-              <div className="mt-1 flex items-center gap-3 text-xs font-medium text-slate-500 tabular-nums">
-                <span
-                  className="flex items-center gap-1 text-slate-600"
-                  title={`${subjectAudios.length} ${subjectAudios.length === 1 ? 'lesson' : 'lessons'}`}
-                  aria-label={`${subjectAudios.length} ${subjectAudios.length === 1 ? 'lesson' : 'lessons'}`}
-                >
-                  <AudioLines size={13} className="text-slate-400 shrink-0" />
-                  <span>{subjectAudios.length}</span>
-                  <span className="sr-only"> {subjectAudios.length === 1 ? 'lesson' : 'lessons'}</span>
-                </span>
+          <span
+            className="flex items-center gap-1.5 text-slate-600"
+            title={`Total duration: ${formatDuration(totalSubjectDuration)}`}
+            aria-label={`Total duration: ${formatDuration(totalSubjectDuration)} Total`}
+          >
+            <Clock size={14} className="text-slate-400 shrink-0" />
+            <span>{formatDuration(totalSubjectDuration)} Total</span>
+          </span>
 
-                <span
-                  className="flex items-center gap-1 text-slate-600"
-                  title={`Total duration: ${formatDuration(totalSubjectDuration)}`}
-                  aria-label={`Total duration: ${formatDuration(totalSubjectDuration)}`}
-                >
-                  <Clock size={13} className="text-slate-400 shrink-0" />
-                  <span>{formatDuration(totalSubjectDuration)}</span>
-                </span>
+          {offlineCount > 0 && (
+            <span
+              className="flex items-center gap-1.5 text-emerald-700 font-semibold"
+              title={`${offlineCount} ${offlineCount === 1 ? 'Note' : 'Notes'} Offline`}
+              aria-label={`${offlineCount} Offline`}
+            >
+              <CheckCircle2 size={14} className="text-emerald-600 shrink-0" />
+              <span>{offlineCount} Offline</span>
+            </span>
+          )}
+        </div>
 
-                {subjectAudios.filter(a => a.is_downloaded_offline).length > 0 && (
-                  <span
-                    className="flex items-center gap-1 text-emerald-600 font-medium"
-                    title={`${subjectAudios.filter(a => a.is_downloaded_offline).length} offline`}
-                    aria-label={`${subjectAudios.filter(a => a.is_downloaded_offline).length} offline`}
-                  >
-                    <CheckCircle2 size={13} className="text-emerald-600 shrink-0" />
-                    <span>{subjectAudios.filter(a => a.is_downloaded_offline).length}</span>
-                    <span className="sr-only"> offline</span>
-                  </span>
-                )}
-              </div>
-            </div>
-          </div>
-
-          {/* Hero Action Toolbar (Play All, Upload, Record) */}
-          <div className="flex items-center gap-2 pt-1 flex-wrap">
-            {subjectAudios.length > 0 && (
-              <button
-                type="button"
-                onClick={() => {
-                  if (onPlayQueue) {
-                    onPlayQueue(subjectAudios, 0);
-                  } else {
-                    onPlayAudio(subjectAudios[0]);
-                  }
-                }}
-                className="h-9 px-4 rounded-full bg-slate-950 hover:bg-slate-800 text-white font-bold text-xs flex items-center gap-2 transition-all active:scale-95 shadow-md shadow-slate-950/20 cursor-pointer"
-                title={`Play all ${selectedSubject.name} lessons`}
-                aria-label={`Play all ${selectedSubject.name} lessons`}
-              >
-                <Play size={14} fill="white" className="translate-x-0.5" />
-                <span>Play All</span>
-              </button>
-            )}
-
+        {/* 3. Hero Action Toolbar (Play All, Upload, Record) */}
+        <div className="flex items-center gap-2 flex-wrap">
+          {subjectAudios.length > 0 && (
             <button
               type="button"
-              onClick={() => handleTriggerUpload(selectedSubject.id)}
-              className="h-9 px-3.5 rounded-full bg-white hover:bg-slate-50 text-slate-800 border border-slate-200/90 font-semibold text-xs flex items-center gap-1.5 transition-all active:scale-95 shadow-2xs cursor-pointer"
-              title={`Upload audio to ${selectedSubject.name}`}
+              onClick={() => {
+                if (onPlayQueue) {
+                  onPlayQueue(subjectAudios, 0);
+                } else {
+                  onPlayAudio(subjectAudios[0]);
+                }
+              }}
+              className="h-9 px-4 rounded-full bg-slate-950 hover:bg-slate-800 text-white font-bold text-xs flex items-center gap-2 transition-all active:scale-95 shadow-md shadow-slate-950/20 cursor-pointer"
+              title={`Play all ${selectedSubject.name} lessons`}
+              aria-label={`Play all ${selectedSubject.name} lessons`}
             >
-              <Upload size={13} className="text-emerald-600" />
-              <span>Upload</span>
+              <Play size={14} fill="white" className="translate-x-0.5" />
+              <span>Play All</span>
             </button>
+          )}
 
-            <button
-              onClick={onGoToRecord}
-              className="h-9 px-3.5 rounded-full bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs flex items-center gap-1.5 transition-all active:scale-95 shadow-2xs cursor-pointer"
-            >
-              <Plus size={14} strokeWidth={2.4} />
-              <span>Record</span>
-            </button>
-          </div>
+          <button
+            type="button"
+            onClick={() => handleTriggerUpload(selectedSubject.id)}
+            className="h-9 px-3.5 rounded-full bg-white hover:bg-slate-50 text-slate-800 border border-slate-200/90 font-semibold text-xs flex items-center gap-1.5 transition-all active:scale-95 shadow-2xs cursor-pointer"
+            title={`Upload audio to ${selectedSubject.name}`}
+          >
+            <Upload size={13} className="text-emerald-600" />
+            <span>Upload</span>
+          </button>
+
+          <button
+            onClick={onGoToRecord}
+            className="h-9 px-3.5 rounded-full bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs flex items-center gap-1.5 transition-all active:scale-95 shadow-2xs cursor-pointer"
+          >
+            <Plus size={14} strokeWidth={2.4} />
+            <span>Record</span>
+          </button>
         </div>
 
         {/* Quick Topic Chips for this Subject */}

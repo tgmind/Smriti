@@ -310,9 +310,9 @@ describe('LibraryTab Apple Music Redesign', () => {
 
     // 3. Compact header displays subject and stats cleanly
     expect(html).toContain('Physics');
-    expect(html).toContain('1 lesson');
+    expect(html).toContain('1 Note');
     expect(html).toContain('3:00');
-    expect(html).toContain('offline');
+    expect(html).toContain('Offline');
   });
 
   it('eliminates View Note screen completely and navigates directly to folder view for initialAudioId', () => {
@@ -547,20 +547,19 @@ describe('LibraryTab Apple Music Redesign', () => {
       />
     );
 
-    // 1. Top bar: Back button + Library breadcrumb (no duplicate Physics in breadcrumb link)
+    // 1. Top bar: Back button + prominent bold folder title in single unified top row
     expect(html).toContain('aria-label="Back to folders"');
-    expect(html).toContain('Library');
+    expect(html).toContain('Physics');
 
     // 2. Top-right actions: Search Lens button and Delete folder button
     expect(html).toContain('aria-label="Search folder"');
     expect(html).toContain('title="Search Physics"');
     expect(html).toContain('aria-label="Delete Physics folder"');
 
-    // 3. Compact symbol-driven folder hero
-    expect(html).toContain('Physics');
-    expect(html).toContain('1 lesson');
-    expect(html).toContain('3:00');
-    expect(html).toContain('1 offline');
+    // 3. Compact symbol-driven folder stats strip with concise labels
+    expect(html).toContain('1 Note');
+    expect(html).toContain('3:00 Total');
+    expect(html).toContain('1 Offline');
 
     // 4. Action toolbar buttons (Play All, Upload, Record) remain untouched
     expect(html).toContain('Play All');
