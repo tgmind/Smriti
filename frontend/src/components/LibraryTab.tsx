@@ -2810,20 +2810,20 @@ export const LibraryTab: React.FC<LibraryTabProps> = ({
       </div>
 
       {/* 3. Direct Subject Folders Section */}
-      <div className="bg-gradient-to-b from-indigo-50/75 via-slate-50/90 to-indigo-50/40 border border-indigo-100/90 shadow-sm rounded-3xl p-4 space-y-3.5">
+      <div className="rounded-3xl bg-gradient-to-br from-rose-100/95 via-pink-100/85 to-fuchsia-100/80 border border-rose-300/80 p-4 shadow-[0_10px_26px_-8px_rgba(225,29,72,0.16)] transition-colors space-y-3.5">
         <div className="flex items-center justify-between px-1">
           <div className="flex items-center gap-1.5">
-            <span className="text-xs font-bold uppercase tracking-wider text-slate-700">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-rose-950/80">
               Subject Folders
             </span>
-            <span className="text-[11px] font-mono text-slate-400 font-semibold">
+            <span className="text-[11px] font-bold text-rose-700 tabular-nums">
               {`(${deduplicatedSubjects.length})`}
             </span>
           </div>
           <button
             type="button"
             onClick={() => setIsCreateFolderOpen(true)}
-            className="text-[11px] font-semibold text-slate-600 hover:text-slate-950 flex items-center gap-1 transition-colors cursor-pointer"
+            className="inline-flex items-center gap-1 rounded-full bg-white/90 hover:bg-white px-3 py-1 text-xs font-semibold text-rose-800 border border-rose-300/70 shadow-2xs active:scale-95 transition cursor-pointer"
           >
             <Plus size={13} strokeWidth={2.2} />
             <span>New Folder</span>
@@ -2833,8 +2833,8 @@ export const LibraryTab: React.FC<LibraryTabProps> = ({
         {/* Clean Minimalist Subject Cards */}
         <div className="space-y-2.5">
           {deduplicatedSubjects.length === 0 ? (
-            <div className="py-8 px-4 text-center space-y-3 bg-white/70 border border-dashed border-slate-200 rounded-2xl">
-              <div className="size-11 rounded-2xl bg-white border border-slate-200 text-slate-400 mx-auto flex items-center justify-center shadow-2xs">
+            <div className="py-8 px-4 text-center space-y-3 bg-white/80 border border-dashed border-rose-200 rounded-2xl">
+              <div className="size-11 rounded-2xl bg-white border border-rose-200 text-rose-400 mx-auto flex items-center justify-center shadow-2xs">
                 <Folder size={20} />
               </div>
               <div className="space-y-1">
@@ -2858,34 +2858,33 @@ export const LibraryTab: React.FC<LibraryTabProps> = ({
               const totalDuration = subjectAudios.reduce((acc, curr) => acc + curr.duration_seconds, 0);
               const latestAudio = subjectAudios[0];
               const SubjectIcon = getSubjectIcon(subject.icon_name);
-              const subjectTheme = getSubjectTheme(subject.color_hex);
 
               return (
                 <div
                   key={subject.id}
                   onClick={() => handleOpenSubject(subject.id)}
-                  className="group bg-white/95 hover:bg-white border border-slate-200/70 hover:border-indigo-200 rounded-2xl p-3 sm:p-3.5 flex items-center justify-between gap-3 transition-all cursor-pointer shadow-2xs hover:shadow-xs active:scale-[0.99]"
+                  className="group relative flex items-center justify-between rounded-2xl bg-white/95 hover:bg-white border border-rose-200/90 hover:border-rose-400/80 px-3.5 py-3 shadow-[0_4px_12px_-3px_rgba(190,24,93,0.10)] transition-all cursor-pointer active:scale-[0.99] gap-3"
                 >
                   {/* Left: Minimalist Subject Icon */}
-                  <div className={`w-11 h-11 rounded-2xl ${subjectTheme.bg} flex items-center justify-center shrink-0 shadow-2xs group-hover:scale-105 transition-transform border ${subjectTheme.border}`}>
+                  <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-rose-100 to-pink-100 text-rose-700 border border-rose-200/80 flex items-center justify-center shrink-0 shadow-2xs group-hover:scale-105 transition-transform">
                     <SubjectIcon size={20} strokeWidth={2.2} />
                   </div>
 
                   {/* Middle: Subject Title & Clean Subtitle */}
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-1.5">
-                      <h3 className="text-sm font-bold text-slate-950 group-hover:text-blue-600 transition-colors truncate">
+                      <h3 className="text-[15px] font-bold text-slate-900 group-hover:text-rose-600 transition-colors truncate">
                         {subject.name}
                       </h3>
                     </div>
-                    <p className="text-xs text-slate-500 mt-0.5 truncate font-normal">
+                    <p className="text-xs font-medium text-slate-600 tabular-nums mt-0.5 truncate">
                       {subjectAudios.length > 0
                         ? `${subjectAudios.length} ${subjectAudios.length === 1 ? 'lesson' : 'lessons'} · ${formatDuration(totalDuration)}`
                         : 'No recordings yet'}
                     </p>
                     {latestAudio && (
-                      <p className="text-[11px] text-slate-400 truncate mt-0.5">
-                        Recent: <span className="text-slate-600 font-medium">{latestAudio.title}</span>
+                      <p className="text-xs text-rose-900/70 truncate mt-0.5">
+                        Recent: <span className="font-medium text-slate-700">{latestAudio.title}</span>
                       </p>
                     )}
                   </div>
@@ -2897,8 +2896,8 @@ export const LibraryTab: React.FC<LibraryTabProps> = ({
                       onClick={(e) => handleToggleFolderMenu(e, subject)}
                       className={`p-2 rounded-xl transition-all cursor-pointer ${
                         activeMenuFolderId === subject.id
-                          ? 'text-indigo-600 bg-indigo-50'
-                          : 'text-slate-400 hover:text-slate-700 hover:bg-slate-100'
+                          ? 'text-rose-600 bg-rose-50'
+                          : 'text-slate-400 hover:text-slate-700 hover:bg-rose-50/60'
                       }`}
                       title={`Folder options for ${subject.name}`}
                       aria-label={`Folder options for ${subject.name}`}
@@ -2908,7 +2907,7 @@ export const LibraryTab: React.FC<LibraryTabProps> = ({
                         Delete {subject.name} folder
                       </span>
                     </button>
-                    <div className="text-slate-300 group-hover:text-slate-600 transition-colors pr-1">
+                    <div className="text-slate-300 group-hover:text-rose-600 transition-colors pr-1">
                       <ChevronRight size={17} className="group-hover:translate-x-0.5 transition-transform" />
                     </div>
                   </div>

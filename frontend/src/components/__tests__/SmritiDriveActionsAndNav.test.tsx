@@ -107,13 +107,13 @@ describe('Smriti Library UI, Drive Actions & Navigation', () => {
     );
 
     // Outer container surface styling
-    expect(html).toContain('from-indigo-50/75 via-slate-50/90 to-indigo-50/40');
-    expect(html).toContain('border-indigo-100/90');
+    expect(html).toContain('from-rose-100/95 via-pink-100/85 to-fuchsia-100/80');
+    expect(html).toContain('border-rose-300/80');
     expect(html).toContain('rounded-3xl');
 
     // Inner folder cards styling
     expect(html).toContain('bg-white/95');
-    expect(html).toContain('hover:border-indigo-200');
+    expect(html).toContain('border-rose-200/90');
   });
 
   it('renders three-dots overflow menu button on folder cards', () => {
