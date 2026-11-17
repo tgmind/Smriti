@@ -397,4 +397,40 @@ describe('LibraryTab Apple Music Redesign', () => {
     expect(html).toContain('Record Lesson');
     expect(html).toContain('Upload an audio file or record a new lesson for Physics');
   });
+
+  it('renders cohesive action deck with Upload, New Topic, and real-time Wi-Fi Only sync state indicator', () => {
+    const htmlWaiting = renderToString(
+      <LibraryTab
+        audioItems={mockAudioItems}
+        subjects={mockSubjects}
+        isDriveConnected={true}
+        syncState="waiting_for_wifi"
+        onPlayAudio={vi.fn()}
+        onToggleFavorite={vi.fn()}
+        onToggleOffline={vi.fn()}
+        onGoToRecord={vi.fn()}
+      />
+    );
+
+    expect(htmlWaiting).toContain('Upload');
+    expect(htmlWaiting).toContain('New Topic');
+    expect(htmlWaiting).toContain('Waiting');
+    expect(htmlWaiting).toContain('Wi-Fi Only');
+
+    const htmlSyncing = renderToString(
+      <LibraryTab
+        audioItems={mockAudioItems}
+        subjects={mockSubjects}
+        isDriveConnected={true}
+        syncState="syncing"
+        onPlayAudio={vi.fn()}
+        onToggleFavorite={vi.fn()}
+        onToggleOffline={vi.fn()}
+        onGoToRecord={vi.fn()}
+      />
+    );
+
+    expect(htmlSyncing).toContain('Syncing...');
+    expect(htmlSyncing).toContain('Active');
+  });
 });

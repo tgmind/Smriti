@@ -101,4 +101,69 @@ describe('NetworkService & Wi-Fi Only Sync Engine', () => {
 
     unsubscribe();
   });
+
+  it('permits sync on ethernet when Wi-Fi Only is enabled', () => {
+    networkService.setMockStatus({
+      isOnline: true,
+      connectionType: 'ethernet',
+      isWifi: false,
+      isCellular: false
+    });
+
+    const permission = networkService.canSync(true);
+    expect(permission.allowed).toBe(true);
+  });
+
+  it('strictly blocks sync on unverified network when Wi-Fi Only is enabled', () => {
+    networkService.setMockStatus({
+      isOnline: true,
+      connectionType: 'unknown',
+      isWifi: false,
+      isCellular: false
+    });
+
+    const permission = networkService.canSync(true);
+    expect(permission.allowed).toBe(false);
+    expect(permission.reason).toBe('wifi_only_unverified');
+    expect(permission.message).toContain('Network connection cannot be verified as Wi-Fi');
+  });
+
+  it('permits sync on unverified network when Wi-Fi Only is disabled', () => {
+    networkService.setMockStatus({
+      isOnline: true,
+      connectionType: 'unknown',
+      isWifi: false,
+      isCellular: false
+    });
+
+    const permission = networkService.canSync(false);
+    expect(permission.allowed).toBe(true);
+  });
+
+  it('notifies subscribers on transition from Wi-Fi to cellular and reports correct previous state', () => {
+    networkService.setMockStatus({
+      isOnline: true,
+      connectionType: 'wifi',
+      isWifi: true,
+      isCellular: false
+    });
+
+    const listener = vi.fn();
+    const unsubscribe = networkService.subscribe(listener);
+
+    // Transition to Cellular
+    networkService.setMockStatus({
+      isOnline: true,
+      connectionType: 'cellular',
+      isWifi: false,
+      isCellular: true
+    });
+
+    expect(listener).toHaveBeenCalledTimes(1);
+    const [current, prev] = listener.mock.calls[0];
+    expect(current.isCellular).toBe(true);
+    expect(prev.isWifi).toBe(true);
+
+    unsubscribe();
+  });
 });

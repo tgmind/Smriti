@@ -12,7 +12,7 @@ export interface NetworkStatus {
 
 export interface SyncPermission {
   allowed: boolean;
-  reason?: 'wifi_only_on_cellular' | 'offline';
+  reason?: 'wifi_only_on_cellular' | 'wifi_only_unverified' | 'offline';
   message?: string;
   connectionType: ConnectionType;
 }
@@ -163,9 +163,10 @@ class NetworkService {
               isCellular = true;
               isWifi = false;
             } else {
+              // Unverified on mobile device: do not claim verified Wi-Fi
               connType = 'unknown';
-              isWifi = true; // lenient fallback for web browser
-              isCellular = false;
+              isWifi = false;
+              isCellular = true;
             }
           } else {
             connType = 'wifi';
@@ -261,19 +262,35 @@ class NetworkService {
       };
     }
 
-    if (wifiOnlyPreference && status.isCellular) {
-      return {
-        allowed: false,
-        reason: 'wifi_only_on_cellular',
-        message: 'Wi-Fi Only Sync is active. Sync paused on mobile data to prevent data usage.',
-        connectionType: 'cellular'
-      };
+    if (wifiOnlyPreference) {
+      if (status.isCellular) {
+        return {
+          allowed: false,
+          reason: 'wifi_only_on_cellular',
+          message: 'Wi-Fi Only Sync is active. Sync paused on mobile data to prevent data usage.',
+          connectionType: 'cellular'
+        };
+      }
+
+      // If connection cannot be verified as Wi-Fi or Ethernet, hold sync
+      if (!status.isWifi && status.connectionType !== 'ethernet') {
+        return {
+          allowed: false,
+          reason: 'wifi_only_unverified',
+          message: 'Wi-Fi Only Sync is active. Network connection cannot be verified as Wi-Fi.',
+          connectionType: status.connectionType
+        };
+      }
     }
 
     return {
       allowed: true,
       connectionType: status.connectionType
     };
+  }
+
+  public isSyncEligible(wifiOnlyPreference: boolean): boolean {
+    return this.canSync(wifiOnlyPreference).allowed;
   }
 
   /**

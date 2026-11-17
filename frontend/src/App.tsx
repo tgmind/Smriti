@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { TabType, Navigation } from './components/Navigation';
 import { MiniPlayer } from './components/MiniPlayer';
 import { FullScreenPlayer } from './components/FullScreenPlayer';
@@ -118,6 +118,7 @@ export const App: React.FC = () => {
 
   // Background non-blocking sync tasks (e.g., folder deletion, audio deletion, Drive sync)
   const [activeSyncTasks, setActiveSyncTasks] = useState<ActiveSyncTask[]>([]);
+  const [syncState, setSyncState] = useState<'idle' | 'syncing' | 'waiting_for_wifi' | 'offline' | 'error' | 'disconnected'>('idle');
 
   // Wi-Fi Only Sync & Network Status Toast
   const [syncToast, setSyncToast] = useState<SyncToastState | null>(null);
@@ -141,6 +142,30 @@ export const App: React.FC = () => {
 
   const handleRetryTask = (task: ActiveSyncTask) => {
     if (task.type === 'delete_folder' || task.type === 'delete_audio' || task.type === 'sync') {
+      const permission = networkService.canSync(userSettings.offline_sync_wifi_only);
+      if (!permission.allowed && (permission.reason === 'wifi_only_on_cellular' || permission.reason === 'wifi_only_unverified')) {
+        updateSyncTask(task.id, {
+          status: 'pending',
+          stageMessage: 'Sync deferred: Waiting for Wi-Fi connection...'
+        });
+        showSyncToast({
+          type: 'wifi_only_paused',
+          title: 'Retry Deferred on Mobile Data',
+          message: 'Wi-Fi Only Sync is active. Task will retry automatically when connected to Wi-Fi.',
+          actionLabel: 'Retry Anyway',
+          onAction: () => {
+            updateSyncTask(task.id, {
+              status: 'running',
+              progressPercent: 20,
+              stageMessage: 'Retrying sync with Google Drive...'
+            });
+            handleSyncDrive({ forceSync: true });
+          },
+          durationMs: 6500
+        });
+        return;
+      }
+
       updateSyncTask(task.id, {
         status: 'running',
         progressPercent: 20,
@@ -210,6 +235,10 @@ export const App: React.FC = () => {
     return networkService.subscribe((current, prev) => {
       // 1. Transitioned to Cellular with Wi-Fi Only Sync enabled
       if (current.isOnline && current.isCellular && !prev.isCellular && userSettings.offline_sync_wifi_only) {
+        // Abort in-flight network activity cleanly to avoid consuming cellular data
+        googleDriveService.cancelActiveTransfers('Paused: Device transitioned to mobile data under Wi-Fi Only Mode');
+        setIsSyncingDrive(false);
+        setSyncState('waiting_for_wifi');
         showSyncToast({
           type: 'wifi_only_paused',
           title: 'Wi-Fi Only Sync Active',
@@ -229,12 +258,59 @@ export const App: React.FC = () => {
             message: 'Google Drive sync resumed automatically over Wi-Fi.',
             durationMs: 4000
           });
-          // Auto-sync library safely
-          handleSyncDrive({ silent: true, forceSync: true }).catch(() => {});
+          // Auto-sync library safely on Wi-Fi
+          handleSyncDrive({ silent: true }).catch(() => {});
         }
       }
     });
   }, [userSettings.offline_sync_wifi_only, isDriveConnected]);
+
+  // Intelligent Cyclic & Scheduled Synchronization Engine
+  useEffect(() => {
+    // 5-minute cyclic interval for periodic background sync
+    const CYCLIC_INTERVAL_MS = 5 * 60 * 1000;
+    const interval = setInterval(() => {
+      // 1. Only run if Google Drive is authenticated & connected
+      if (!googleDriveService.isConnected()) return;
+
+      // 2. Avoid collision if a sync is already running
+      if (isSyncingDrive) return;
+
+      // 3. Strict Network Eligibility Check
+      const permission = networkService.canSync(userSettings.offline_sync_wifi_only);
+      if (!permission.allowed) {
+        if (permission.reason === 'wifi_only_on_cellular' || permission.reason === 'wifi_only_unverified') {
+          setSyncState('waiting_for_wifi');
+        } else if (permission.reason === 'offline') {
+          setSyncState('offline');
+        }
+        return;
+      }
+
+      // 4. Eligible: Execute silent background cyclic sync
+      handleSyncDrive({ silent: true, isCyclic: true }).catch(err => {
+        console.warn('[CyclicSync] Periodic sync notice:', err);
+      });
+    }, CYCLIC_INTERVAL_MS);
+
+    return () => clearInterval(interval);
+  }, [userSettings.offline_sync_wifi_only, isSyncingDrive, isDriveConnected]);
+
+  // Foreground Resume Synchronization Engine
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible' && googleDriveService.isConnected() && !isSyncingDrive) {
+        const permission = networkService.canSync(userSettings.offline_sync_wifi_only);
+        if (permission.allowed) {
+          handleSyncDrive({ silent: true, isForegroundResume: true }).catch(() => {});
+        } else if (permission.reason === 'wifi_only_on_cellular' || permission.reason === 'wifi_only_unverified') {
+          setSyncState('waiting_for_wifi');
+        }
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+  }, [userSettings.offline_sync_wifi_only, isSyncingDrive]);
 
   // Subscribe to Bridge events
   useEffect(() => {
@@ -778,7 +854,12 @@ export const App: React.FC = () => {
   };
 
   // Re-sync cloud data from Google Drive
-  const handleSyncDrive = async (options?: { silent?: boolean; forceSync?: boolean }) => {
+  const handleSyncDrive = async (options?: {
+    silent?: boolean;
+    forceSync?: boolean;
+    isCyclic?: boolean;
+    isForegroundResume?: boolean;
+  }) => {
     if (!googleDriveService.isConnected()) {
       await handleConnectDrive();
       return;
@@ -788,25 +869,31 @@ export const App: React.FC = () => {
     if (!options?.forceSync) {
       const permission = networkService.canSync(userSettings.offline_sync_wifi_only);
       if (!permission.allowed) {
-        if (permission.reason === 'wifi_only_on_cellular') {
-          showSyncToast({
-            type: 'wifi_only_paused',
-            title: 'Sync Paused on Mobile Data',
-            message: 'Wi-Fi Only Sync is active. Sync paused to avoid cellular data usage.',
-            actionLabel: 'Sync Anyway',
-            onAction: () => {
-              handleSyncDrive({ forceSync: true });
-            },
-            durationMs: 7000
-          });
+        if (permission.reason === 'wifi_only_on_cellular' || permission.reason === 'wifi_only_unverified') {
+          setSyncState('waiting_for_wifi');
+          if (!options?.silent && !options?.isCyclic && !options?.isForegroundResume) {
+            showSyncToast({
+              type: 'wifi_only_paused',
+              title: 'Sync Paused on Mobile Data',
+              message: 'Wi-Fi Only Sync is active. Sync paused to avoid cellular data usage.',
+              actionLabel: 'Sync Anyway',
+              onAction: () => {
+                handleSyncDrive({ forceSync: true });
+              },
+              durationMs: 7000
+            });
+          }
           return;
         } else if (permission.reason === 'offline') {
-          showSyncToast({
-            type: 'offline',
-            title: 'Offline Mode',
-            message: 'No internet connection detected. Library is safely preserved on device.',
-            durationMs: 4000
-          });
+          setSyncState('offline');
+          if (!options?.silent && !options?.isCyclic && !options?.isForegroundResume) {
+            showSyncToast({
+              type: 'offline',
+              title: 'Offline Mode',
+              message: 'No internet connection detected. Library is safely preserved on device.',
+              durationMs: 4000
+            });
+          }
           return;
         }
       }
@@ -814,12 +901,14 @@ export const App: React.FC = () => {
 
     try {
       setIsSyncingDrive(true);
+      setSyncState('syncing');
       const driveData = await googleDriveService.fetchDriveData(subjects);
       if (driveData) {
         setAudioItems(driveData.audioItems || []);
         if (driveData.subjects && driveData.subjects.length > 0) {
           setSubjects(driveData.subjects);
         }
+        setSyncState('idle');
         if (!options?.silent) {
           showSyncToast({
             type: 'synced',
@@ -832,11 +921,27 @@ export const App: React.FC = () => {
       const info = await bridge.getStorageInfoAsync();
       setStorageInfo(info);
     } catch (err: any) {
-      console.error('Error syncing with Google Drive:', err);
+      if (err?.name === 'AbortError' || err?.message?.includes('aborted') || err?.message?.includes('cellular') || err?.message?.includes('cancelled')) {
+        console.log('[Sync] Sync safely paused / cancelled on network switch');
+        setSyncState('waiting_for_wifi');
+      } else {
+        console.error('Error syncing with Google Drive:', err);
+        setSyncState('error');
+      }
     } finally {
       setIsSyncingDrive(false);
     }
   };
+
+  const computedSyncState: 'idle' | 'syncing' | 'waiting_for_wifi' | 'offline' | 'error' | 'disconnected' = useMemo(() => {
+    if (!isDriveConnected) return 'disconnected';
+    if (isSyncingDrive) return 'syncing';
+    if (!networkService.isOnline()) return 'offline';
+    if (userSettings.offline_sync_wifi_only && (networkService.isCellular() || !networkService.isWifi())) {
+      return 'waiting_for_wifi';
+    }
+    return syncState;
+  }, [isDriveConnected, isSyncingDrive, userSettings.offline_sync_wifi_only, syncState]);
 
   // Google Drive disconnect trigger: Stops playback, safely purges all local cache/audio files across Android and Web, clears UI to protect privacy
   const handleDisconnectDrive = async () => {
@@ -1327,6 +1432,7 @@ export const App: React.FC = () => {
             userSettings={userSettings}
             isDriveConnected={isDriveConnected}
             isSyncingDrive={isSyncingDrive}
+            syncState={computedSyncState}
             onSyncDrive={handleSyncDrive}
             onConnectDrive={handleConnectDrive}
             onTogglePlay={handleTogglePlay}

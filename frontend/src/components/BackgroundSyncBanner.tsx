@@ -8,7 +8,7 @@ export interface ActiveSyncTask {
   targetName: string;
   stageMessage: string;
   progressPercent: number; // 0 to 100
-  status: 'running' | 'completed' | 'error';
+  status: 'running' | 'completed' | 'error' | 'pending';
   errorMessage?: string;
   timestamp: number;
 }

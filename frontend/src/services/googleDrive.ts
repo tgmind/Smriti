@@ -88,10 +88,48 @@ class GoogleDriveService {
   private subjectFolderCache: Map<string, string> = new Map();
   private transferListeners: Set<(transfers: DriveTransferItem[]) => void> = new Set();
   private transfers: DriveTransferItem[] = [];
+  private activeAbortController: AbortController | null = null;
 
   constructor() {
     this.restoreToken();
     this.restoreTransfers();
+  }
+
+  public getAbortSignal(): AbortSignal {
+    if (!this.activeAbortController) {
+      this.activeAbortController = new AbortController();
+    }
+    return this.activeAbortController.signal;
+  }
+
+  public cancelActiveTransfers(reason: string = 'Operation cancelled') {
+    if (this.activeAbortController) {
+      try {
+        this.activeAbortController.abort(new Error(reason));
+      } catch {
+        // ignore
+      }
+      this.activeAbortController = null;
+    }
+    let changed = false;
+    this.transfers = this.transfers.map((t) => {
+      if (t.state === 'uploading' || t.state === 'processing') {
+        changed = true;
+        return {
+          ...t,
+          state: 'error',
+          error: reason
+        };
+      }
+      return t;
+    });
+    if (changed) {
+      this.notifyTransfers();
+    }
+  }
+
+  public resetAbortSignal() {
+    this.activeAbortController = null;
   }
 
   /**
@@ -1388,6 +1426,14 @@ class GoogleDriveService {
         xhr.open('POST', uploadUrl);
         xhr.setRequestHeader('Authorization', `Bearer ${this.accessToken}`);
 
+        const signal = this.getAbortSignal();
+        const onAbort = () => {
+          try {
+            xhr.abort();
+          } catch {}
+        };
+        signal.addEventListener('abort', onAbort, { once: true });
+
         xhr.upload.onprogress = (event) => {
           if (event.lengthComputable && event.total > 0) {
             const rawPercent = Math.round((event.loaded / event.total) * 100);
@@ -1401,6 +1447,7 @@ class GoogleDriveService {
         };
 
         xhr.onload = () => {
+          signal.removeEventListener('abort', onAbort);
           if (xhr.status >= 200 && xhr.status < 300) {
             try {
               const data = JSON.parse(xhr.responseText);
@@ -1424,13 +1471,22 @@ class GoogleDriveService {
         };
 
         xhr.onerror = () => {
+          signal.removeEventListener('abort', onAbort);
           const err = 'Network error during Google Drive upload';
           this.updateTransfer(transferId, { state: 'error', errorMessage: err });
           reject(new Error(err));
         };
 
         xhr.ontimeout = () => {
+          signal.removeEventListener('abort', onAbort);
           const err = 'Google Drive upload timed out';
+          this.updateTransfer(transferId, { state: 'error', errorMessage: err });
+          reject(new Error(err));
+        };
+
+        xhr.onabort = () => {
+          signal.removeEventListener('abort', onAbort);
+          const err = 'Google Drive upload paused or cancelled';
           this.updateTransfer(transferId, { state: 'error', errorMessage: err });
           reject(new Error(err));
         };
@@ -1448,7 +1504,8 @@ class GoogleDriveService {
         headers: {
           Authorization: `Bearer ${this.accessToken}`
         },
-        body: form
+        body: form,
+        signal: this.getAbortSignal()
       });
 
       if (!res.ok) {
@@ -1506,7 +1563,8 @@ class GoogleDriveService {
         {
           headers: {
             Authorization: `Bearer ${this.accessToken}`
-          }
+          },
+          signal: this.getAbortSignal()
         }
       );
 

@@ -38,7 +38,9 @@ import {
   ShieldCheck,
   Upload,
   Mic,
-  AlertCircle
+  AlertCircle,
+  WifiOff,
+  CloudOff
 } from 'lucide-react';
 import { AudioItem, Subject, PlaybackState, UserSettings, UploadProgressState } from '../types';
 import { formatDuration } from '../services/learningEngine';
@@ -86,6 +88,7 @@ export interface LibraryTabProps {
   playbackState?: PlaybackState;
   isDriveConnected?: boolean;
   isSyncingDrive?: boolean;
+  syncState?: 'idle' | 'syncing' | 'waiting_for_wifi' | 'offline' | 'error' | 'disconnected';
   onSyncDrive?: () => void;
   onConnectDrive?: () => void;
   onTogglePlay?: () => void;
@@ -147,6 +150,7 @@ export const LibraryTab: React.FC<LibraryTabProps> = ({
   playbackState,
   isDriveConnected = false,
   isSyncingDrive = false,
+  syncState = 'idle',
   onSyncDrive,
   onConnectDrive,
   onTogglePlay,
@@ -1847,69 +1851,83 @@ export const LibraryTab: React.FC<LibraryTabProps> = ({
 
   return (
     <div className="space-y-4 pb-28 pt-3 px-4 max-w-md mx-auto animate-in">
-      {/* 1. Restored Top Welcome Greeting Header (from Image 1) above Search Bar */}
+      {/* 1. Header & User Identity Bar */}
       <div className="space-y-3 pt-1">
         {/* Row 1: Profile & Greeting with Notification Bell */}
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
-            {/* Mint Circle Avatar */}
+            {/* Medallion Avatar with Status Indicator */}
             <div
               onClick={onNavigateToAccount}
-              className="size-10.5 rounded-full bg-[#A7F3D0]/60 border border-[#34D399]/40 text-[#065F46] flex items-center justify-center font-bold text-sm shadow-2xs hover:scale-105 active:scale-95 transition-all cursor-pointer"
-              title="View Account Profile"
+              className="relative size-11 rounded-full bg-gradient-to-br from-emerald-50 via-teal-50 to-sky-50 border border-emerald-300/60 text-emerald-800 flex items-center justify-center font-bold text-sm shadow-2xs hover:scale-105 active:scale-95 transition-all cursor-pointer group"
+              title="View Account Profile & Settings"
             >
-              स्म
+              <span>स्म</span>
+              <span className="absolute bottom-0 right-0 size-3 rounded-full bg-emerald-500 border-2 border-white ring-1 ring-emerald-400/30" />
             </div>
 
             {/* Greeting & Vault Status */}
             <div>
               <div className="flex items-center gap-1.5">
-                <span className="text-sm font-bold text-slate-900 tracking-tight">
-                  {`Hi, ${userSettings?.display_name || googleDriveService.getUserProfile()?.name || 'Scholar'}`}
+                <span className="text-xs font-semibold text-slate-500 tracking-normal block leading-tight">
+                  {(() => {
+                    const hour = new Date().getHours();
+                    if (hour < 12) return 'Good morning';
+                    if (hour < 17) return 'Good afternoon';
+                    return 'Good evening';
+                  })()}
                 </span>
-                <span className="size-2 rounded-full bg-[#10B981] inline-block" />
               </div>
-              <p className="text-[11px] text-slate-500 font-medium">
-                Offline-First Vault • Ready to Study
-              </p>
+              <h1 className="text-base font-extrabold text-slate-950 tracking-tight leading-tight flex items-center gap-1.5 mt-0.5">
+                <span>{`Hi, ${userSettings?.display_name || googleDriveService.getUserProfile()?.name || 'Scholar'}`}</span>
+              </h1>
             </div>
           </div>
 
-          {/* Notification Bell Button */}
-          <button
-            onClick={() => setShowNotificationToast(true)}
-            className="size-10 rounded-full bg-white border border-slate-200/80 text-slate-700 hover:text-slate-950 hover:bg-slate-50 shadow-2xs transition-all active:scale-90 flex items-center justify-center relative cursor-pointer"
-            title="Daily Revision Reminders"
-          >
-            <Bell size={17} />
-            <span className="absolute top-2 right-2.5 size-2 rounded-full bg-[#10B981]" />
-          </button>
+          {/* Right: Quick Notification Bell Button */}
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setShowNotificationToast(!showNotificationToast)}
+              className="size-10 rounded-full bg-white border border-slate-200/90 text-slate-700 hover:text-slate-950 hover:bg-slate-50 shadow-2xs transition-all active:scale-90 flex items-center justify-center relative cursor-pointer"
+              title="Daily Revision Reminders & Spaced Practice"
+              aria-label="Daily Study Reminders"
+            >
+              <Bell size={17} strokeWidth={2} />
+              <span className="absolute top-2.5 right-2.5 size-2 rounded-full bg-emerald-500 ring-2 ring-white" />
+            </button>
+          </div>
         </div>
 
-        {/* Row 2: Hero Brand Title & Tagline */}
-        <div className="pt-0.5 space-y-0.5">
-          <h2 className="text-2xl font-black text-slate-950 tracking-tight leading-tight">
-            Save With Smriti
-          </h2>
-          <p className="text-xs text-slate-500 font-medium">
-            The Vedic tool for learning anything.
-          </p>
+        {/* Row 2: Headline & Vault Capacity Badge */}
+        <div className="pt-0.5 flex items-baseline justify-between">
+          <div>
+            <h2 className="text-2xl font-black text-slate-950 tracking-tight leading-tight">
+              Study Library
+            </h2>
+            <p className="text-xs text-slate-500 font-medium mt-0.5">
+              The Vedic tool for learning anything.
+            </p>
+          </div>
+          <span className="text-[11px] font-mono font-semibold px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 border border-slate-200/80">
+            {deduplicatedSubjects.length} {deduplicatedSubjects.length === 1 ? 'folder' : 'folders'}
+          </span>
         </div>
 
-        {/* Row 3: Search Bar with Filters icon */}
+        {/* Row 3: Modern Full-Width Search Bar */}
         <div className="relative pt-0.5">
-          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 size-4 text-slate-400" />
+          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 size-4 text-slate-400 pointer-events-none" />
           <input
             type="text"
             placeholder="Search audio notes, subjects, concepts..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full pl-9.5 pr-9 py-2.5 rounded-2xl bg-white border border-slate-200/80 text-xs text-slate-800 placeholder:text-slate-400 shadow-2xs focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-400 transition-all"
+            className="w-full pl-9.5 pr-9 py-2.5 rounded-2xl bg-white border border-slate-200/90 text-xs sm:text-sm text-slate-900 placeholder:text-slate-400 shadow-2xs hover:border-slate-300 focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-400 transition-all font-medium"
           />
           {searchQuery ? (
             <button
               onClick={() => setSearchQuery('')}
               className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-0.5 cursor-pointer"
+              aria-label="Clear search"
             >
               <X size={14} />
             </button>
@@ -1917,7 +1935,7 @@ export const LibraryTab: React.FC<LibraryTabProps> = ({
             <button
               onClick={onNavigateToAccount}
               className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700 p-0.5 cursor-pointer"
-              title="Filter & Settings"
+              title="Account & Storage Preferences"
             >
               <SlidersHorizontal size={15} />
             </button>
@@ -1973,56 +1991,141 @@ export const LibraryTab: React.FC<LibraryTabProps> = ({
         </div>
       )}
 
-      {/* Action Chips Row (Upload, New Topic, Sync Drive) */}
-      <div className="grid grid-cols-3 gap-2">
+      {/* 2. Cohesive Premium Action Deck (Upload, New Folder, Cloud Sync) */}
+      <div className="grid grid-cols-3 gap-2.5">
+        {/* Action 1: Upload Audio */}
         <button
           type="button"
           onClick={() => handleTriggerUpload()}
-          className="bg-[#E8F8F0] hover:bg-[#DCF3E7] text-emerald-800 border border-emerald-200/70 p-2.5 rounded-2xl flex items-center justify-center gap-1.5 text-xs font-semibold active:scale-95 transition-all shadow-2xs cursor-pointer"
+          className="bg-white hover:bg-slate-50/90 border border-slate-200/90 hover:border-emerald-300/80 rounded-2xl p-2.5 sm:p-3 flex flex-col items-center justify-center text-center gap-1.5 shadow-2xs hover:shadow-xs active:scale-[0.98] transition-all cursor-pointer group"
           title="Upload audio notes from device"
+          aria-label="Upload audio notes from device"
         >
-          <Plus size={15} className="text-emerald-700" />
-          <span>Upload</span>
+          <div className="w-8 h-8 rounded-xl bg-emerald-50 text-emerald-700 flex items-center justify-center group-hover:scale-105 transition-transform shadow-2xs">
+            <Upload size={15} strokeWidth={2.2} />
+          </div>
+          <div className="w-full min-w-0">
+            <span className="text-xs font-bold text-slate-900 block truncate leading-tight">Upload</span>
+            <span className="text-[10px] text-slate-400 font-medium block truncate mt-0.5">Audio File</span>
+          </div>
         </button>
 
+        {/* Action 2: New Topic */}
         <button
+          type="button"
           onClick={() => setIsCreateFolderOpen(true)}
-          className="bg-[#FFEFEF] hover:bg-[#FFE5E5] text-rose-800 border border-rose-200/70 p-2.5 rounded-2xl flex items-center justify-center gap-1.5 text-xs font-semibold active:scale-95 transition-all shadow-2xs cursor-pointer"
+          className="bg-white hover:bg-slate-50/90 border border-slate-200/90 hover:border-indigo-300/80 rounded-2xl p-2.5 sm:p-3 flex flex-col items-center justify-center text-center gap-1.5 shadow-2xs hover:shadow-xs active:scale-[0.98] transition-all cursor-pointer group"
+          title="Create a new topic folder"
+          aria-label="New Topic"
         >
-          <Folder size={15} className="text-rose-700" />
-          <span>New Topic</span>
+          <div className="w-8 h-8 rounded-xl bg-indigo-50 text-indigo-700 flex items-center justify-center group-hover:scale-105 transition-transform shadow-2xs">
+            <FolderPlus size={15} strokeWidth={2.2} />
+          </div>
+          <div className="w-full min-w-0">
+            <span className="text-xs font-bold text-slate-900 block truncate leading-tight">New Topic</span>
+            <span className="text-[10px] text-slate-400 font-medium block truncate mt-0.5">Folder</span>
+          </div>
         </button>
 
+        {/* Action 3: Cloud Sync with Intelligent Wi-Fi Only State */}
         <button
-          onClick={onSyncDrive || onConnectDrive || onGoToRecord}
+          type="button"
+          onClick={() => (onSyncDrive ? onSyncDrive() : onConnectDrive ? onConnectDrive() : onGoToRecord())}
           disabled={isSyncingDrive}
-          title={isDriveConnected ? "Sync and refresh cloud notes from Google Drive" : "Connect Google Drive"}
-          className="bg-[#EEF6FF] hover:bg-[#E0EEFF] text-sky-800 border border-sky-200/70 p-2.5 rounded-2xl flex items-center justify-center gap-1.5 text-xs font-semibold active:scale-95 transition-all shadow-2xs cursor-pointer disabled:opacity-60"
+          title={
+            syncState === 'waiting_for_wifi'
+              ? 'Wi-Fi Only Sync active: Paused on mobile data'
+              : syncState === 'offline'
+              ? 'Offline mode: Changes stored safely on device'
+              : isDriveConnected
+              ? 'Tap to sync library with Google Drive'
+              : 'Connect Google Drive account'
+          }
+          aria-label={
+            syncState === 'waiting_for_wifi'
+              ? 'Sync paused waiting for Wi-Fi'
+              : isSyncingDrive
+              ? 'Synchronizing library'
+              : 'Sync Google Drive'
+          }
+          className="bg-white hover:bg-slate-50/90 border border-slate-200/90 hover:border-sky-300/80 rounded-2xl p-2.5 sm:p-3 flex flex-col items-center justify-center text-center gap-1.5 shadow-2xs hover:shadow-xs active:scale-[0.98] transition-all cursor-pointer group disabled:opacity-75"
         >
-          {isSyncingDrive ? (
-            <RefreshCw size={15} className="text-sky-700 animate-spin" />
+          {syncState === 'syncing' || isSyncingDrive ? (
+            <div className="w-8 h-8 rounded-xl bg-sky-50 text-sky-600 flex items-center justify-center shadow-2xs">
+              <RefreshCw size={15} className="animate-spin" />
+            </div>
+          ) : syncState === 'waiting_for_wifi' ? (
+            <div className="w-8 h-8 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center shadow-2xs">
+              <WifiOff size={15} strokeWidth={2.2} />
+            </div>
+          ) : syncState === 'offline' ? (
+            <div className="w-8 h-8 rounded-xl bg-slate-100 text-slate-500 flex items-center justify-center shadow-2xs">
+              <CloudOff size={15} strokeWidth={2.2} />
+            </div>
           ) : (
-            <Cloud size={15} className="text-sky-700" />
+            <div className="w-8 h-8 rounded-xl bg-sky-50 text-sky-700 flex items-center justify-center group-hover:scale-105 transition-transform shadow-2xs">
+              <Cloud size={15} strokeWidth={2.2} />
+            </div>
           )}
-          <span>{isSyncingDrive ? 'Syncing...' : isDriveConnected ? 'Sync Drive' : 'Drive'}</span>
+
+          <div className="w-full min-w-0">
+            <span className="text-xs font-bold text-slate-900 block truncate leading-tight">
+              {syncState === 'syncing' || isSyncingDrive
+                ? 'Syncing...'
+                : syncState === 'waiting_for_wifi'
+                ? 'Waiting'
+                : syncState === 'offline'
+                ? 'Offline'
+                : isDriveConnected
+                ? 'Sync Drive'
+                : 'Connect'}
+            </span>
+            <span
+              className={`text-[10px] font-medium block truncate mt-0.5 ${
+                syncState === 'waiting_for_wifi'
+                  ? 'text-amber-600 font-semibold'
+                  : syncState === 'syncing'
+                  ? 'text-sky-600 font-semibold'
+                  : isDriveConnected
+                  ? 'text-emerald-600 font-semibold'
+                  : 'text-slate-400'
+              }`}
+            >
+              {syncState === 'waiting_for_wifi'
+                ? 'Wi-Fi Only'
+                : syncState === 'syncing'
+                ? 'Active'
+                : isDriveConnected
+                ? 'Cloud Active'
+                : 'Google Drive'}
+            </span>
+          </div>
         </button>
       </div>
 
-      {/* DIRECT SUBJECT FOLDERS CONTAINER (Tabs "All, favs, Offline, <5m" & Catalog view removed) */}
-      <div className="bg-white border border-slate-200/80 rounded-3xl p-3 sm:p-4 space-y-3 shadow-2xs">
+      {/* 3. Direct Subject Folders Section */}
+      <div className="bg-white border border-slate-200/80 rounded-3xl p-3.5 sm:p-4 space-y-3 shadow-2xs">
         <div className="flex items-center justify-between px-1">
           <div className="flex items-center gap-1.5">
             <span className="text-xs font-bold uppercase tracking-wider text-slate-700">
               Subject Folders
             </span>
-            <span className="text-[11px] font-mono text-slate-400 font-medium">
+            <span className="text-[11px] font-mono text-slate-400 font-semibold">
               {`(${deduplicatedSubjects.length})`}
             </span>
           </div>
+          <button
+            type="button"
+            onClick={() => setIsCreateFolderOpen(true)}
+            className="text-[11px] font-semibold text-slate-600 hover:text-slate-950 flex items-center gap-1 transition-colors cursor-pointer"
+          >
+            <Plus size={13} strokeWidth={2.2} />
+            <span>New Folder</span>
+          </button>
         </div>
 
         {/* Clean Minimalist Subject Cards */}
-        <div className="space-y-2">
+        <div className="space-y-2.5">
           {deduplicatedSubjects.length === 0 ? (
             <div className="py-8 px-4 text-center space-y-3 bg-slate-50/50 border border-dashed border-slate-200 rounded-2xl">
               <div className="size-11 rounded-2xl bg-white border border-slate-200 text-slate-400 mx-auto flex items-center justify-center shadow-2xs">
@@ -2037,7 +2140,7 @@ export const LibraryTab: React.FC<LibraryTabProps> = ({
               <button
                 type="button"
                 onClick={() => setIsCreateFolderOpen(true)}
-                className="px-3 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-[11px] font-semibold inline-flex items-center gap-1.5 shadow-2xs active:scale-95 transition-all cursor-pointer"
+                className="px-3.5 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-[11px] font-semibold inline-flex items-center gap-1.5 shadow-2xs active:scale-95 transition-all cursor-pointer"
               >
                 <FolderPlus size={13} />
                 <span>Create Folder</span>
@@ -2045,66 +2148,157 @@ export const LibraryTab: React.FC<LibraryTabProps> = ({
             </div>
           ) : (
             deduplicatedSubjects.map((subject) => {
-            const subjectAudios = audiosBySubject.get(subject.id) || audiosBySubject.get(subject.name.toLowerCase()) || [];
-            const totalDuration = subjectAudios.reduce((acc, curr) => acc + curr.duration_seconds, 0);
-            const latestAudio = subjectAudios[0];
-            const SubjectIcon = getSubjectIcon(subject.icon_name);
-            const subjectTheme = getSubjectTheme(subject.color_hex);
+              const subjectAudios = audiosBySubject.get(subject.id) || audiosBySubject.get(subject.name.toLowerCase()) || [];
+              const totalDuration = subjectAudios.reduce((acc, curr) => acc + curr.duration_seconds, 0);
+              const latestAudio = subjectAudios[0];
+              const SubjectIcon = getSubjectIcon(subject.icon_name);
+              const subjectTheme = getSubjectTheme(subject.color_hex);
 
-            return (
-              <div
-                key={subject.id}
-                onClick={() => handleOpenSubject(subject.id)}
-                className="group bg-white hover:bg-slate-50/90 border border-slate-200/80 hover:border-slate-300 rounded-2xl p-3 sm:p-3.5 flex items-center justify-between gap-3 transition-all cursor-pointer shadow-2xs hover:shadow-xs active:scale-[0.99]"
-              >
-                {/* Left: Minimalist Subject Icon */}
-                <div className={`w-10 h-10 rounded-2xl ${subjectTheme.bg} flex items-center justify-center shrink-0 shadow-2xs group-hover:scale-105 transition-transform border ${subjectTheme.border}`}>
-                  <SubjectIcon size={20} />
-                </div>
+              return (
+                <div
+                  key={subject.id}
+                  onClick={() => handleOpenSubject(subject.id)}
+                  className="group bg-white hover:bg-slate-50/90 border border-slate-200/80 hover:border-slate-300 rounded-2xl p-3 sm:p-3.5 flex items-center justify-between gap-3 transition-all cursor-pointer shadow-2xs hover:shadow-xs active:scale-[0.99]"
+                >
+                  {/* Left: Minimalist Subject Icon */}
+                  <div className={`w-11 h-11 rounded-2xl ${subjectTheme.bg} flex items-center justify-center shrink-0 shadow-2xs group-hover:scale-105 transition-transform border ${subjectTheme.border}`}>
+                    <SubjectIcon size={20} strokeWidth={2.2} />
+                  </div>
 
-                {/* Middle: Subject Title & Clean Subtitle */}
-                <div className="flex-1 min-w-0">
-                  <h3 className="text-sm font-bold text-slate-950 group-hover:text-blue-600 transition-colors truncate">
-                    {subject.name}
-                  </h3>
-                  <p className="text-xs text-slate-500 mt-0.5 truncate font-normal">
-                    {subjectAudios.length > 0
-                      ? `${subjectAudios.length} ${subjectAudios.length === 1 ? 'lesson' : 'lessons'} · ${formatDuration(totalDuration)}`
-                      : 'No recordings yet'}
-                  </p>
-                  {latestAudio && (
-                    <p className="text-[11px] text-slate-400 truncate mt-0.5">
-                      Recent: <span className="text-slate-600 font-medium">{latestAudio.title}</span>
+                  {/* Middle: Subject Title & Clean Subtitle */}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-1.5">
+                      <h3 className="text-sm font-bold text-slate-950 group-hover:text-blue-600 transition-colors truncate">
+                        {subject.name}
+                      </h3>
+                    </div>
+                    <p className="text-xs text-slate-500 mt-0.5 truncate font-normal">
+                      {subjectAudios.length > 0
+                        ? `${subjectAudios.length} ${subjectAudios.length === 1 ? 'lesson' : 'lessons'} · ${formatDuration(totalDuration)}`
+                        : 'No recordings yet'}
                     </p>
-                  )}
-                </div>
+                    {latestAudio && (
+                      <p className="text-[11px] text-slate-400 truncate mt-0.5">
+                        Recent: <span className="text-slate-600 font-medium">{latestAudio.title}</span>
+                      </p>
+                    )}
+                  </div>
 
-                {/* Right: Actions */}
-                <div className="flex items-center gap-1 shrink-0">
-                  {onDeleteSubject && (
+                  {/* Right: Actions */}
+                  <div className="flex items-center gap-1 shrink-0">
+                    {onDeleteSubject && (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setSubjectToDelete(subject);
+                        }}
+                        className="p-2 text-slate-300 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-all cursor-pointer"
+                        title={`Delete ${subject.name} folder`}
+                        aria-label={`Delete ${subject.name} folder`}
+                      >
+                        <Trash2 size={15} />
+                      </button>
+                    )}
+                    <div className="text-slate-300 group-hover:text-slate-600 transition-colors pr-1">
+                      <ChevronRight size={17} className="group-hover:translate-x-0.5 transition-transform" />
+                    </div>
+                  </div>
+                </div>
+              );
+            })
+          )}
+        </div>
+      </div>
+
+      {/* 4. Recent Audio Notes or Quick Start Guide */}
+      {audioItems.length > 0 ? (
+        <div className="bg-white border border-slate-200/80 rounded-3xl p-3.5 sm:p-4 space-y-3 shadow-2xs">
+          <div className="flex items-center justify-between px-1">
+            <span className="text-xs font-bold uppercase tracking-wider text-slate-700">
+              Recent Audio Notes
+            </span>
+            <span className="text-[11px] font-mono text-slate-400 font-semibold">
+              {audioItems.length} total
+            </span>
+          </div>
+
+          <div className="space-y-2">
+            {audioItems.slice(0, 3).map((audio) => {
+              const isPlaying = playbackState?.currentAudio?.id === audio.id && playbackState.isPlaying;
+              return (
+                <div
+                  key={audio.id}
+                  onClick={() => handleOpenAudioNote(audio)}
+                  className="group bg-slate-50/60 hover:bg-slate-100/80 border border-slate-200/60 hover:border-slate-300/80 rounded-2xl p-3 flex items-center justify-between gap-3 transition-all cursor-pointer shadow-2xs active:scale-[0.99]"
+                >
+                  <div className="flex items-center gap-3 min-w-0 flex-1">
                     <button
                       type="button"
                       onClick={(e) => {
                         e.stopPropagation();
-                        setSubjectToDelete(subject);
+                        onPlayAudio(audio);
                       }}
-                      className="p-1.5 text-slate-300 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-all cursor-pointer"
-                      title={`Delete ${subject.name} folder`}
-                      aria-label={`Delete ${subject.name} folder`}
+                      className={`size-9 rounded-xl flex items-center justify-center shrink-0 shadow-2xs transition-transform active:scale-90 ${
+                        isPlaying ? 'bg-emerald-500 text-white shadow-emerald-500/20' : 'bg-white border border-slate-200 text-slate-800 hover:bg-slate-50'
+                      }`}
+                      aria-label={isPlaying ? `Pause ${audio.title}` : `Play ${audio.title}`}
                     >
-                      <Trash2 size={15} />
+                      {isPlaying ? <Pause size={14} fill="currentColor" /> : <Play size={14} fill="currentColor" className="translate-x-0.5" />}
                     </button>
-                  )}
-                  <div className="text-slate-300 group-hover:text-slate-600 transition-colors">
-                    <ChevronRight size={16} className="group-hover:translate-x-0.5 transition-transform" />
+
+                    <div className="min-w-0 flex-1">
+                      <h4 className="text-xs sm:text-sm font-bold text-slate-900 group-hover:text-blue-600 transition-colors truncate">
+                        {audio.title}
+                      </h4>
+                      <p className="text-[11px] text-slate-500 font-medium truncate mt-0.5 flex items-center gap-1.5">
+                        <span className="font-semibold text-slate-700">{audio.subject_name || 'General'}</span>
+                        <span>•</span>
+                        <span>{formatDuration(audio.duration_seconds)}</span>
+                        {audio.is_favorite && <Star size={11} className="text-amber-500 fill-amber-500" />}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="text-slate-300 group-hover:text-slate-600 transition-colors pr-1">
+                    <ChevronRight size={15} className="group-hover:translate-x-0.5 transition-transform" />
                   </div>
                 </div>
-              </div>
-            );
-          })
-          )}
+              );
+            })}
+          </div>
         </div>
-      </div>
+      ) : (
+        <div className="bg-gradient-to-br from-white via-slate-50/60 to-emerald-50/20 border border-slate-200/80 rounded-3xl p-5 text-center space-y-3.5 shadow-2xs">
+          <div className="size-11 rounded-2xl bg-emerald-50 border border-emerald-200/60 text-emerald-700 mx-auto flex items-center justify-center shadow-2xs">
+            <Mic size={22} strokeWidth={2.2} />
+          </div>
+          <div className="space-y-1">
+            <h3 className="text-sm font-bold text-slate-900">Start Your Audio Study Vault</h3>
+            <p className="text-xs text-slate-500 max-w-xs mx-auto leading-relaxed">
+              Capture your first lesson, voice reflection, or upload lecture audio to activate spaced retention repeats.
+            </p>
+          </div>
+          <div className="flex items-center justify-center gap-2.5 pt-0.5">
+            <button
+              type="button"
+              onClick={onGoToRecord}
+              className="px-4 py-2 rounded-xl bg-slate-950 hover:bg-slate-800 text-white text-xs font-semibold inline-flex items-center gap-1.5 shadow-2xs active:scale-95 transition-all cursor-pointer"
+            >
+              <Mic size={14} />
+              <span>Record Note</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => handleTriggerUpload()}
+              className="px-4 py-2 rounded-xl bg-white hover:bg-slate-100 border border-slate-200/80 text-slate-800 text-xs font-semibold inline-flex items-center gap-1.5 shadow-2xs active:scale-95 transition-all cursor-pointer"
+            >
+              <Upload size={14} />
+              <span>Upload Audio</span>
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* If Searching: Direct Audio Search Results */}
       {searchQuery.trim() && (
