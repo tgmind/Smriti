@@ -26,6 +26,7 @@ interface ISmritiBridgeNative {
   getNetworkTransportType?(): string;
   exitApp?(): void;
   shareText?(title: string, text: string): void;
+  recordVerifiedFullPlay?(audioId: string, durationSeconds: number, speed: number): void;
 }
 
 declare global {
@@ -650,6 +651,16 @@ class BridgeManager {
       await audioStorage.deleteAudioBlob(audioId);
     } catch (e) {
       console.warn('Failed removing offline blob', e);
+    }
+  }
+
+  public recordVerifiedFullPlay(audioId: string, durationSeconds: number, speed: number = 1.0) {
+    if (this.isNativeApp() && window.SmritiBridge?.recordVerifiedFullPlay) {
+      try {
+        window.SmritiBridge.recordVerifiedFullPlay(audioId, durationSeconds, speed);
+      } catch (e) {
+        console.warn('[Bridge] Native recordVerifiedFullPlay error', e);
+      }
     }
   }
 

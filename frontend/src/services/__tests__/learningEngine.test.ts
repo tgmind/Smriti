@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { calculateNextReview, evaluateCompletedPlay, formatDuration } from '../learningEngine';
+import { calculateNextReview, evaluateCompletedPlay, formatDuration, VerifiedPlayTracker } from '../learningEngine';
 
 describe('Learning & Memory Reinforcement Engine', () => {
   describe('Spaced Repetition Algorithm (SuperMemo SM-2 adaptation)', () => {
@@ -95,6 +95,110 @@ describe('Learning & Memory Reinforcement Engine', () => {
       expect(formatDuration(-15)).toBe('0:00');
       expect(formatDuration(undefined as any)).toBe('0:00');
       expect(formatDuration(null as any)).toBe('0:00');
+    });
+  });
+
+  describe('VerifiedPlayTracker Anti-Cheat Play Counting Engine', () => {
+    it('awards completion (+1) on genuine full continuous listen (>=95% covered)', () => {
+      const tracker = new VerifiedPlayTracker(0.5);
+      const audioId = 'track-1';
+      const duration = 20; // 20 seconds
+
+      // Simulate natural forward ticks every 0.5s from 0 to 20
+      for (let t = 0; t <= duration; t += 0.5) {
+        tracker.trackProgress(audioId, t, duration, true);
+      }
+
+      expect(tracker.getCoveragePercentage()).toBeGreaterThanOrEqual(95);
+
+      // Reaches end
+      const completed = tracker.recordCompletion(audioId, 20, duration, true);
+      expect(completed).toBe(true);
+
+      // Subsequent duplicate trigger returns false (no double-counting)
+      const duplicateTrigger = tracker.recordCompletion(audioId, 20, duration, true);
+      expect(duplicateTrigger).toBe(false);
+    });
+
+    it('rejects playCount when user scrubs/skips forward (e.g. 0:02 to 0:19 on 20s track)', () => {
+      const tracker = new VerifiedPlayTracker(0.5);
+      const audioId = 'track-2';
+      const duration = 20;
+
+      // Listen 0..2s
+      tracker.trackProgress(audioId, 0, duration, true);
+      tracker.trackProgress(audioId, 0.5, duration, true);
+      tracker.trackProgress(audioId, 1.0, duration, true);
+      tracker.trackProgress(audioId, 1.5, duration, true);
+      tracker.trackProgress(audioId, 2.0, duration, true);
+
+      // User skips forward to 19s (scrub)
+      tracker.handleSeek(19.0);
+      tracker.trackProgress(audioId, 19.0, duration, true);
+      tracker.trackProgress(audioId, 19.5, duration, true);
+      tracker.trackProgress(audioId, 20.0, duration, true);
+
+      // Total verified time is only ~3 seconds (15% coverage)
+      expect(tracker.getCoveragePercentage()).toBeLessThan(30);
+
+      // Reaches end
+      const completed = tracker.recordCompletion(audioId, 20, duration, true);
+      expect(completed).toBe(false);
+    });
+
+    it('rejects playCount when stopped early at 80% duration', () => {
+      const tracker = new VerifiedPlayTracker(0.5);
+      const audioId = 'track-3';
+      const duration = 20;
+
+      // Listen up to 16s (80%)
+      for (let t = 0; t <= 16; t += 0.5) {
+        tracker.trackProgress(audioId, t, duration, true);
+      }
+
+      // Stopped at 16s (not end of track)
+      const completed = tracker.recordCompletion(audioId, 16, duration, false);
+      expect(completed).toBe(false);
+    });
+
+    it('rejects playCount when looping a subsegment via A-B loop repeatedly', () => {
+      const tracker = new VerifiedPlayTracker(0.5);
+      const audioId = 'track-4';
+      const duration = 100; // 100 second track
+
+      // Loop subsegment [10s..20s] 10 times!
+      for (let loop = 0; loop < 10; loop++) {
+        tracker.handleSeek(10);
+        for (let t = 10; t <= 20; t += 0.5) {
+          tracker.trackProgress(audioId, t, duration, true, true);
+        }
+      }
+
+      // Unique coverage is only 10 seconds of 100s = 10%
+      expect(tracker.getCoveragePercentage()).toBeLessThan(15);
+      const completed = tracker.recordCompletion(audioId, 20, duration, false);
+      expect(completed).toBe(false);
+    });
+
+    it('allows legitimate replay to earn second completion (+1) after resetForNewPass', () => {
+      const tracker = new VerifiedPlayTracker(0.5);
+      const audioId = 'track-5';
+      const duration = 10;
+
+      // Pass 1: Listen 0..10
+      for (let t = 0; t <= duration; t += 0.5) {
+        tracker.trackProgress(audioId, t, duration, true);
+      }
+      expect(tracker.recordCompletion(audioId, 10, duration, true)).toBe(true);
+
+      // Track loops/restarts from start
+      tracker.resetForNewPass();
+
+      // Pass 2: Listen 0..10 again
+      for (let t = 0; t <= duration; t += 0.5) {
+        tracker.trackProgress(audioId, t, duration, true);
+      }
+      expect(tracker.recordCompletion(audioId, 10, duration, true)).toBe(true);
     });
   });
 });

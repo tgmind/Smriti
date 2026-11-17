@@ -22,12 +22,18 @@ interface AudioDao {
 
     @Query("SELECT SUM(fileSizeBytes) FROM cached_audio_items")
     suspend fun getTotalStorageBytes(): Long?
+
+    @Query("UPDATE cached_audio_items SET playCount = playCount + :increment, lastPlayedAt = :playedAt WHERE id = :audioId")
+    suspend fun incrementPlayCount(audioId: String, increment: Int = 1, playedAt: Long = System.currentTimeMillis())
 }
 
 @Dao
 interface PlaybackEventDao {
     @Query("SELECT * FROM pending_playback_events ORDER BY clientRecordedAt ASC")
     suspend fun getPendingEvents(): List<PendingPlaybackEventEntity>
+
+    @Query("SELECT * FROM pending_playback_events WHERE verifiedFullPlay = 1 ORDER BY clientRecordedAt ASC")
+    suspend fun getPendingVerifiedFullPlays(): List<PendingPlaybackEventEntity>
 
     @Insert(onConflict = OnConflictStrategy.IGNORE)
     suspend fun insertEvent(event: PendingPlaybackEventEntity)

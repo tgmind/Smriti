@@ -20,6 +20,7 @@ import androidx.media3.common.MediaItem
 import androidx.media3.common.PlaybackParameters
 import androidx.media3.common.Player
 import com.smriti.app.data.CachedAudioEntity
+import com.smriti.app.data.PendingPlaybackEventEntity
 import com.smriti.app.data.SmritiDatabase
 import com.smriti.app.media.SmritiMediaPlaybackService
 import com.smriti.app.recorder.AudioRecorderHelper
@@ -415,9 +416,37 @@ class SmritiWebBridge(
                     googleDriveFileId = if (json.has("google_drive_file_id")) json.getString("google_drive_file_id") else null,
                     fileSizeBytes = json.optLong("file_size_bytes", 0L),
                     isFavorite = json.optBoolean("is_favorite", false),
-                    lastListenedAt = System.currentTimeMillis()
+                    lastListenedAt = System.currentTimeMillis(),
+                    playCount = json.optInt("play_count", 0),
+                    lastPlayedAt = if (json.has("last_played_at")) System.currentTimeMillis() else null
                 )
                 db.audioDao().insertOrUpdateAudio(entity)
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }
+    }
+
+    @JavascriptInterface
+    fun recordVerifiedFullPlay(audioId: String, durationSeconds: Double, speed: Float) {
+        scope.launch {
+            try {
+                val now = System.currentTimeMillis()
+                val event = PendingPlaybackEventEntity(
+                    id = java.util.UUID.randomUUID().toString(),
+                    audioId = audioId,
+                    startTimestamp = now - (durationSeconds * 1000).toLong(),
+                    endTimestamp = now,
+                    actualDurationSeconds = durationSeconds,
+                    completionPercentage = 100.0,
+                    isCompletedPlay = true,
+                    playbackSpeed = speed,
+                    clientRecordedAt = now,
+                    retryCount = 0,
+                    verifiedFullPlay = true
+                )
+                db.playbackEventDao().insertEvent(event)
+                db.audioDao().incrementPlayCount(audioId, 1, now)
             } catch (e: Exception) {
                 e.printStackTrace()
             }

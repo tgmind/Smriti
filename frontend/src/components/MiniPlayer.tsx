@@ -5,6 +5,7 @@ import {
 } from 'lucide-react';
 import { AudioItem, PlaybackState } from '../types';
 import { formatDuration } from '../services/learningEngine';
+import { getPlayCountTheme, formatPlayCountBadge } from '../utils/playCountColor';
 
 export interface MiniPlayerProps {
   playbackState: PlaybackState;
@@ -140,6 +141,18 @@ export const MiniPlayer: React.FC<MiniPlayerProps> = ({
               <span className="font-mono text-slate-500 text-[10.5px] tracking-tight shrink-0">
                 {formatDuration(currentDisplayPos)} / {formatDuration(safeDuration)}
               </span>
+              <span className="text-slate-300 font-bold">•</span>
+              {(() => {
+                const playTheme = getPlayCountTheme(currentAudio.play_count);
+                return (
+                  <span
+                    className={`inline-flex items-center px-1.5 py-0.2 rounded text-[9.5px] font-bold border font-mono shrink-0 ${playTheme.badgeClass}`}
+                    title={`Play count: ${currentAudio.play_count || 0} (${playTheme.label})`}
+                  >
+                    {formatPlayCountBadge(currentAudio.play_count)}
+                  </span>
+                );
+              })()}
             </div>
           </div>
 

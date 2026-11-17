@@ -56,8 +56,8 @@ describe('FullScreenPlayer Dark Aesthetic & Tactile Haptic Architecture', () => 
       />
     );
 
-    // 1. Dark aesthetic background
-    expect(html).toContain('bg-black');
+    // 1. Aesthetic background
+    expect(html).toContain('bg-[#f8fafc]');
 
     // 2. Audio Title & Subtitle
     expect(html).toContain('Teri ummeed');

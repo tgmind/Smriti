@@ -22,6 +22,7 @@ import {
 } from 'lucide-react';
 import { AudioItem, PlaybackState, Subject } from '../types';
 import { formatDuration } from '../services/learningEngine';
+import { getPlayCountTheme, formatPlayCountBadge } from '../utils/playCountColor';
 import { Slider } from './ui/slider';
 import { Badge } from './ui/badge';
 import { LoopIntervalSelector } from './LoopIntervalSelector';
@@ -132,6 +133,9 @@ export const FullScreenPlayer: React.FC<FullScreenPlayerProps> = ({
 
   const matchedSubject = subjects.find((s) => s.id === currentAudio.subject_id);
   const displaySubjectName = currentAudio.subject_name || matchedSubject?.name || 'Academic Concept';
+
+  const currentPlayCount = currentAudio.play_count || 0;
+  const currentPlayTheme = getPlayCountTheme(currentPlayCount);
 
   const loopRange = abLoop?.enabled
     ? {
@@ -339,35 +343,56 @@ export const FullScreenPlayer: React.FC<FullScreenPlayerProps> = ({
       {/* 2. Main Stage: Refined Vinyl & Wave Visualizer vs Upgraded Glass Queue */}
       {viewMode === 'player' ? (
         <section className="flex-1 min-h-0 flex flex-col justify-between px-5 w-full max-w-md mx-auto z-10 pb-2 pt-2 overflow-hidden">
-          {/* Vinyl Disc & Organic Ambient Centerpiece */}
-          <div className="flex-1 flex flex-col items-center justify-center relative my-auto w-full">
+          {/* Central Mastery Play-Count Ring Visualizer */}
+          <div className="flex-1 flex flex-col items-center justify-center relative my-auto w-full py-3">
             {/* Ambient Animated Soundwave Layers */}
-            <div className="absolute inset-0 flex items-center justify-center pointer-events-none opacity-40 animate-disc-pulse">
+            <div className="absolute inset-0 flex items-center justify-center pointer-events-none opacity-35 animate-disc-pulse">
               <OrganicSoundwave isPlaying={isPlaying} />
             </div>
 
-            {/* Premium Vinyl Disc Visualizer */}
-            <div className="relative size-56 sm:size-64 rounded-full p-2.5 bg-black/90 shadow-[0_20px_50px_-10px_rgba(15,23,42,0.25)] border-4 border-slate-900/80 flex items-center justify-center transition-transform">
-              {/* Concentric Grooves */}
-              <div
-                className={cn(
-                  'size-full rounded-full vinyl-grooves p-3 flex items-center justify-center relative shadow-inner',
-                  isPlaying ? 'animate-vinyl-spin' : 'animate-vinyl-spin-paused'
-                )}
-              >
-                {/* Vinyl Light Reflection Highlights */}
-                <div className="absolute inset-0 rounded-full bg-gradient-to-tr from-white/10 via-transparent to-white/20 pointer-events-none" />
+            {/* Mastery Play-Count Circular Hub */}
+            <div className="relative size-60 sm:size-68 rounded-full bg-white border border-slate-200/90 shadow-[0_20px_50px_-12px_rgba(15,23,42,0.12)] flex items-center justify-center p-3 select-none transition-transform duration-300">
+              {/* Subtle inner concentric guide */}
+              <div className="absolute inset-2.5 rounded-full border border-slate-100 pointer-events-none" />
 
-                {/* Center Label / Subject Art */}
-                <div
-                  className="size-20 sm:size-22 rounded-full border-2 border-slate-300 shadow-md flex flex-col items-center justify-center text-center p-2 z-10 relative overflow-hidden"
-                  style={{
-                    backgroundColor: matchedSubject?.color_hex ? `${matchedSubject.color_hex}25` : '#e0f2fe'
-                  }}
-                >
-                  <div className="size-3 rounded-full bg-black border-2 border-slate-200 absolute shadow-inner" />
-                  <span className="text-[10px] font-bold text-slate-800 uppercase tracking-wider truncate w-full mt-4 font-mono">
-                    {displaySubjectName}
+              {/* High-Precision Circular Progress SVG Ring */}
+              <svg className="absolute inset-0 size-full -rotate-90 pointer-events-none" viewBox="0 0 200 200">
+                {/* Background Ring Track */}
+                <circle
+                  cx="100"
+                  cy="100"
+                  r="86"
+                  stroke="#F1F5F9"
+                  strokeWidth="8"
+                  fill="transparent"
+                />
+                {/* Active Colored Progress Arc */}
+                <circle
+                  cx="100"
+                  cy="100"
+                  r="86"
+                  stroke={currentPlayTheme.hex}
+                  strokeWidth="8"
+                  strokeDasharray={2 * Math.PI * 86}
+                  strokeDashoffset={2 * Math.PI * 86 * (1 - Math.min(100, Math.max(0, currentPlayTheme.progressPercent)) / 100)}
+                  strokeLinecap="round"
+                  fill="transparent"
+                  className="transition-all duration-700 ease-out"
+                />
+              </svg>
+
+              {/* Inner Center Hub with Big Tabular Count & Tier Label */}
+              <div className="flex flex-col items-center justify-center text-center z-10 px-4">
+                <span className={cn('text-5xl sm:text-6xl font-black tabular-nums tracking-tight leading-none', currentPlayTheme.textColor)}>
+                  {currentPlayCount}
+                </span>
+                <span className="text-[10px] sm:text-[11px] font-bold uppercase tracking-[0.22em] text-slate-400 mt-2 font-mono">
+                  PLAY COUNT
+                </span>
+                <div className="mt-2.5">
+                  <span className={cn('inline-flex items-center gap-1.5 px-3 py-0.5 rounded-full text-[11px] sm:text-xs font-bold border shadow-2xs whitespace-nowrap', currentPlayTheme.badgeClass)}>
+                    <span className="size-1.5 rounded-full shrink-0" style={{ backgroundColor: currentPlayTheme.hex }} />
+                    {currentPlayTheme.label}
                   </span>
                 </div>
               </div>
@@ -582,6 +607,10 @@ export const FullScreenPlayer: React.FC<FullScreenPlayerProps> = ({
                     <span className="truncate">{displaySubjectName}</span>
                     <span>•</span>
                     <span>{formatDuration(safePosition)} / {formatDuration(safeDuration)}</span>
+                    <span>•</span>
+                    <span className={cn('shrink-0 font-bold px-1.5 py-0.2 rounded-md border text-[9.5px]', currentPlayTheme.badgeClass)}>
+                      {formatPlayCountBadge(currentPlayCount)}
+                    </span>
                   </div>
                 </div>
               </div>
@@ -649,6 +678,15 @@ export const FullScreenPlayer: React.FC<FullScreenPlayerProps> = ({
                         <span className="truncate">{item.subject_name || 'Academic'}</span>
                         <span>•</span>
                         <span>{formatDuration(item.duration_seconds || 60)}</span>
+                        <span>•</span>
+                        {(() => {
+                          const itemPlayTheme = getPlayCountTheme(item.play_count);
+                          return (
+                            <span className={cn('shrink-0 font-bold px-1.5 py-0.2 rounded-md border text-[9.5px]', itemPlayTheme.badgeClass)}>
+                              {formatPlayCountBadge(item.play_count)}
+                            </span>
+                          );
+                        })()}
                       </div>
                     </div>
 

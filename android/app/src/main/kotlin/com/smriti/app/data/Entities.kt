@@ -14,7 +14,9 @@ data class CachedAudioEntity(
     val fileSizeBytes: Long,
     val isFavorite: Boolean = false,
     val lastListenedAt: Long? = null,
-    val addedAt: Long = System.currentTimeMillis()
+    val addedAt: Long = System.currentTimeMillis(),
+    val playCount: Int = 0,
+    val lastPlayedAt: Long? = null
 )
 
 @Entity(tableName = "pending_playback_events")
@@ -28,7 +30,8 @@ data class PendingPlaybackEventEntity(
     val isCompletedPlay: Boolean,
     val playbackSpeed: Float,
     val clientRecordedAt: Long = System.currentTimeMillis(),
-    val retryCount: Int = 0
+    val retryCount: Int = 0,
+    val verifiedFullPlay: Boolean = false
 )
 
 @Entity(tableName = "offline_revisions")

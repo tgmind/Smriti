@@ -1,196 +1,358 @@
-import React from 'react';
-import { Headphones, CheckCircle2, Calendar, TrendingUp } from 'lucide-react';
-import { DailyStudyStats, RevisionItem } from '../types';
+import React, { useState, useMemo } from 'react';
+import { Play, BookOpen } from 'lucide-react';
+import { AudioItem, DailyStudyStats, RevisionItem } from '../types';
+import { getPlayCountTheme, formatPlayCountBadge } from '../utils/playCountColor';
 import { formatDuration } from '../services/learningEngine';
 
-interface ProgressTabProps {
-  dailyStats: DailyStudyStats[];
+export interface ProgressTabProps {
+  audioItems?: AudioItem[];
+  dailyStats?: DailyStudyStats[];
   revisionItems?: RevisionItem[];
+  onPlayAudio?: (audio: AudioItem) => void;
 }
 
+export type MasteryFilter = 'most_played' | 'yet_to_learn' | 'in_memory' | 'learned';
+
 export const ProgressTab: React.FC<ProgressTabProps> = ({
-  dailyStats
+  audioItems = [],
+  onPlayAudio
 }) => {
-  // Exposure Metrics
-  const totalLifetimeSeconds = dailyStats.reduce((acc, curr) => acc + curr.total_listening_seconds, 0);
-  const totalCompletedPlays = dailyStats.reduce((acc, curr) => acc + curr.completed_plays, 0);
-  const totalHours = (totalLifetimeSeconds / 3600).toFixed(1);
-  const activeDays = dailyStats.filter(s => s.total_listening_seconds > 0).length;
-  const avgMinutesPerActiveDay = activeDays > 0 ? Math.round((totalLifetimeSeconds / activeDays) / 60) : 0;
+  const [activeFilter, setActiveFilter] = useState<MasteryFilter>('most_played');
+
+  // Compute 4-Tier mastery counts across all student audio notes
+  const masteryCounts = useMemo(() => {
+    let tier1 = 0; // < 20 (Not Still Learned)
+    let tier2 = 0; // 20..49 (Building Memory)
+    let tier3 = 0; // 50..70 (In Memory)
+    let tier4 = 0; // > 70 (Learned by Heart)
+
+    for (const item of audioItems) {
+      const count = item.play_count || 0;
+      if (count < 20) tier1++;
+      else if (count < 50) tier2++;
+      else if (count <= 70) tier3++;
+      else tier4++;
+    }
+
+    return {
+      tier1, // < 20 (Red)
+      tier2, // 20..49 (Orange)
+      tier3, // 50..70 (Yellow)
+      tier4, // > 70 (Dark Green)
+      total: audioItems.length
+    };
+  }, [audioItems]);
+
+  // Filter and sort tracks according to the active tab
+  const displayedTracks = useMemo(() => {
+    const list = [...audioItems];
+
+    switch (activeFilter) {
+      case 'yet_to_learn':
+        // playCount < 50, sorted lowest-first so weak tracks surface immediately
+        return list
+          .filter((a) => (a.play_count || 0) < 50)
+          .sort((a, b) => (a.play_count || 0) - (b.play_count || 0));
+
+      case 'in_memory':
+        // 50 <= playCount <= 70, close to mastery
+        return list
+          .filter((a) => {
+            const c = a.play_count || 0;
+            return c >= 50 && c <= 70;
+          })
+          .sort((a, b) => (b.play_count || 0) - (a.play_count || 0));
+
+      case 'learned':
+        // playCount > 70, learned by heart
+        return list
+          .filter((a) => (a.play_count || 0) > 70)
+          .sort((a, b) => (b.play_count || 0) - (a.play_count || 0));
+
+      case 'most_played':
+      default:
+        // All tracks sorted descending by play count
+        return list.sort((a, b) => (b.play_count || 0) - (a.play_count || 0));
+    }
+  }, [audioItems, activeFilter]);
 
   return (
     <div className="space-y-4 pb-36 pt-3 px-4 max-w-md mx-auto animate-in">
-      {/* Header */}
+      {/* 1. Header */}
       <div className="pt-1">
         <h1 className="text-2xl font-bold text-slate-900 tracking-tight">
           Study Progress
         </h1>
         <p className="text-xs text-slate-500 mt-0.5">
-          Objective listening exposure & daily audio consistency.
+          Verified play count analytics &amp; memorization mastery.
         </p>
       </div>
 
-      {/* Overview Metrics Cards */}
-      <div className="grid grid-cols-3 gap-2">
-        {/* Exposure (Indigo) */}
-        <div className="bg-white border border-slate-200/90 p-3 rounded-2xl text-center space-y-1 shadow-2xs hover:shadow-xs transition-all">
-          <div className="w-8 h-8 rounded-xl bg-indigo-50 border border-indigo-200/60 text-indigo-700 flex items-center justify-center mx-auto shadow-2xs">
-            <Headphones size={15} />
+      {/* 2. Mastery Breakdown Summary Strip (4-Tier Overview) */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+        {/* Tier 4: Learned by Heart (> 70) - Dark Green */}
+        <div
+          onClick={() => setActiveFilter('learned')}
+          className={`p-3 rounded-2xl border transition-all cursor-pointer shadow-2xs ${
+            activeFilter === 'learned'
+              ? 'bg-green-100/90 border-green-400 ring-2 ring-green-600/30'
+              : 'bg-green-50/70 border-green-200/90 hover:bg-green-100/60'
+          }`}
+          role="button"
+          tabIndex={0}
+          aria-label="Filter Learned by Heart tracks"
+        >
+          <div className="flex items-center justify-between">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-green-800">
+              Learned
+            </span>
+            <span className="size-2 rounded-full bg-green-700" />
           </div>
-          <span className="text-lg font-bold font-mono text-slate-900 block">
-            {totalHours}h
-          </span>
-          <span className="text-[10px] uppercase font-bold text-slate-500 block font-mono">
-            Exposure
+          <div className="mt-1 flex items-baseline gap-1">
+            <span className="text-2xl font-extrabold text-green-950 tabular-nums">
+              {masteryCounts.tier4}
+            </span>
+            <span className="text-[11px] font-medium text-green-700">tracks</span>
+          </div>
+          <span className="text-[10px] font-semibold text-green-800 block mt-0.5">
+            &gt; 70 Plays
           </span>
         </div>
 
-        {/* Completed (Emerald) */}
-        <div className="bg-white border border-slate-200/90 p-3 rounded-2xl text-center space-y-1 shadow-2xs hover:shadow-xs transition-all">
-          <div className="w-8 h-8 rounded-xl bg-emerald-50 border border-emerald-200/60 text-emerald-700 flex items-center justify-center mx-auto shadow-2xs">
-            <CheckCircle2 size={15} />
+        {/* Tier 3: In Memory (50..70) - Yellow */}
+        <div
+          onClick={() => setActiveFilter('in_memory')}
+          className={`p-3 rounded-2xl border transition-all cursor-pointer shadow-2xs ${
+            activeFilter === 'in_memory'
+              ? 'bg-yellow-100/90 border-yellow-400 ring-2 ring-yellow-500/30'
+              : 'bg-yellow-50/70 border-yellow-200/90 hover:bg-yellow-100/60'
+          }`}
+          role="button"
+          tabIndex={0}
+          aria-label="Filter In Memory tracks"
+        >
+          <div className="flex items-center justify-between">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-yellow-800">
+              In Memory
+            </span>
+            <span className="size-2 rounded-full bg-yellow-500" />
           </div>
-          <span className="text-lg font-bold font-mono text-slate-900 block">
-            {totalCompletedPlays}
-          </span>
-          <span className="text-[10px] uppercase font-bold text-slate-500 block font-mono">
-            Completed
+          <div className="mt-1 flex items-baseline gap-1">
+            <span className="text-2xl font-extrabold text-yellow-950 tabular-nums">
+              {masteryCounts.tier3}
+            </span>
+            <span className="text-[11px] font-medium text-yellow-700">tracks</span>
+          </div>
+          <span className="text-[10px] font-semibold text-yellow-800 block mt-0.5">
+            50–70 Plays
           </span>
         </div>
 
-        {/* Active Days (Amber) */}
-        <div className="bg-white border border-slate-200/90 p-3 rounded-2xl text-center space-y-1 shadow-2xs hover:shadow-xs transition-all">
-          <div className="w-8 h-8 rounded-xl bg-amber-50 border border-amber-200/60 text-amber-700 flex items-center justify-center mx-auto shadow-2xs">
-            <Calendar size={15} />
+        {/* Tier 2: Building Memory (20..49) - Orange */}
+        <div
+          onClick={() => setActiveFilter('yet_to_learn')}
+          className={`p-3 rounded-2xl border transition-all cursor-pointer shadow-2xs ${
+            activeFilter === 'yet_to_learn'
+              ? 'bg-orange-100/90 border-orange-400 ring-2 ring-orange-500/30'
+              : 'bg-orange-50/70 border-orange-200/90 hover:bg-orange-100/60'
+          }`}
+          role="button"
+          tabIndex={0}
+          aria-label="Filter Building Memory tracks"
+        >
+          <div className="flex items-center justify-between">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-orange-800">
+              Building
+            </span>
+            <span className="size-2 rounded-full bg-orange-500" />
           </div>
-          <span className="text-lg font-bold font-mono text-slate-900 block">
-            {activeDays}d
+          <div className="mt-1 flex items-baseline gap-1">
+            <span className="text-2xl font-extrabold text-orange-950 tabular-nums">
+              {masteryCounts.tier2}
+            </span>
+            <span className="text-[11px] font-medium text-orange-700">tracks</span>
+          </div>
+          <span className="text-[10px] font-semibold text-orange-800 block mt-0.5">
+            20–49 Plays
           </span>
-          <span className="text-[10px] uppercase font-bold text-slate-500 block font-mono">
-            Active Days
+        </div>
+
+        {/* Tier 1: Yet to Learn (< 20) - Red */}
+        <div
+          onClick={() => setActiveFilter('yet_to_learn')}
+          className={`p-3 rounded-2xl border transition-all cursor-pointer shadow-2xs ${
+            activeFilter === 'yet_to_learn'
+              ? 'bg-red-100/90 border-red-400 ring-2 ring-red-500/30'
+              : 'bg-red-50/70 border-red-200/90 hover:bg-red-100/60'
+          }`}
+          role="button"
+          tabIndex={0}
+          aria-label="Filter Yet to Learn tracks"
+        >
+          <div className="flex items-center justify-between">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-red-800">
+              Yet to Learn
+            </span>
+            <span className="size-2 rounded-full bg-red-500" />
+          </div>
+          <div className="mt-1 flex items-baseline gap-1">
+            <span className="text-2xl font-extrabold text-red-950 tabular-nums">
+              {masteryCounts.tier1}
+            </span>
+            <span className="text-[11px] font-medium text-red-700">tracks</span>
+          </div>
+          <span className="text-[10px] font-semibold text-red-800 block mt-0.5">
+            &lt; 20 Plays
           </span>
         </div>
       </div>
 
-      {/* EXPOSURE ANALYTICS & VISUAL CHART */}
-      <div className="bg-white border border-slate-200/80 rounded-3xl p-4.5 shadow-2xs space-y-3.5">
-        <div className="flex items-center justify-between border-b border-slate-100 pb-2.5">
-          <div className="flex items-center gap-1.5">
-            <TrendingUp size={16} className="text-blue-600" />
-            <h2 className="text-xs font-bold text-slate-900 uppercase tracking-wider">
-              Study Exposure Trend
-            </h2>
-          </div>
-          <span className="text-[11px] font-mono text-slate-400">
-            Avg ~{avgMinutesPerActiveDay}m/day
-          </span>
-        </div>
-
-        {/* Exposure Trend Visual */}
-        <div className="pt-1">
-          {dailyStats.length === 0 ? (
-            <div className="h-24 flex items-center justify-center text-xs text-slate-400 italic border-b border-slate-100 pb-2">
-              No study exposure recorded yet. Listen to lessons to view your daily trend.
-            </div>
-          ) : (
-            <div className="flex items-end justify-between gap-2 h-24 pt-2 border-b border-slate-100 pb-2">
-              {dailyStats.map((stat, idx) => {
-                const maxSecs = Math.max(...dailyStats.map(s => s.total_listening_seconds), 3600);
-                const heightPct = Math.max(14, (stat.total_listening_seconds / maxSecs) * 100);
-                const dayLabel = stat.study_date.split('-').slice(1).join('/');
-
-                return (
-                  <div key={idx} className="flex-1 flex flex-col items-center gap-1.5 h-full justify-end">
-                    <div
-                      className="w-full max-w-[28px] rounded-xl bg-blue-600 hover:bg-blue-500 transition-all shadow-2xs cursor-default"
-                      style={{ height: `${heightPct}%` }}
-                      title={`${stat.study_date}: ${Math.round(stat.total_listening_seconds / 60)} minutes (${stat.completed_plays} plays)`}
-                    />
-                    <span className="text-[9px] font-mono font-medium text-slate-500">
-                      {dayLabel}
-                    </span>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </div>
-
-        <div className="grid grid-cols-2 gap-2.5 pt-1">
-          <div className="bg-slate-50 border border-slate-100 p-3 rounded-2xl">
-            <span className="text-[10px] font-mono uppercase text-slate-500 font-semibold block">
-              Total Duration
-            </span>
-            <span className="text-lg font-black font-mono text-slate-950 mt-0.5 block">
-              {formatDuration(totalLifetimeSeconds)}
-            </span>
-            <span className="text-[10px] text-slate-400 mt-0.5 block">
-              Accumulated audio study
-            </span>
-          </div>
-
-          <div className="bg-slate-50 border border-slate-100 p-3 rounded-2xl">
-            <span className="text-[10px] font-mono uppercase text-slate-500 font-semibold block">
-              Full Completions
-            </span>
-            <span className="text-lg font-black font-mono text-slate-950 mt-0.5 block">
-              {totalCompletedPlays} <span className="text-xs font-normal text-slate-500">lectures</span>
-            </span>
-            <span className="text-[10px] text-emerald-700 mt-0.5 block flex items-center gap-0.5 font-medium">
-              <CheckCircle2 size={11} /> ≥75% listened
-            </span>
-          </div>
-        </div>
+      {/* 3. Interactive Filter Tabs */}
+      <div className="flex items-center gap-1.5 p-1 bg-slate-100/90 border border-slate-200/80 rounded-2xl overflow-x-auto no-scrollbar">
+        <button
+          type="button"
+          onClick={() => setActiveFilter('most_played')}
+          className={`flex-1 min-w-[85px] py-1.5 px-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer text-center ${
+            activeFilter === 'most_played'
+              ? 'bg-white text-slate-900 shadow-2xs'
+              : 'text-slate-500 hover:text-slate-900'
+          }`}
+        >
+          Most Played
+        </button>
+        <button
+          type="button"
+          onClick={() => setActiveFilter('yet_to_learn')}
+          className={`flex-1 min-w-[85px] py-1.5 px-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer text-center ${
+            activeFilter === 'yet_to_learn'
+              ? 'bg-white text-slate-900 shadow-2xs'
+              : 'text-slate-500 hover:text-slate-900'
+          }`}
+        >
+          Yet to Learn
+        </button>
+        <button
+          type="button"
+          onClick={() => setActiveFilter('in_memory')}
+          className={`flex-1 min-w-[85px] py-1.5 px-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer text-center ${
+            activeFilter === 'in_memory'
+              ? 'bg-white text-slate-900 shadow-2xs'
+              : 'text-slate-500 hover:text-slate-900'
+          }`}
+        >
+          In Memory
+        </button>
+        <button
+          type="button"
+          onClick={() => setActiveFilter('learned')}
+          className={`flex-1 min-w-[85px] py-1.5 px-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer text-center ${
+            activeFilter === 'learned'
+              ? 'bg-white text-slate-900 shadow-2xs'
+              : 'text-slate-500 hover:text-slate-900'
+          }`}
+        >
+          Learned
+        </button>
       </div>
 
-      {/* DAILY STUDY ACTIVITY LOG */}
-      <div className="bg-white border border-slate-200/80 rounded-3xl p-4.5 shadow-2xs space-y-3">
-        <div className="flex items-center justify-between border-b border-slate-100 pb-2.5">
-          <div className="flex items-center gap-1.5">
-            <Calendar size={16} className="text-slate-600" />
-            <h2 className="text-xs font-bold text-slate-900 uppercase tracking-wider">
-              Recent Activity Log
-            </h2>
-          </div>
-          <span className="text-[11px] font-mono text-slate-400">
-            {dailyStats.length} records
-          </span>
-        </div>
-
-        <div className="space-y-1.5">
-          {dailyStats.length === 0 ? (
-            <div className="p-4 text-center text-xs text-slate-400 italic">
-              No study activity logged yet.
+      {/* 4. Minimalist Track Analytics Rows (With Direct Practice Tap) */}
+      <div className="space-y-2.5">
+        {displayedTracks.length === 0 ? (
+          <div className="bg-white border border-dashed border-slate-200 rounded-3xl p-8 text-center space-y-2 shadow-2xs">
+            <div className="size-10 rounded-2xl bg-slate-100 text-slate-400 mx-auto flex items-center justify-center shadow-2xs">
+              <BookOpen size={18} />
             </div>
-          ) : (
-            [...dailyStats].reverse().map((stat, idx) => {
-              const minutes = Math.round(stat.total_listening_seconds / 60);
-              return (
-                <div
-                  key={idx}
-                  className="flex items-center justify-between p-2.5 rounded-2xl bg-slate-50/70 border border-slate-100 text-xs"
-                >
-                  <div>
-                    <span className="font-mono font-bold text-slate-800 block">
-                      {stat.study_date}
-                    </span>
-                    <span className="text-[10px] text-slate-400 font-mono">
-                      {stat.completed_plays} completed {stat.completed_plays === 1 ? 'play' : 'plays'}
-                    </span>
+            <h4 className="text-sm font-bold text-slate-800">No tracks in this category</h4>
+            <p className="text-xs text-slate-500 max-w-xs mx-auto">
+              {activeFilter === 'learned'
+                ? 'Keep listening to your audio notes! Complete 71+ genuine listens to master tracks by heart.'
+                : activeFilter === 'in_memory'
+                ? 'Tracks reach this stage when played between 50 and 70 times.'
+                : 'Upload or record study notes to begin your memorization journey.'}
+            </p>
+          </div>
+        ) : (
+          displayedTracks.map((track, idx) => {
+            const count = track.play_count || 0;
+            const theme = getPlayCountTheme(count);
+
+            return (
+              <div
+                key={track.id}
+                onClick={() => onPlayAudio && onPlayAudio(track)}
+                className="group relative bg-white hover:bg-slate-50/80 border border-slate-200/90 rounded-2xl p-3.5 shadow-2xs hover:shadow-xs transition-all cursor-pointer active:scale-[0.99] space-y-2.5"
+                role="button"
+                tabIndex={0}
+                aria-label={`Play ${track.title} - ${count} plays`}
+              >
+                {/* Top: Rank, Title, Folder, Play Button */}
+                <div className="flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                    {/* Rank / Status indicator */}
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      <span
+                        className="size-2 rounded-full shrink-0"
+                        style={{ backgroundColor: theme.hex }}
+                      />
+                      <span className="text-xs font-mono font-semibold text-slate-400 tabular-nums">
+                        {(idx + 1).toString().padStart(2, '0')}
+                      </span>
+                    </div>
+
+                    {/* Track Title & Subject */}
+                    <div className="min-w-0 flex-1">
+                      <h3 className="text-[14px] font-bold text-slate-900 group-hover:text-blue-600 transition-colors truncate leading-tight">
+                        {track.title}
+                      </h3>
+                      <div className="flex items-center gap-1.5 mt-0.5 text-xs text-slate-500 truncate">
+                        <span>{track.subject_name || 'General'}</span>
+                        <span className="text-slate-300">•</span>
+                        <span className="tabular-nums">{formatDuration(track.duration_seconds)}</span>
+                      </div>
+                    </div>
                   </div>
-                  <div className="text-right">
-                    <span className="font-mono font-bold text-blue-700 block">
-                      {minutes} min
-                    </span>
-                    <span className="text-[10px] text-slate-400 font-mono">
-                      {formatDuration(stat.total_listening_seconds)}
-                    </span>
+
+                  {/* Right: Color-Coded Play Count Badge + Practice Button */}
+                  <div className="flex items-center gap-2 shrink-0">
+                    <div className="text-right">
+                      <span
+                        className="text-sm font-extrabold tabular-nums block leading-none"
+                        style={{ color: theme.hex }}
+                      >
+                        {formatPlayCountBadge(count)}
+                      </span>
+                      <span
+                        className={`inline-block mt-0.5 px-1.5 py-0.2 rounded-md text-[9.5px] font-bold border ${theme.badgeClass}`}
+                      >
+                        {theme.label}
+                      </span>
+                    </div>
+
+                    <button
+                      type="button"
+                      className="size-8 rounded-full bg-slate-900 text-white flex items-center justify-center shadow-2xs group-hover:scale-105 active:scale-90 transition-all shrink-0 cursor-pointer"
+                      title={`Practice ${track.title}`}
+                      aria-label={`Practice ${track.title}`}
+                    >
+                      <Play size={12} fill="currentColor" className="translate-x-0.5" />
+                    </button>
                   </div>
                 </div>
-              );
-            })
-          )}
-        </div>
+
+                {/* Bottom: Subtle Horizontal Mastery Progress Bar */}
+                <div className="w-full bg-slate-100 rounded-full h-1.5 overflow-hidden">
+                  <div
+                    className="h-full rounded-full transition-all duration-300"
+                    style={{
+                      width: `${theme.progressPercent}%`,
+                      backgroundColor: theme.hex
+                    }}
+                  />
+                </div>
+              </div>
+            );
+          })
+        )}
       </div>
     </div>
   );

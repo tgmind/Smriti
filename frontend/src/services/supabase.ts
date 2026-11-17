@@ -77,3 +77,40 @@ export function exportDataAsCSV(dailyStats: DailyStudyStats[]) {
   a.click();
   URL.revokeObjectURL(url);
 }
+
+/**
+ * Atomically increments the verified play count of an audio item in Supabase via RPC.
+ */
+export async function incrementAudioPlayCountInSupabase(
+  audio: AudioItem,
+  increment: number = 1
+): Promise<number | null> {
+  if (!supabase) return null;
+
+  try {
+    const { data: sessionData } = await supabase.auth.getSession();
+    if (!sessionData?.session?.user) return null;
+
+    // Check if audio.id is a valid UUID
+    const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(audio.id);
+
+    const { data, error } = await supabase.rpc('increment_audio_play_count', {
+      p_audio_id: isUuid ? audio.id : null,
+      p_google_drive_file_id: audio.google_drive_file_id || null,
+      p_title: audio.title || 'Untitled Note',
+      p_subject_name: audio.subject_name || 'General',
+      p_duration_seconds: audio.duration_seconds || 0,
+      p_increment: increment
+    });
+
+    if (error) {
+      console.warn('[Supabase] increment_audio_play_count RPC notice:', error.message);
+      return null;
+    }
+
+    return typeof data === 'number' ? data : null;
+  } catch (err) {
+    console.warn('[Supabase] increment_audio_play_count exception:', err);
+    return null;
+  }
+}

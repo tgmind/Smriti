@@ -50,6 +50,7 @@ import { SyncModePill } from './ui/SyncModePill';
 import { bridge } from '../services/bridge';
 import { AudioItem, Subject, PlaybackState, UserSettings, UploadProgressState } from '../types';
 import { formatDuration } from '../services/learningEngine';
+import { getPlayCountTheme, formatPlayCountBadge } from '../utils/playCountColor';
 import { ACADEMIC_ICON_MAP } from '../utils/subjectVisuals';
 import { googleDriveService } from '../services/googleDrive';
 import { toastService } from '../services/toastService';
@@ -2503,6 +2504,18 @@ export const LibraryTab: React.FC<LibraryTabProps> = ({
                           <span className="text-slate-300">•</span>
                           <span className="whitespace-nowrap">{formatFileSize(audio.file_size_bytes)}</span>
                           <span className="text-slate-300">•</span>
+                          {(() => {
+                            const playTheme = getPlayCountTheme(audio.play_count);
+                            return (
+                              <span
+                                className={`shrink-0 whitespace-nowrap text-[10px] font-bold px-1.5 py-0.2 rounded-md border font-mono ${playTheme.badgeClass}`}
+                                title={`Play count: ${audio.play_count || 0} (${playTheme.label})`}
+                              >
+                                {formatPlayCountBadge(audio.play_count)}
+                              </span>
+                            );
+                          })()}
+                          <span className="text-slate-300">•</span>
                           {audio.is_downloaded_offline ? (
                             <span className="inline-flex items-center gap-1 text-emerald-600 font-semibold whitespace-nowrap">
                               <CheckCircle2 size={12} className="text-emerald-500 shrink-0" />
@@ -2951,6 +2964,18 @@ export const LibraryTab: React.FC<LibraryTabProps> = ({
                         <span className="font-semibold text-slate-700">{audio.subject_name || 'General'}</span>
                         <span>•</span>
                         <span>{formatDuration(audio.duration_seconds)}</span>
+                        <span>•</span>
+                        {(() => {
+                          const playTheme = getPlayCountTheme(audio.play_count);
+                          return (
+                            <span
+                              className={`shrink-0 whitespace-nowrap text-[9.5px] font-bold px-1.5 py-0.2 rounded-md border font-mono ${playTheme.badgeClass}`}
+                              title={`Play count: ${audio.play_count || 0} (${playTheme.label})`}
+                            >
+                              {formatPlayCountBadge(audio.play_count)}
+                            </span>
+                          );
+                        })()}
                         {audio.is_favorite && <Star size={11} className="text-amber-500 fill-amber-500" />}
                       </p>
                     </div>
@@ -3048,6 +3073,17 @@ export const LibraryTab: React.FC<LibraryTabProps> = ({
                     <span className="text-[11px] font-mono text-slate-400">
                       {formatDuration(audio.duration_seconds)}
                     </span>
+                    {(() => {
+                      const playTheme = getPlayCountTheme(audio.play_count);
+                      return (
+                        <span
+                          className={`shrink-0 whitespace-nowrap text-[9.5px] font-bold px-1.5 py-0.2 rounded-md border font-mono ${playTheme.badgeClass}`}
+                          title={`Play count: ${audio.play_count || 0} (${playTheme.label})`}
+                        >
+                          {formatPlayCountBadge(audio.play_count)}
+                        </span>
+                      );
+                    })()}
                     <ChevronRight size={14} className="text-slate-400" />
                   </div>
                 </div>

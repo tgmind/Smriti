@@ -22,7 +22,9 @@ import {
   DEFAULT_USER_SETTINGS
 } from './services/supabase';
 import { bridge } from './services/bridge';
-import { evaluateCompletedPlay } from './services/learningEngine';
+import { verifiedPlayTracker } from './services/learningEngine';
+import { playCountService } from './services/playCountService';
+import { getPlayCountTheme } from './utils/playCountColor';
 import { googleDriveService } from './services/googleDrive';
 import { audioStorage } from './services/audioStorage';
 import { networkService } from './services/networkService';
@@ -44,7 +46,9 @@ export const App: React.FC = () => {
       const parsed: AudioItem[] = JSON.parse(saved);
       // Remove any previously stored demo/fake audio entries
       const demoIds = new Set(['aud-1', 'aud-2', 'aud-3', 'aud-4']);
-      return parsed.filter(item => !demoIds.has(item.id));
+      return parsed
+        .filter(item => !demoIds.has(item.id))
+        .map(item => playCountService.mergeAudioItem(item));
     } catch {
       return [];
     }
@@ -267,6 +271,55 @@ export const App: React.FC = () => {
     });
   };
 
+  const handleVerifiedPlayCompleted = async (audio: AudioItem) => {
+    // Record study session statistics
+    recordCompletedPlayStats(currentSessionListeningSeconds.current);
+
+    // 1. Instant local optimistic increment + asynchronous Supabase sync
+    const newCount = await playCountService.incrementPlayCount(audio);
+
+    // 2. Android native Room SQLite persistence
+    bridge.recordVerifiedFullPlay(audio.id, audio.duration_seconds || 60, playbackState.playbackSpeed);
+
+    // 3. Update React state for all audio items
+    const nowIso = new Date().toISOString();
+    setAudioItems(prev => {
+      const updated = prev.map(item =>
+        item.id === audio.id
+          ? { ...item, play_count: newCount, last_listened_at: nowIso }
+          : item
+      );
+      try {
+        localStorage.setItem('smriti_audio_items', JSON.stringify(updated));
+      } catch (e) {
+        console.warn('Failed to save audio items to localStorage', e);
+      }
+      return updated;
+    });
+
+    // 4. Update playbackState.currentAudio if it matches
+    setPlaybackState(prev => {
+      if (prev.currentAudio?.id === audio.id) {
+        return {
+          ...prev,
+          currentAudio: {
+            ...prev.currentAudio,
+            play_count: newCount,
+            last_listened_at: nowIso
+          }
+        };
+      }
+      return prev;
+    });
+
+    // 5. Celebration Toast
+    const theme = getPlayCountTheme(newCount);
+    toastService.progress(
+      'Play Count Verified (+1)',
+      `"${audio.title}" reached ${newCount} plays • ${theme.label}`
+    );
+  };
+
   // Sync to localStorage
   useEffect(() => {
     localStorage.setItem('smriti_audio_items', JSON.stringify(audioItems));
@@ -402,20 +455,23 @@ export const App: React.FC = () => {
         // Accumulate active listening seconds
         currentSessionListeningSeconds.current += 0.25;
 
-        // Check Completed-Play policy
-        if (
-          !completedPlayRecordedForSession.current &&
-          playbackState.currentAudio &&
-          dur > 0
-        ) {
-          const evalResult = evaluateCompletedPlay(
-            currentSessionListeningSeconds.current,
-            dur
-          );
+        // Anti-Cheat Verified Play Coverage Tracking
+        const activeAudio = playbackState.currentAudio;
+        if (activeAudio) {
+          verifiedPlayTracker.trackProgress(activeAudio.id, pos, dur);
 
-          if (evalResult.isCompleted) {
-            completedPlayRecordedForSession.current = true;
-            recordCompletedPlayStats(currentSessionListeningSeconds.current);
+          // If playback is within 0.5s of the natural end, attempt verified completion
+          if (pos >= (dur - 0.5) && !completedPlayRecordedForSession.current) {
+            const isCompleted = verifiedPlayTracker.recordCompletion(
+              activeAudio.id,
+              pos,
+              dur,
+              false
+            );
+            if (isCompleted) {
+              completedPlayRecordedForSession.current = true;
+              handleVerifiedPlayCompleted(activeAudio);
+            }
           }
         }
       } else if (eventName === 'playbackStateChanged') {
@@ -440,19 +496,17 @@ export const App: React.FC = () => {
     const qIndex = currentQueueIndexRef.current;
     const repMode = repeatModeRef.current;
 
-    // 1. Transparent SM-2 Completed-Play Metric Evaluation
-    if (
-      !completedPlayRecordedForSession.current &&
-      state.currentAudio &&
-      state.durationSeconds > 0
-    ) {
-      const evalResult = evaluateCompletedPlay(
-        currentSessionListeningSeconds.current,
-        state.durationSeconds
+    // 1. Transparent SM-2 & Anti-Cheat Verified Full Play Completion
+    if (state.currentAudio && state.durationSeconds > 0 && !completedPlayRecordedForSession.current) {
+      const isCompleted = verifiedPlayTracker.recordCompletion(
+        state.currentAudio.id,
+        state.positionSeconds,
+        state.durationSeconds,
+        true // isEnded = true
       );
-      if (evalResult.isCompleted) {
+      if (isCompleted) {
         completedPlayRecordedForSession.current = true;
-        recordCompletedPlayStats(currentSessionListeningSeconds.current);
+        handleVerifiedPlayCompleted(state.currentAudio);
       }
     }
 
@@ -471,6 +525,7 @@ export const App: React.FC = () => {
     if (repMode === 'one' && state.currentAudio) {
       currentSessionListeningSeconds.current = 0;
       completedPlayRecordedForSession.current = false;
+      verifiedPlayTracker.resetForNewPass();
       bridge.seek(0);
       bridge.play(state.currentAudio, state.playbackSpeed);
       setPlaybackState(prev => ({ ...prev, isPlaying: true, positionSeconds: 0 }));
@@ -537,6 +592,9 @@ export const App: React.FC = () => {
       ? audio.duration_seconds
       : 60;
 
+    // Arm anti-cheat verified play tracker for this track
+    verifiedPlayTracker.setActiveTrack(audio.id, safeDuration);
+
     setPlaybackState(prev => ({
       ...prev,
       currentAudio: audio,
@@ -545,13 +603,12 @@ export const App: React.FC = () => {
       durationSeconds: safeDuration
     }));
 
-    // Increment play_count and update last_listened_at
+    // Update last_listened_at only (play_count is strictly earned via complete verified listen)
     setAudioItems(prev =>
       prev.map(item =>
         item.id === audio.id
           ? {
               ...item,
-              play_count: (item.play_count || 0) + 1,
               last_listened_at: new Date().toISOString()
             }
           : item
@@ -612,6 +669,7 @@ export const App: React.FC = () => {
 
   const handleSeek = (seconds: number) => {
     bridge.seek(seconds);
+    verifiedPlayTracker.handleSeek(seconds);
     setPlaybackState(prev => ({ ...prev, positionSeconds: seconds }));
   };
 
@@ -785,7 +843,7 @@ export const App: React.FC = () => {
         return googleDriveService.fetchDriveData(subjects);
       }).then(data => {
         if (data && data.audioItems && data.audioItems.length > 0) {
-          setAudioItems(data.audioItems);
+          setAudioItems(data.audioItems.map(item => playCountService.mergeAudioItem(item)));
         }
         if (data && data.subjects && data.subjects.length > 0) {
           setSubjects(data.subjects);
@@ -967,7 +1025,7 @@ export const App: React.FC = () => {
       // Fetch cloud catalog and recordings for this specific connected account
       const driveData = await googleDriveService.fetchDriveData(subjects);
       if (driveData) {
-        setAudioItems(driveData.audioItems || []);
+        setAudioItems((driveData.audioItems || []).map(item => playCountService.mergeAudioItem(item)));
         if (driveData.subjects && driveData.subjects.length > 0) {
           setSubjects(driveData.subjects);
         }
@@ -992,7 +1050,7 @@ export const App: React.FC = () => {
 
       const driveData = await googleDriveService.fetchDriveData(subjects);
       if (driveData) {
-        setAudioItems(driveData.audioItems || []);
+        setAudioItems((driveData.audioItems || []).map(item => playCountService.mergeAudioItem(item)));
         if (driveData.subjects && driveData.subjects.length > 0) {
           setSubjects(driveData.subjects);
         }
@@ -1059,7 +1117,7 @@ export const App: React.FC = () => {
       setSyncState('syncing');
       const driveData = await googleDriveService.fetchDriveData(subjects);
       if (driveData) {
-        setAudioItems(driveData.audioItems || []);
+        setAudioItems((driveData.audioItems || []).map(item => playCountService.mergeAudioItem(item)));
         if (driveData.subjects && driveData.subjects.length > 0) {
           setSubjects(driveData.subjects);
         }
@@ -1625,7 +1683,7 @@ export const App: React.FC = () => {
         const driveData = await googleDriveService.fetchDriveData(nextSubjects);
         if (driveData) {
           if (driveData.audioItems) {
-            setAudioItems(driveData.audioItems);
+            setAudioItems(driveData.audioItems.map(item => playCountService.mergeAudioItem(item)));
           }
           if (driveData.subjects && driveData.subjects.length > 0) {
             setSubjects(driveData.subjects);
@@ -1780,7 +1838,7 @@ export const App: React.FC = () => {
         const driveData = await googleDriveService.fetchDriveData(subjects);
         if (driveData) {
           if (driveData.audioItems) {
-            setAudioItems(driveData.audioItems);
+            setAudioItems(driveData.audioItems.map(item => playCountService.mergeAudioItem(item)));
           }
           if (driveData.subjects && driveData.subjects.length > 0) {
             setSubjects(driveData.subjects);
@@ -1985,6 +2043,8 @@ export const App: React.FC = () => {
         {currentTab === 'progress' && (
           <ProgressTab
             dailyStats={dailyStats}
+            audioItems={audioItems}
+            onPlayAudio={(audio) => handlePlayAudio(audio, audioItems, undefined, true)}
           />
         )}
 

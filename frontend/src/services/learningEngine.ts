@@ -137,3 +137,139 @@ export function formatDuration(seconds: number): string {
   }
   return `${mins}:${secs.toString().padStart(2, '0')}`;
 }
+
+/**
+ * Strict Anti-Cheat Verified Coverage Tracker.
+ * 
+ * Rules:
+ * 1. Accumulates verified listening intervals only when delta is 0 < delta <= 2.0s.
+ * 2. Scrubbing/seeking forward skips coverage.
+ * 3. A-B looping subsegments cannot earn playCount unless >=95% of full track duration is covered.
+ * 4. Completes playCount (+1) only when currentTime >= duration - 0.5s (or isEnded) AND verifiedSeconds >= duration * 0.95.
+ * 5. Resets on completion to strictly eliminate double-counting.
+ */
+export class VerifiedPlayTracker {
+  private currentAudioId: string | null = null;
+  private durationSeconds: number = 0;
+  private lastPositionSeconds: number | null = null;
+  private bucketSize: number = 0.5;
+  private listenedBuckets = new Set<number>();
+  private completedForCurrentPass = false;
+
+  constructor(bucketSize = 0.5) {
+    this.bucketSize = bucketSize;
+  }
+
+  public setActiveTrack(audioId: string | null, durationSeconds: number = 0) {
+    if (this.currentAudioId !== audioId) {
+      this.currentAudioId = audioId;
+      this.durationSeconds = durationSeconds;
+      this.lastPositionSeconds = null;
+      this.listenedBuckets.clear();
+      this.completedForCurrentPass = false;
+    } else if (durationSeconds > 0 && this.durationSeconds <= 0) {
+      this.durationSeconds = durationSeconds;
+    }
+  }
+
+  public handleSeek(newPositionSeconds: number) {
+    this.lastPositionSeconds = newPositionSeconds;
+  }
+
+  public trackProgress(
+    audioId: string,
+    currentTime: number,
+    durationSeconds: number,
+    isPlaying: boolean = true,
+    _abLoopActive: boolean = false
+  ): { verifiedSeconds: number; coveragePercentage: number } {
+    if (!audioId || durationSeconds <= 0 || !isPlaying) {
+      return {
+        verifiedSeconds: this.getVerifiedSeconds(),
+        coveragePercentage: this.getCoveragePercentage()
+      };
+    }
+
+    if (this.currentAudioId !== audioId) {
+      this.setActiveTrack(audioId, durationSeconds);
+    } else if (durationSeconds > 0) {
+      this.durationSeconds = durationSeconds;
+    }
+
+    if (this.lastPositionSeconds === null) {
+      this.lastPositionSeconds = currentTime;
+      const bucket = Math.floor(currentTime / this.bucketSize);
+      if (bucket >= 0 && bucket * this.bucketSize <= durationSeconds) {
+        this.listenedBuckets.add(bucket);
+      }
+      return {
+        verifiedSeconds: this.getVerifiedSeconds(),
+        coveragePercentage: this.getCoveragePercentage()
+      };
+    }
+
+    const delta = currentTime - this.lastPositionSeconds;
+
+    // Normal forward playback: delta between 0 and 2.0s
+    if (delta > 0 && delta <= 2.0) {
+      const startBucket = Math.floor(this.lastPositionSeconds / this.bucketSize);
+      const endBucket = Math.floor(currentTime / this.bucketSize);
+      for (let b = startBucket; b <= endBucket; b++) {
+        if (b >= 0 && b * this.bucketSize <= durationSeconds) {
+          this.listenedBuckets.add(b);
+        }
+      }
+    }
+
+    this.lastPositionSeconds = currentTime;
+
+    return {
+      verifiedSeconds: this.getVerifiedSeconds(),
+      coveragePercentage: this.getCoveragePercentage()
+    };
+  }
+
+  public getVerifiedSeconds(): number {
+    return this.listenedBuckets.size * this.bucketSize;
+  }
+
+  public getCoveragePercentage(): number {
+    if (this.durationSeconds <= 0) return 0;
+    const pct = (this.getVerifiedSeconds() / this.durationSeconds) * 100;
+    return Math.min(100, Number(pct.toFixed(1)));
+  }
+
+  public recordCompletion(
+    audioId: string,
+    currentTime: number,
+    durationSeconds: number,
+    isEnded: boolean = false
+  ): boolean {
+    if (!audioId || audioId !== this.currentAudioId) return false;
+    if (this.completedForCurrentPass) return false;
+
+    const dur = durationSeconds > 0 ? durationSeconds : this.durationSeconds;
+    if (dur <= 0) return false;
+
+    const reachedEnd = isEnded || currentTime >= (dur - 0.5);
+    const verifiedSecs = this.getVerifiedSeconds();
+    const hasFullCoverage = verifiedSecs >= (dur * 0.95);
+
+    if (reachedEnd && hasFullCoverage) {
+      this.completedForCurrentPass = true;
+      this.listenedBuckets.clear();
+      this.lastPositionSeconds = null;
+      return true;
+    }
+
+    return false;
+  }
+
+  public resetForNewPass() {
+    this.listenedBuckets.clear();
+    this.lastPositionSeconds = null;
+    this.completedForCurrentPass = false;
+  }
+}
+
+export const verifiedPlayTracker = new VerifiedPlayTracker();
