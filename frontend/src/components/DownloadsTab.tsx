@@ -49,7 +49,6 @@ export interface DownloadsTabProps {
   onConnectDrive?: () => void;
   onSyncDrive?: () => void;
   onSyncItemToDrive?: (audio: AudioItem) => void;
-  onDownloadItemFromDrive?: (audio: AudioItem) => void;
   onToggleOffline: (audio: AudioItem) => void;
   onDeleteAllDownloads: () => Promise<void> | void;
   onPlayAudio: (audio: AudioItem) => void;
@@ -73,7 +72,6 @@ export const DownloadsTab: React.FC<DownloadsTabProps> = ({
   onConnectDrive,
   onSyncDrive,
   onSyncItemToDrive,
-  onDownloadItemFromDrive,
   onToggleOffline,
   onDeleteAllDownloads,
   onPlayAudio,
@@ -153,18 +151,6 @@ export const DownloadsTab: React.FC<DownloadsTabProps> = ({
     const unsynced = audioItems.filter((a) => !a.google_drive_file_id);
     unsynced.forEach((audio) => {
       if (onSyncItemToDrive) onSyncItemToDrive(audio);
-    });
-  };
-
-  const handleTriggerDownloadAll = () => {
-    bridge.triggerHaptic('medium');
-    if (!isConnected) {
-      if (onConnectDrive) onConnectDrive();
-      return;
-    }
-    const cloudOnly = audioItems.filter((a) => !a.is_downloaded_offline);
-    cloudOnly.forEach((audio) => {
-      if (onDownloadItemFromDrive) onDownloadItemFromDrive(audio);
     });
   };
 
@@ -269,12 +255,12 @@ export const DownloadsTab: React.FC<DownloadsTabProps> = ({
           </div>
         )}
 
-        {/* Sync to Drive & Offline Cache Action Buttons */}
-        <div className="flex items-center gap-2 pt-0.5">
+        {/* Sync to Drive Action Button */}
+        <div className="pt-0.5">
           <button
             onClick={handleTriggerSyncAll}
             disabled={isSyncingDrive}
-            className="flex-1 py-2 px-3 rounded-xl bg-white border border-sky-200 text-sky-800 hover:bg-sky-50 text-xs font-semibold flex items-center justify-center gap-1.5 shadow-2xs active:scale-95 transition-all cursor-pointer disabled:opacity-60"
+            className="w-full py-2 px-3 rounded-xl bg-white border border-sky-200 text-sky-800 hover:bg-sky-50 text-xs font-semibold flex items-center justify-center gap-1.5 shadow-2xs active:scale-95 transition-all cursor-pointer disabled:opacity-60"
             title="Sync any unsynced audio notes to personal Google Drive"
           >
             {isSyncingDrive ? (
@@ -283,14 +269,6 @@ export const DownloadsTab: React.FC<DownloadsTabProps> = ({
               <Upload size={13} className="text-[#24A1DE]" />
             )}
             <span>{isSyncingDrive ? 'Syncing...' : 'Sync to Drive'}</span>
-          </button>
-          <button
-            onClick={handleTriggerDownloadAll}
-            className="flex-1 py-2 px-3 rounded-xl bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 text-xs font-semibold flex items-center justify-center gap-1.5 shadow-2xs active:scale-95 transition-all cursor-pointer"
-            title="Download all audio notes to device for offline study"
-          >
-            <Download size={13} className="text-slate-600" />
-            <span>Offline Cache</span>
           </button>
         </div>
       </div>

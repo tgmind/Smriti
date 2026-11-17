@@ -257,19 +257,6 @@ export const HomeTab: React.FC<HomeTabProps> = ({
     });
   };
 
-  const handleTriggerDownloadAll = () => {
-    if (!isDriveConnected && onConnectDrive) {
-      onConnectDrive();
-      return;
-    }
-    const cloudOnly = recentAudio.filter((a) => !a.is_downloaded_offline);
-    cloudOnly.forEach((target) => {
-      if (onDownloadFromDrive) {
-        onDownloadFromDrive(target);
-      }
-    });
-  };
-
   return (
     <div className="space-y-4 pb-36 pt-2 px-3 animate-in">
       {/* Search & Restored User Greeting Header Bar */}
@@ -801,23 +788,15 @@ export const HomeTab: React.FC<HomeTabProps> = ({
             </div>
           )}
 
-          {/* Sync / Download Action Buttons */}
-          <div className="flex items-center gap-2 pt-0.5">
+          {/* Sync Action Button */}
+          <div className="pt-0.5">
             <button
               onClick={handleTriggerSyncAll}
-              className="flex-1 py-2 px-3 rounded-xl bg-white border border-sky-200 text-sky-800 hover:bg-sky-50 text-xs font-semibold flex items-center justify-center gap-1.5 shadow-2xs active:scale-95 transition-all cursor-pointer"
+              className="w-full py-2 px-3 rounded-xl bg-white border border-sky-200 text-sky-800 hover:bg-sky-50 text-xs font-semibold flex items-center justify-center gap-1.5 shadow-2xs active:scale-95 transition-all cursor-pointer"
               title="Sync any unsynced audio notes to personal Google Drive"
             >
               <Upload size={13} className="text-[#24A1DE]" />
               <span>Sync to Drive</span>
-            </button>
-            <button
-              onClick={handleTriggerDownloadAll}
-              className="flex-1 py-2 px-3 rounded-xl bg-white border border-slate-200 text-slate-700 hover:bg-slate-50 text-xs font-semibold flex items-center justify-center gap-1.5 shadow-2xs active:scale-95 transition-all cursor-pointer"
-              title="Download all audio notes to device for offline study"
-            >
-              <Download size={13} className="text-slate-600" />
-              <span>Offline Cache</span>
             </button>
           </div>
         </div>

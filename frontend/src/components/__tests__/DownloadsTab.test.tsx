@@ -80,7 +80,7 @@ describe('DownloadsTab Component', () => {
     // 2. Drive Account Card
     expect(html).toContain('Synced');
     expect(html).toContain('Sync to Drive');
-    expect(html).toContain('Offline Cache');
+    expect(html).not.toContain('Offline Cache');
 
     // 3. Local Storage summary badge
     expect(html).toContain('Local Storage');

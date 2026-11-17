@@ -593,14 +593,16 @@ class GoogleDriveService {
       // 2. Consolidate any duplicate folders in Google Drive into clean canonical folders
       await this.consolidateSubjectFolders(rootId);
 
-      // 3. Identify subjects to ensure folders for: ONLY General by default, plus user's custom subjects
-      const subjectNames = new Set<string>(['General']);
+      // 3. Identify subjects to ensure folders for: user's subjects (or General by default if empty)
+      const subjectNames = new Set<string>();
       if (subjects && subjects.length > 0) {
         subjects.forEach(s => {
           if (s.name && s.name.trim()) {
             subjectNames.add(s.name.trim());
           }
         });
+      } else {
+        subjectNames.add('General');
       }
 
       const subjectFolderIds: Record<string, string> = {};
@@ -1909,9 +1911,9 @@ class GoogleDriveService {
         if (!s || !s.name) continue;
         const norm = s.name.trim().toLowerCase();
         if (legacyDummyFolderNames.includes(norm)) continue;
-        // Only keep subject if it matches a folder actually existing in Smriti, or General, or has audio, or if folder map is empty (e.g. In basic mock tests)
+        // Only keep subject if it matches a folder actually existing in Smriti, or has audio, or if folder map is empty (e.g. In basic mock tests)
         const hasAudio = initialCatalogAudioItems.some(a => (a.subject_name || '').trim().toLowerCase() === norm);
-        const isValidSubject = norm === 'general' || validSubjectNames.has(norm) || (validSubjectNames.size === 0) || hasAudio;
+        const isValidSubject = validSubjectNames.has(norm) || (validSubjectNames.size === 0 && norm === 'general') || hasAudio;
         if (isValidSubject && !subMap.has(norm)) {
           subMap.set(norm, {
             ...s,
@@ -1927,11 +1929,11 @@ class GoogleDriveService {
           const norm = ks.name.trim().toLowerCase();
           if (legacyDummyFolderNames.includes(norm)) continue;
           // Protect against resurrecting deleted folders:
-          // Keep subject if it exists in Drive folders, or is General, or has audio recordings, or in basic mock environment
+          // Keep subject if it exists in Drive folders, or has audio recordings, or in basic mock environment
           const hasAudio =
             initialCatalogAudioItems.some(a => (a.subject_name || '').trim().toLowerCase() === norm) ||
             discoveredAudioItems.some(a => (a.subject_name || '').trim().toLowerCase() === norm);
-          const isValidSubject = norm === 'general' || validSubjectNames.has(norm) || (validSubjectNames.size === 0) || hasAudio;
+          const isValidSubject = validSubjectNames.has(norm) || (validSubjectNames.size === 0 && norm === 'general') || hasAudio;
           if (isValidSubject && !subMap.has(norm)) {
             subMap.set(norm, ks);
           }

@@ -53,10 +53,10 @@ export const App: React.FC = () => {
     const fallbackSubjects: Subject[] = [
       { id: 'general', name: 'General', icon_name: 'BookOpen', color_hex: '#38bdf8', description: 'General study & lecture notes', sort_order: 1 }
     ];
-    if (!saved) return fallbackSubjects;
+    if (saved === null) return fallbackSubjects;
     try {
       const parsed: Subject[] = JSON.parse(saved);
-      if (Array.isArray(parsed) && parsed.length > 0) {
+      if (Array.isArray(parsed)) {
         // Strictly deduplicate by normalized name and normalize deprecated icons
         const map = new Map<string, Subject>();
         for (const s of parsed) {
@@ -76,8 +76,7 @@ export const App: React.FC = () => {
             });
           }
         }
-        const cleaned = Array.from(map.values());
-        return cleaned.length > 0 ? cleaned : fallbackSubjects;
+        return Array.from(map.values());
       }
       return fallbackSubjects;
     } catch {
@@ -1049,14 +1048,15 @@ export const App: React.FC = () => {
           progressPercent: deleteRecordings ? 55 : 45
         });
 
-        let generalFolderId: string | undefined;
-        if (!deleteRecordings) {
-          generalFolderId = await googleDriveService.getOrCreateSubjectFolder('General');
+        let targetFolderId: string | undefined;
+        if (!deleteRecordings && nextSubjects.length > 0) {
+          const fallbackSubject = nextSubjects.find(s => s.name.toLowerCase() === 'general') || nextSubjects[0];
+          targetFolderId = await googleDriveService.getOrCreateSubjectFolder(fallbackSubject.name);
         }
 
         await googleDriveService.deleteSubjectFolder(subjectName, {
-          deleteFiles: deleteRecordings,
-          moveToFolderId: generalFolderId
+          deleteFiles: deleteRecordings || nextSubjects.length === 0,
+          moveToFolderId: targetFolderId
         });
 
         updateSyncTask(taskId, {
@@ -1123,21 +1123,12 @@ export const App: React.FC = () => {
     if (!targetSubject) return;
 
     const subjectName = targetSubject.name;
-    if (subjectName.toLowerCase() === 'general') {
-      console.warn('The General folder is the core default folder and cannot be deleted.');
-      return;
-    }
     const deleteRecordings = !!options?.deleteRecordings;
 
     // 1. Immediate optimistic UI and local persistence update (instant feedback, never blocks UI)
-    let nextSubjects = subjects.filter(
+    const nextSubjects = subjects.filter(
       s => s.id !== targetSubject.id && s.name.toLowerCase() !== subjectName.toLowerCase()
     );
-    if (nextSubjects.length === 0) {
-      nextSubjects = [
-        { id: 'general', name: 'General', icon_name: 'BookOpen', color_hex: '#38bdf8', description: 'General study & lecture notes', sort_order: 1 }
-      ];
-    }
     setSubjects(nextSubjects);
 
     let nextAudioItems: AudioItem[] = [];
@@ -1145,18 +1136,19 @@ export const App: React.FC = () => {
       a => a.subject_id === targetSubject.id || a.subject_name?.toLowerCase() === subjectName.toLowerCase()
     );
 
-    if (deleteRecordings) {
+    if (deleteRecordings || nextSubjects.length === 0) {
       nextAudioItems = audioItems.filter(
         a => a.subject_id !== targetSubject.id && a.subject_name?.toLowerCase() !== subjectName.toLowerCase()
       );
       setAudioItems(nextAudioItems);
     } else {
+      const fallbackSubject = nextSubjects.find(s => s.name.toLowerCase() === 'general') || nextSubjects[0];
       nextAudioItems = audioItems.map(a => {
         if (a.subject_id === targetSubject.id || a.subject_name?.toLowerCase() === subjectName.toLowerCase()) {
           return {
             ...a,
-            subject_id: 'general',
-            subject_name: 'General'
+            subject_id: fallbackSubject.id,
+            subject_name: fallbackSubject.name
           };
         }
         return a;
@@ -1361,7 +1353,6 @@ export const App: React.FC = () => {
             onConnectDrive={handleConnectDrive}
             onSyncDrive={handleSyncDrive}
             onSyncItemToDrive={handleSyncItemToDrive}
-            onDownloadItemFromDrive={handleDownloadItemFromDrive}
             onToggleOffline={handleToggleOffline}
             onDeleteAllDownloads={handleDeleteAllDownloads}
             onPlayAudio={handlePlayAudio}

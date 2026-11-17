@@ -14,6 +14,7 @@ import {
   ArrowLeft,
   BookOpen,
   Folder,
+  FolderPlus,
   Clock,
   FileAudio,
   Check,
@@ -1454,7 +1455,7 @@ export const LibraryTab: React.FC<LibraryTabProps> = ({
 
           {/* Header Action: Delete Folder (Clean & Non-overlapping) */}
           <div className="flex items-center gap-1.5 shrink-0">
-            {onDeleteSubject && selectedSubject.name.toLowerCase() !== 'general' && (
+            {onDeleteSubject && (
               <button
                 type="button"
                 onClick={() => setSubjectToDelete(selectedSubject)}
@@ -2022,7 +2023,28 @@ export const LibraryTab: React.FC<LibraryTabProps> = ({
 
         {/* Clean Minimalist Subject Cards */}
         <div className="space-y-2">
-          {deduplicatedSubjects.map((subject) => {
+          {deduplicatedSubjects.length === 0 ? (
+            <div className="py-8 px-4 text-center space-y-3 bg-slate-50/50 border border-dashed border-slate-200 rounded-2xl">
+              <div className="size-11 rounded-2xl bg-white border border-slate-200 text-slate-400 mx-auto flex items-center justify-center shadow-2xs">
+                <Folder size={20} />
+              </div>
+              <div className="space-y-1">
+                <h4 className="text-xs font-bold text-slate-900">No subject folders</h4>
+                <p className="text-[11px] text-slate-500 max-w-xs mx-auto">
+                  Create custom folders to organize your lectures and study recordings.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsCreateFolderOpen(true)}
+                className="px-3 py-1.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-[11px] font-semibold inline-flex items-center gap-1.5 shadow-2xs active:scale-95 transition-all cursor-pointer"
+              >
+                <FolderPlus size={13} />
+                <span>Create Folder</span>
+              </button>
+            </div>
+          ) : (
+            deduplicatedSubjects.map((subject) => {
             const subjectAudios = audiosBySubject.get(subject.id) || audiosBySubject.get(subject.name.toLowerCase()) || [];
             const totalDuration = subjectAudios.reduce((acc, curr) => acc + curr.duration_seconds, 0);
             const latestAudio = subjectAudios[0];
@@ -2059,7 +2081,7 @@ export const LibraryTab: React.FC<LibraryTabProps> = ({
 
                 {/* Right: Actions */}
                 <div className="flex items-center gap-1 shrink-0">
-                  {onDeleteSubject && subject.name.toLowerCase() !== 'general' && (
+                  {onDeleteSubject && (
                     <button
                       type="button"
                       onClick={(e) => {
@@ -2068,6 +2090,7 @@ export const LibraryTab: React.FC<LibraryTabProps> = ({
                       }}
                       className="p-1.5 text-slate-300 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-all cursor-pointer"
                       title={`Delete ${subject.name} folder`}
+                      aria-label={`Delete ${subject.name} folder`}
                     >
                       <Trash2 size={15} />
                     </button>
@@ -2078,7 +2101,8 @@ export const LibraryTab: React.FC<LibraryTabProps> = ({
                 </div>
               </div>
             );
-          })}
+          })
+          )}
         </div>
       </div>
 
@@ -2176,29 +2200,36 @@ export const LibraryTab: React.FC<LibraryTabProps> = ({
                   const subAudios = audiosBySubject.get(subjectToDelete.id) || audiosBySubject.get(subjectToDelete.name.toLowerCase()) || [];
                   const count = subAudios.length;
                   if (count > 0) {
+                    const otherSubjects = deduplicatedSubjects.filter(
+                      s => s.id !== subjectToDelete.id && s.name.toLowerCase() !== subjectToDelete.name.toLowerCase()
+                    );
+                    const fallbackSubject = otherSubjects.find(s => s.name.toLowerCase() === 'general') || otherSubjects[0];
+
                     return (
                       <div className="pt-2.5 border-t border-slate-200 space-y-2">
                         <p className="font-semibold text-slate-800">
                           This folder contains {count} {count === 1 ? 'recording' : 'recordings'}:
                         </p>
                         <div className="space-y-2">
-                          <label className="flex items-start gap-2.5 p-2.5 rounded-xl bg-white border border-slate-200 cursor-pointer hover:bg-slate-50 transition-colors">
-                            <input
-                              type="radio"
-                              name="deleteRecordingsOption"
-                              checked={!deleteRecordingsOption}
-                              onChange={() => setDeleteRecordingsOption(false)}
-                              className="mt-0.5 accent-blue-600 cursor-pointer"
-                            />
-                            <span className="text-[11px] font-medium text-slate-800">
-                              Keep recordings (move to <strong className="text-blue-600">General</strong> folder)
-                            </span>
-                          </label>
+                          {fallbackSubject && (
+                            <label className="flex items-start gap-2.5 p-2.5 rounded-xl bg-white border border-slate-200 cursor-pointer hover:bg-slate-50 transition-colors">
+                              <input
+                                type="radio"
+                                name="deleteRecordingsOption"
+                                checked={!deleteRecordingsOption}
+                                onChange={() => setDeleteRecordingsOption(false)}
+                                className="mt-0.5 accent-blue-600 cursor-pointer"
+                              />
+                              <span className="text-[11px] font-medium text-slate-800">
+                                Keep recordings (move to <strong className="text-blue-600">{fallbackSubject.name}</strong> folder)
+                              </span>
+                            </label>
+                          )}
                           <label className="flex items-start gap-2.5 p-2.5 rounded-xl bg-white border border-rose-200 cursor-pointer hover:bg-rose-50/50 transition-colors">
                             <input
                               type="radio"
                               name="deleteRecordingsOption"
-                              checked={deleteRecordingsOption}
+                              checked={deleteRecordingsOption || !fallbackSubject}
                               onChange={() => setDeleteRecordingsOption(true)}
                               className="mt-0.5 accent-rose-600 cursor-pointer"
                             />

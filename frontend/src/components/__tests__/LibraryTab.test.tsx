@@ -218,6 +218,28 @@ describe('LibraryTab Apple Music Redesign', () => {
     expect(html).toContain('title="Delete Chemistry folder"');
   });
 
+  it('renders delete folder action button for General folder as well, enabling full folder customization', () => {
+    const subjectsWithGeneral: Subject[] = [
+      ...mockSubjects,
+      { id: 'general', name: 'General', icon_name: 'BookOpen', color_hex: '#38bdf8', sort_order: 3 }
+    ];
+
+    const html = renderToString(
+      <LibraryTab
+        audioItems={mockAudioItems}
+        subjects={subjectsWithGeneral}
+        onPlayAudio={vi.fn()}
+        onToggleFavorite={vi.fn()}
+        onToggleOffline={vi.fn()}
+        onGoToRecord={vi.fn()}
+        onDeleteSubject={vi.fn()}
+      />
+    );
+
+    expect(html).toContain('title="Delete General folder"');
+    expect(html).toContain('aria-label="Delete General folder"');
+  });
+
   it('does not display obstructive modal backdrop by default and allows free navigation', () => {
     const html = renderToString(
       <LibraryTab
