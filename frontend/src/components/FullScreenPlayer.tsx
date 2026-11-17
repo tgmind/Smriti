@@ -226,9 +226,9 @@ export const FullScreenPlayer: React.FC<FullScreenPlayerProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-black flex flex-col justify-between h-[100dvh] max-h-[100dvh] overflow-hidden safe-top safe-bottom text-white select-none animate-in fade-in duration-200">
+    <div className="fixed inset-0 z-50 bg-[#f8fafc] flex flex-col justify-between h-[100dvh] max-h-[100dvh] overflow-hidden safe-top safe-bottom text-slate-900 select-none animate-in fade-in duration-200">
       {/* 1. Universal Top Header Bar (Now Playing vs Queue Mode) */}
-      <header className="flex flex-col items-center shrink-0 w-full max-w-md mx-auto z-10 px-4 sm:px-5 pt-1.5 pb-1">
+      <header className="flex flex-col items-center shrink-0 w-full max-w-md mx-auto z-10 px-4 sm:px-5 pt-2 pb-1">
         {/* Apple Music Style Pill Drag Handle when in Queue Mode */}
         {viewMode === 'queue' && (
           <div
@@ -236,7 +236,7 @@ export const FullScreenPlayer: React.FC<FullScreenPlayerProps> = ({
               bridge.triggerHaptic('light');
               setViewMode('player');
             }}
-            className="w-12 h-1.5 rounded-full bg-white/25 hover:bg-white/45 active:bg-white/70 cursor-pointer transition-all mb-2 -mt-0.5 shadow-xs"
+            className="w-12 h-1.5 rounded-full bg-slate-300 hover:bg-slate-400 active:bg-slate-500 cursor-pointer transition-all mb-2 -mt-0.5 shadow-2xs"
             role="button"
             aria-label="Minimize queue"
             title="Minimize queue"
@@ -254,7 +254,7 @@ export const FullScreenPlayer: React.FC<FullScreenPlayerProps> = ({
                 onClose();
               }
             }}
-            className="size-10 rounded-full flex items-center justify-center bg-white/[0.08] hover:bg-white/[0.18] border border-white/15 text-white active:scale-90 transition-all cursor-pointer shadow-md group"
+            className="size-10 rounded-full flex items-center justify-center bg-white hover:bg-slate-100 border border-slate-200/90 text-slate-700 active:scale-90 transition-all cursor-pointer shadow-xs group"
             aria-label={viewMode === 'queue' ? 'Minimize queue' : 'Collapse player'}
             title={viewMode === 'queue' ? 'Minimize Queue to Player' : 'Collapse Player'}
           >
@@ -262,7 +262,7 @@ export const FullScreenPlayer: React.FC<FullScreenPlayerProps> = ({
               size={22}
               strokeWidth={2.6}
               className={cn(
-                'text-white transition-transform duration-200',
+                'text-slate-700 transition-transform duration-200',
                 viewMode === 'queue' ? 'group-hover:translate-y-0.5' : 'group-hover:translate-y-0.5'
               )}
             />
@@ -270,10 +270,10 @@ export const FullScreenPlayer: React.FC<FullScreenPlayerProps> = ({
 
           {/* Center: Two-Line Typographic Header with Full Subject (No Cutoffs) */}
           <div className="flex flex-col items-center justify-center text-center px-2 min-w-0 max-w-[210px]">
-            <span className="text-[10px] font-mono tracking-widest text-slate-400 uppercase font-semibold">
+            <span className="text-[10px] font-mono tracking-widest text-slate-400 uppercase font-bold">
               {viewMode === 'queue' ? 'Playlists & Queue' : 'PLAYING FROM'}
             </span>
-            <h3 className="text-xs font-semibold text-slate-200 truncate w-full">
+            <h3 className="text-xs font-bold text-slate-900 truncate w-full">
               {displaySubjectName}
             </h3>
           </div>
@@ -285,12 +285,12 @@ export const FullScreenPlayer: React.FC<FullScreenPlayerProps> = ({
                 bridge.triggerHaptic('light');
                 onToggleOffline(currentAudio);
               }}
-              className="size-9 rounded-full flex items-center justify-center bg-white/[0.06] hover:bg-white/[0.12] border border-white/10 text-slate-300 hover:text-white active:scale-90 transition-all cursor-pointer shadow-2xs"
+              className="size-9 rounded-full flex items-center justify-center bg-white hover:bg-slate-100 border border-slate-200/90 text-slate-600 hover:text-slate-900 active:scale-90 transition-all cursor-pointer shadow-2xs"
               title={currentAudio.is_downloaded_offline ? 'Saved Offline' : 'Save for Offline Study'}
               aria-label="Toggle offline download"
             >
               {currentAudio.is_downloaded_offline ? (
-                <CheckCircle2 size={17} className="text-emerald-400" />
+                <CheckCircle2 size={17} className="text-emerald-600" />
               ) : (
                 <Download size={17} />
               )}
@@ -301,7 +301,7 @@ export const FullScreenPlayer: React.FC<FullScreenPlayerProps> = ({
                 bridge.triggerHaptic('light');
                 setActiveModal('tools');
               }}
-              className="size-9 rounded-full flex items-center justify-center bg-white/[0.06] hover:bg-white/[0.12] border border-white/10 text-slate-300 hover:text-white active:scale-90 transition-all cursor-pointer shadow-2xs"
+              className="size-9 rounded-full flex items-center justify-center bg-white hover:bg-slate-100 border border-slate-200/90 text-slate-600 hover:text-slate-900 active:scale-90 transition-all cursor-pointer shadow-2xs"
               aria-label="Study tools and options"
             >
               <MoreHorizontal size={19} />
@@ -313,24 +313,51 @@ export const FullScreenPlayer: React.FC<FullScreenPlayerProps> = ({
       {/* Screen Reader Helper for Study Mode */}
       <span className="sr-only">Study Mode</span>
 
-      {/* 2. Main Stage: Pristine Pure Black Calm UI vs Upgraded Glass Queue */}
+      {/* 2. Main Stage: Refined Vinyl & Wave Visualizer vs Upgraded Glass Queue */}
       {viewMode === 'player' ? (
-        <section className="flex-1 min-h-0 flex flex-col justify-end px-5 w-full max-w-md mx-auto z-10 pb-2 pt-4 overflow-hidden">
-          {/* Pristine Pure Black Void - Center stage is kept completely clean, calm, and uncluttered */}
-          <div className="flex-1 w-full" aria-hidden="true" />
+        <section className="flex-1 min-h-0 flex flex-col justify-between px-5 w-full max-w-md mx-auto z-10 pb-2 pt-2 overflow-hidden">
+          {/* Vinyl Disc & Organic Ambient Centerpiece */}
+          <div className="flex-1 flex flex-col items-center justify-center relative my-auto w-full">
+            {/* Ambient Animated Soundwave Layers */}
+            <div className="absolute inset-0 flex items-center justify-center pointer-events-none opacity-40 animate-disc-pulse">
+              <OrganicSoundwave isPlaying={isPlaying} />
+            </div>
 
-          {/* Test compatibility & background soundwave audio hooks rendered off-canvas */}
-          <div className="hidden animate-disc-pulse" aria-hidden="true">
-            <OrganicSoundwave isPlaying={isPlaying} />
+            {/* Premium Vinyl Disc Visualizer */}
+            <div className="relative size-56 sm:size-64 rounded-full p-2.5 bg-black/90 shadow-[0_20px_50px_-10px_rgba(15,23,42,0.25)] border-4 border-slate-900/80 flex items-center justify-center transition-transform">
+              {/* Concentric Grooves */}
+              <div
+                className={cn(
+                  'size-full rounded-full vinyl-grooves p-3 flex items-center justify-center relative shadow-inner',
+                  isPlaying ? 'animate-vinyl-spin' : 'animate-vinyl-spin-paused'
+                )}
+              >
+                {/* Vinyl Light Reflection Highlights */}
+                <div className="absolute inset-0 rounded-full bg-gradient-to-tr from-white/10 via-transparent to-white/20 pointer-events-none" />
+
+                {/* Center Label / Subject Art */}
+                <div
+                  className="size-20 sm:size-22 rounded-full border-2 border-slate-300 shadow-md flex flex-col items-center justify-center text-center p-2 z-10 relative overflow-hidden"
+                  style={{
+                    backgroundColor: matchedSubject?.color_hex ? `${matchedSubject.color_hex}25` : '#e0f2fe'
+                  }}
+                >
+                  <div className="size-3 rounded-full bg-black border-2 border-slate-200 absolute shadow-inner" />
+                  <span className="text-[10px] font-bold text-slate-800 uppercase tracking-wider truncate w-full mt-4 font-mono">
+                    {displaySubjectName}
+                  </span>
+                </div>
+              </div>
+            </div>
           </div>
 
-          {/* UP NEXT PREVIEW CARD: Minimalist Obsidian Glass Dock */}
+          {/* UP NEXT PREVIEW CARD: Minimalist Light Glass Dock */}
           <div
             onClick={() => {
               bridge.triggerHaptic('light');
               setViewMode('queue');
             }}
-            className="w-full bg-white/[0.03] hover:bg-white/[0.07] border border-white/[0.06] hover:border-white/[0.14] rounded-2xl p-3 shadow-md backdrop-blur-xl cursor-pointer transition-all duration-200 group/queuepeek active:scale-[0.99] mb-1"
+            className="w-full bg-white hover:bg-slate-50 border border-slate-200/90 rounded-2xl p-3 shadow-xs cursor-pointer transition-all duration-200 group/queuepeek active:scale-[0.99] mb-1"
             role="button"
             tabIndex={0}
             onKeyDown={(e) => {
@@ -340,7 +367,7 @@ export const FullScreenPlayer: React.FC<FullScreenPlayerProps> = ({
           >
             <div className="flex items-center justify-between gap-3">
               <div className="flex items-center gap-2.5 min-w-0">
-                <div className="size-8 rounded-xl bg-white/[0.06] border border-white/10 flex items-center justify-center text-slate-300 shrink-0 group-hover/queuepeek:text-white group-hover/queuepeek:bg-white/[0.12] transition-colors shadow-2xs">
+                <div className="size-8 rounded-xl bg-slate-100 border border-slate-200/80 flex items-center justify-center text-slate-600 shrink-0 group-hover/queuepeek:text-slate-900 group-hover/queuepeek:bg-slate-200 transition-colors shadow-2xs">
                   <ListMusic size={15} />
                 </div>
                 <div className="min-w-0">
@@ -348,16 +375,16 @@ export const FullScreenPlayer: React.FC<FullScreenPlayerProps> = ({
                     <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 font-mono">
                       {displaySubjectName}
                     </span>
-                    <span className="text-[9.5px] font-mono font-bold px-1.5 py-0.2 rounded-full bg-white/[0.06] text-slate-400 border border-white/10">
+                    <span className="text-[9.5px] font-mono font-bold px-1.5 py-0.2 rounded-full bg-slate-100 text-slate-600 border border-slate-200/70">
                       {activeSubjectQueue.length} notes
                     </span>
                   </div>
                   {nextAudio ? (
-                    <p className="text-xs font-semibold text-white truncate mt-0.5 group-hover/queuepeek:text-slate-200">
-                      Next: <span className="font-normal text-slate-300">{nextAudio.title}</span>
+                    <p className="text-xs font-semibold text-slate-900 truncate mt-0.5 group-hover/queuepeek:text-amber-700">
+                      Next: <span className="font-normal text-slate-600">{nextAudio.title}</span>
                     </p>
                   ) : (
-                    <p className="text-xs text-slate-400 truncate mt-0.5">
+                    <p className="text-xs text-slate-500 truncate mt-0.5">
                       Tap to view all {audioQueue.length} queue notes
                     </p>
                   )}
@@ -366,13 +393,13 @@ export const FullScreenPlayer: React.FC<FullScreenPlayerProps> = ({
 
               <div className="flex items-center gap-2 shrink-0">
                 {isPlaying && (
-                  <span className="inline-flex items-end gap-0.5 h-3 w-3 text-white mb-0.5">
-                    <span className="w-0.5 bg-white rounded-full animate-eq-1 h-full shadow-[0_0_6px_white]" />
-                    <span className="w-0.5 bg-white rounded-full animate-eq-2 h-2/3 shadow-[0_0_6px_white]" />
-                    <span className="w-0.5 bg-white rounded-full animate-eq-3 h-4/5 shadow-[0_0_6px_white]" />
+                  <span className="inline-flex items-end gap-0.5 h-3 w-3 text-amber-500 mb-0.5">
+                    <span className="w-0.5 bg-amber-500 rounded-full animate-eq-1 h-full" />
+                    <span className="w-0.5 bg-amber-500 rounded-full animate-eq-2 h-2/3" />
+                    <span className="w-0.5 bg-amber-500 rounded-full animate-eq-3 h-4/5" />
                   </span>
                 )}
-                <span className="text-[11px] font-semibold text-slate-300 group-hover/queuepeek:text-white px-2.5 py-1 rounded-lg bg-white/[0.06] border border-white/10 transition-colors shadow-2xs">
+                <span className="text-[11px] font-semibold text-slate-700 group-hover/queuepeek:text-slate-900 px-2.5 py-1 rounded-lg bg-slate-100 border border-slate-200/80 transition-colors shadow-2xs">
                   View Queue
                 </span>
               </div>
@@ -380,12 +407,12 @@ export const FullScreenPlayer: React.FC<FullScreenPlayerProps> = ({
           </div>
         </section>
       ) : (
-        /* PLAYLISTS & QUEUE STUDIO: In Minimalist Black-White-Modern Slaty Grey Theme */
+        /* PLAYLISTS & QUEUE STUDIO: In Minimalist Light Theme */
         <section className="flex-1 min-h-0 flex flex-col w-full max-w-md mx-auto px-4 z-10 py-1 overflow-hidden">
-          {/* Top Bar: 3-Segment Scope Controller with Glassmorphic Non-Fill Aesthetics */}
+          {/* Top Bar: 3-Segment Scope Controller */}
           <div className="space-y-2 mb-2 shrink-0">
             {/* 3-Segment Scope Controller */}
-            <div className="grid grid-cols-3 gap-1 bg-white/[0.04] border border-white/[0.08] backdrop-blur-xl rounded-2xl p-1 shadow-2xs">
+            <div className="grid grid-cols-3 gap-1 bg-slate-100/90 border border-slate-200/90 rounded-2xl p-1 shadow-2xs">
               <button
                 onClick={() => {
                   bridge.triggerHaptic('light');
@@ -394,8 +421,8 @@ export const FullScreenPlayer: React.FC<FullScreenPlayerProps> = ({
                 className={cn(
                   'py-2 px-2.5 rounded-xl text-xs font-semibold truncate transition-all cursor-pointer text-center',
                   queueScope === 'subject'
-                    ? 'bg-white text-black font-extrabold shadow-[0_4px_15px_rgba(255,255,255,0.2)]'
-                    : 'text-slate-400 hover:text-white hover:bg-white/[0.05]'
+                    ? 'bg-white text-black font-extrabold shadow-sm'
+                    : 'text-slate-500 hover:text-slate-900 hover:bg-white/50'
                 )}
               >
                 {displaySubjectName} ({activeSubjectQueue.length})
@@ -409,8 +436,8 @@ export const FullScreenPlayer: React.FC<FullScreenPlayerProps> = ({
                 className={cn(
                   'py-2 px-2.5 rounded-xl text-xs font-semibold truncate transition-all cursor-pointer text-center',
                   queueScope === 'all'
-                    ? 'bg-white text-black font-extrabold shadow-[0_4px_15px_rgba(255,255,255,0.2)]'
-                    : 'text-slate-400 hover:text-white hover:bg-white/[0.05]'
+                    ? 'bg-white text-black font-extrabold shadow-sm'
+                    : 'text-slate-500 hover:text-slate-900 hover:bg-white/50'
                 )}
               >
                 All Notes ({audioQueue.length})
@@ -424,16 +451,16 @@ export const FullScreenPlayer: React.FC<FullScreenPlayerProps> = ({
                 className={cn(
                   'py-2 px-2.5 rounded-xl text-xs font-semibold truncate transition-all cursor-pointer flex items-center justify-center gap-1.5',
                   queueScope === 'favorites'
-                    ? 'bg-white text-black font-extrabold shadow-[0_4px_15px_rgba(255,255,255,0.2)]'
-                    : 'text-slate-400 hover:text-white hover:bg-white/[0.05]'
+                    ? 'bg-white text-black font-extrabold shadow-sm'
+                    : 'text-slate-500 hover:text-slate-900 hover:bg-white/50'
                 )}
               >
-                <Heart size={12} className={queueScope === 'favorites' ? 'fill-black text-black' : 'text-slate-400'} />
+                <Heart size={12} className={queueScope === 'favorites' ? 'fill-rose-500 text-rose-500' : 'text-slate-400'} />
                 <span>Favorites ({favoriteAudioList.length})</span>
               </button>
             </div>
 
-            {/* Glassmorphic Search Bar */}
+            {/* Modern Light Search Bar */}
             <div className="relative">
               <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
               <input
@@ -441,12 +468,12 @@ export const FullScreenPlayer: React.FC<FullScreenPlayerProps> = ({
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="Search notes in queue..."
-                className="w-full bg-white/[0.04] border border-white/[0.08] focus:border-white/25 rounded-xl pl-8 pr-8 py-2 text-xs text-white placeholder-slate-400 focus:outline-none transition-all shadow-inner backdrop-blur-md"
+                className="w-full bg-white border border-slate-200/90 focus:border-slate-400 rounded-xl pl-8 pr-8 py-2 text-xs text-slate-900 placeholder-slate-400 focus:outline-none transition-all shadow-2xs"
               />
               {searchQuery && (
                 <button
                   onClick={() => setSearchQuery('')}
-                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white p-1"
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700 p-1"
                 >
                   <X size={13} />
                 </button>
@@ -454,30 +481,30 @@ export const FullScreenPlayer: React.FC<FullScreenPlayerProps> = ({
             </div>
           </div>
 
-          {/* Scrollable Track Queue (Deduplicated with High-End Glass Cards) */}
+          {/* Scrollable Track Queue (Deduplicated with Refined Cards) */}
           <div className="flex-1 min-h-0 overflow-y-auto space-y-2 pr-0.5 no-scrollbar">
             {/* 1. ELEVATED "NOW PLAYING" CARD */}
-            <div className="p-3.5 rounded-2xl bg-gradient-to-br from-white/[0.08] via-white/[0.04] to-transparent border border-white/20 shadow-xl backdrop-blur-xl flex items-center justify-between gap-3">
+            <div className="p-3.5 rounded-2xl bg-white border border-slate-200/90 shadow-sm flex items-center justify-between gap-3">
               <div className="flex items-center gap-3 min-w-0">
-                <div className="size-11 rounded-xl bg-white/[0.08] border border-white/15 flex items-center justify-center shrink-0 text-white shadow-inner">
+                <div className="size-11 rounded-xl bg-amber-50 border border-amber-200/80 flex items-center justify-center shrink-0 text-amber-600 shadow-2xs">
                   {isPlaying ? (
-                    <span className="inline-flex items-end gap-0.5 h-3.5 w-3.5 text-white">
-                      <span className="w-0.5 bg-white rounded-full animate-eq-1 h-full shadow-[0_0_8px_white]" />
-                      <span className="w-0.5 bg-white rounded-full animate-eq-2 h-2/3 shadow-[0_0_8px_white]" />
-                      <span className="w-0.5 bg-white rounded-full animate-eq-3 h-4/5 shadow-[0_0_8px_white]" />
+                    <span className="inline-flex items-end gap-0.5 h-3.5 w-3.5 text-amber-600">
+                      <span className="w-0.5 bg-amber-600 rounded-full animate-eq-1 h-full" />
+                      <span className="w-0.5 bg-amber-600 rounded-full animate-eq-2 h-2/3" />
+                      <span className="w-0.5 bg-amber-600 rounded-full animate-eq-3 h-4/5" />
                     </span>
                   ) : (
-                    <Play size={16} className="fill-white text-white translate-x-0.5" />
+                    <Play size={16} className="fill-amber-600 text-amber-600 translate-x-0.5" />
                   )}
                 </div>
                 <div className="min-w-0">
-                  <span className="text-[9.5px] font-mono font-bold tracking-widest text-emerald-400 uppercase">
+                  <span className="text-[9.5px] font-mono font-bold tracking-widest text-emerald-700 uppercase">
                     NOW PLAYING
                   </span>
-                  <h4 className="text-xs sm:text-sm font-bold text-white line-clamp-2 leading-snug">
+                  <h4 className="text-xs sm:text-sm font-bold text-slate-900 line-clamp-2 leading-snug">
                     {currentAudio.title}
                   </h4>
-                  <div className="flex items-center gap-1.5 text-[10px] text-slate-400 font-mono mt-0.5">
+                  <div className="flex items-center gap-1.5 text-[10px] text-slate-500 font-mono mt-0.5">
                     <span className="truncate">{displaySubjectName}</span>
                     <span>•</span>
                     <span>{formatDuration(safePosition)} / {formatDuration(safeDuration)}</span>
@@ -488,10 +515,10 @@ export const FullScreenPlayer: React.FC<FullScreenPlayerProps> = ({
               <div className="flex items-center gap-1 shrink-0">
                 <button
                   onClick={handlePlayPause}
-                  className="size-9 rounded-full bg-white text-black flex items-center justify-center active:scale-90 transition-transform cursor-pointer shadow-md"
+                  className="size-9 rounded-full bg-slate-950 text-white flex items-center justify-center active:scale-90 transition-transform cursor-pointer shadow-xs"
                   aria-label={isPlaying ? 'Pause' : 'Play'}
                 >
-                  {isPlaying ? <Pause size={16} className="fill-black" /> : <Play size={16} className="fill-black translate-x-0.5" />}
+                  {isPlaying ? <Pause size={16} className="fill-white" /> : <Play size={16} className="fill-white translate-x-0.5" />}
                 </button>
               </div>
             </div>
@@ -526,11 +553,11 @@ export const FullScreenPlayer: React.FC<FullScreenPlayerProps> = ({
                       bridge.triggerHaptic('medium');
                       if (onSelectTrack) onSelectTrack(item);
                     }}
-                    className="p-3 rounded-2xl bg-white/[0.025] hover:bg-white/[0.06] border border-white/[0.05] hover:border-white/[0.15] transition-all duration-150 flex items-center justify-between gap-3 cursor-pointer group active:scale-[0.985] shadow-2xs"
+                    className="p-3 rounded-2xl bg-white hover:bg-slate-50 border border-slate-200/80 hover:border-slate-300 transition-all duration-150 flex items-center justify-between gap-3 cursor-pointer group active:scale-[0.985] shadow-2xs"
                   >
                     {/* Left: 40px Rounded Squircle Subject Icon */}
                     <div
-                      className="size-10 rounded-xl flex items-center justify-center shrink-0 border border-white/10 shadow-xs"
+                      className="size-10 rounded-xl flex items-center justify-center shrink-0 border border-slate-200/80 shadow-2xs"
                       style={{ background: itemVisual.colorHex + '20', color: itemVisual.colorHex }}
                     >
                       <ItemIcon size={18} />
@@ -538,10 +565,10 @@ export const FullScreenPlayer: React.FC<FullScreenPlayerProps> = ({
 
                     {/* Center: Title (2-line clamp to prevent clipping) & Metadata */}
                     <div className="flex-1 min-w-0">
-                      <h5 className="text-xs sm:text-sm font-semibold text-slate-200 group-hover:text-white line-clamp-2 leading-snug">
+                      <h5 className="text-xs sm:text-sm font-semibold text-slate-900 group-hover:text-amber-700 line-clamp-2 leading-snug">
                         {item.title}
                       </h5>
-                      <div className="flex items-center gap-1.5 text-[10.5px] text-slate-400 font-mono mt-0.5">
+                      <div className="flex items-center gap-1.5 text-[10.5px] text-slate-500 font-mono mt-0.5">
                         <span className="truncate">{item.subject_name || 'Academic'}</span>
                         <span>•</span>
                         <span>{formatDuration(item.duration_seconds || 60)}</span>
@@ -552,17 +579,17 @@ export const FullScreenPlayer: React.FC<FullScreenPlayerProps> = ({
                     <div className="flex items-center gap-1.5 shrink-0" onClick={(e) => e.stopPropagation()}>
                       {item.is_downloaded_offline && (
                         <span title="Offline ready">
-                          <CheckCircle2 size={16} className="text-emerald-400" />
+                          <CheckCircle2 size={16} className="text-emerald-600" />
                         </span>
                       )}
                       <button
                         onClick={() => onToggleFavorite(item.id)}
-                        className="p-1.5 text-slate-500 hover:text-white cursor-pointer active:scale-85 transition-transform"
+                        className="p-1.5 text-slate-400 hover:text-rose-500 cursor-pointer active:scale-85 transition-transform"
                         aria-label={item.is_favorite ? 'Remove favorite' : 'Add favorite'}
                       >
                         <Heart
                           size={16}
-                          className={item.is_favorite ? 'text-white fill-white' : ''}
+                          className={item.is_favorite ? 'text-rose-500 fill-rose-500' : ''}
                         />
                       </button>
                     </div>
@@ -577,13 +604,13 @@ export const FullScreenPlayer: React.FC<FullScreenPlayerProps> = ({
       {/* 3. Audio Title & Favorite Heart Row (2-Line Clamp to Prevent Text Clipping) */}
       <div className="w-full max-w-md mx-auto px-6 mb-2 flex items-center justify-between gap-4 z-10 shrink-0">
         <div className="flex-1 min-w-0">
-          <h2 className="text-2xl font-black text-white tracking-tight leading-snug line-clamp-2">
+          <h2 className="text-2xl font-black text-slate-950 tracking-tight leading-snug line-clamp-2">
             {currentAudio.title}
           </h2>
-          <p className="text-sm font-medium text-slate-400 mt-0.5 truncate flex items-center gap-1.5">
+          <p className="text-sm font-medium text-slate-500 mt-0.5 truncate flex items-center gap-1.5">
             <span>{displaySubjectName}</span>
-            <span className="text-slate-600">•</span>
-            <span className="font-mono text-slate-400">{playbackSpeed}×</span>
+            <span className="text-slate-300">•</span>
+            <span className="font-mono text-slate-600">{playbackSpeed}×</span>
           </p>
         </div>
 
@@ -598,16 +625,16 @@ export const FullScreenPlayer: React.FC<FullScreenPlayerProps> = ({
             size={26}
             className={
               currentAudio.is_favorite
-                ? 'text-white fill-white transition-colors'
-                : 'text-white/80 hover:text-white stroke-[2.2] transition-colors'
+                ? 'text-rose-500 fill-rose-500 transition-colors'
+                : 'text-slate-400 hover:text-slate-700 stroke-[2.2] transition-colors'
             }
           />
         </button>
       </div>
 
-      {/* 4. Bottom Player Controls & Slender White Scrubber */}
+      {/* 4. Bottom Player Controls & Slender Scrubber */}
       <footer className="w-full max-w-md mx-auto shrink-0 px-6 pb-6 pt-1 space-y-4 z-10">
-        {/* High-Precision Slender White Seek Bar */}
+        {/* High-Precision Slender Seek Bar */}
         <div className="space-y-1.5">
           <Slider
             value={currentDisplayPos}
@@ -625,18 +652,18 @@ export const FullScreenPlayer: React.FC<FullScreenPlayerProps> = ({
               setScrubPosition(null);
             }}
             formatTooltip={(val) => formatDuration(val)}
-            trackClassName="bg-zinc-800/90 h-1"
-            rangeClassName="bg-white"
-            thumbClassName="size-3.5 bg-white border-white shadow-md active:scale-125"
+            trackClassName="bg-slate-200/90 h-1"
+            rangeClassName="bg-slate-900"
+            thumbClassName="size-3.5 bg-slate-900 border-white shadow-md active:scale-125"
             aria-label="Audio scrubber"
           />
 
-          <div className="flex justify-between items-center text-xs font-mono font-medium text-slate-400 px-0.5 select-none">
+          <div className="flex justify-between items-center text-xs font-mono font-medium text-slate-500 px-0.5 select-none">
             <span>{formatDuration(currentDisplayPos)}</span>
             {abLoop?.enabled && (
               <Badge
                 variant="outline"
-                className="text-[10px] py-0 px-2 font-mono bg-amber-500/15 border border-amber-500/40 text-amber-300"
+                className="text-[10px] py-0 px-2 font-mono bg-amber-50 border border-amber-200 text-amber-800"
               >
                 LOOP {formatDuration(abLoop.startSeconds)}–{formatDuration(abLoop.endSeconds)}
               </Badge>
@@ -646,7 +673,7 @@ export const FullScreenPlayer: React.FC<FullScreenPlayerProps> = ({
         </div>
 
         {/* Primary Controls Row: Exactly 5 Symmetrical Controls */}
-        <div className="flex items-center justify-between px-2 sm:px-4 text-white">
+        <div className="flex items-center justify-between px-2 sm:px-4 text-slate-900">
           {/* Shuffle / Mode Button */}
           <button
             onClick={handleToggleRepeatMode}
@@ -657,7 +684,7 @@ export const FullScreenPlayer: React.FC<FullScreenPlayerProps> = ({
             <Shuffle
               size={21}
               className={
-                isRepeatQueue ? 'text-emerald-400' : 'text-white/70 hover:text-white transition-colors'
+                isRepeatQueue ? 'text-emerald-600' : 'text-slate-400 hover:text-slate-900 transition-colors'
               }
             />
           </button>
@@ -669,13 +696,13 @@ export const FullScreenPlayer: React.FC<FullScreenPlayerProps> = ({
             aria-label="Rewind 10 seconds"
             title="Previous track (or -10s)"
           >
-            <SkipBack size={26} className="text-white fill-white hover:scale-105 transition-transform" />
+            <SkipBack size={26} className="text-slate-900 fill-slate-900 hover:scale-105 transition-transform" />
           </button>
 
-          {/* Hero Solid White Play / Pause Button */}
+          {/* Hero Play / Pause Button */}
           <button
             onClick={handlePlayPause}
-            className="size-16 sm:size-17 rounded-full bg-white text-black shadow-[0_10px_35px_rgba(255,255,255,0.22)] active:scale-95 hover:scale-105 transition-all flex items-center justify-center cursor-pointer"
+            className="size-16 sm:size-17 rounded-full bg-white text-black border border-slate-200/90 shadow-[0_8px_24px_rgba(15,23,42,0.12)] active:scale-95 hover:scale-105 transition-all flex items-center justify-center cursor-pointer"
             aria-label={isPlaying ? 'Pause' : 'Play'}
           >
             {isPlaying ? (
@@ -692,7 +719,7 @@ export const FullScreenPlayer: React.FC<FullScreenPlayerProps> = ({
             aria-label="Forward 15 seconds"
             title="Next track (or +15s)"
           >
-            <SkipForward size={26} className="text-white fill-white hover:scale-105 transition-transform" />
+            <SkipForward size={26} className="text-slate-900 fill-slate-900 hover:scale-105 transition-transform" />
           </button>
 
           {/* Repeat Track Toggle */}
@@ -703,25 +730,25 @@ export const FullScreenPlayer: React.FC<FullScreenPlayerProps> = ({
             title={isRepeatTrack ? 'Repeat Track' : isRepeatQueue ? 'Repeat All' : 'Repeat Off'}
           >
             {isRepeatTrack ? (
-              <Repeat1 size={21} className="text-emerald-400" />
+              <Repeat1 size={21} className="text-emerald-600" />
             ) : (
               <Repeat
                 size={21}
                 className={
-                  isRepeatQueue ? 'text-white' : 'text-white/70 hover:text-white transition-colors'
+                  isRepeatQueue ? 'text-slate-900' : 'text-slate-400 hover:text-slate-900 transition-colors'
                 }
               />
             )}
           </button>
         </div>
 
-        {/* Refined Glassmorphic Toolstrip: Zero Clutter, Zero Redundancy */}
-        <div className="flex items-center justify-between gap-2 pt-2 text-slate-400">
+        {/* Refined Toolstrip: Zero Clutter, Zero Redundancy */}
+        <div className="flex items-center justify-between gap-2 pt-2 text-slate-500">
           <div className="flex items-center gap-2">
             {/* Speed Pill: Tap cycles directly through 1.0x -> 1.25x -> 1.5x -> 2.0x */}
             <button
               onClick={handleCycleSpeed}
-              className="py-1 px-3 rounded-full bg-white/[0.05] hover:bg-white/[0.10] border border-white/10 hover:border-white/20 text-xs font-mono font-medium text-slate-200 hover:text-white transition-all active:scale-95 shadow-2xs cursor-pointer backdrop-blur-md"
+              className="py-1 px-3 rounded-full bg-white hover:bg-slate-100 border border-slate-200/90 text-xs font-mono font-semibold text-slate-800 transition-all active:scale-95 shadow-2xs cursor-pointer"
               title="Tap to cycle playback speed (1.0x, 1.25x, 1.5x, 2.0x)"
             >
               <span>{playbackSpeed}× Speed</span>
@@ -734,14 +761,14 @@ export const FullScreenPlayer: React.FC<FullScreenPlayerProps> = ({
                 setActiveModal('ab_loop');
               }}
               className={cn(
-                'py-1 px-3 rounded-full border text-xs font-medium transition-all active:scale-95 shadow-2xs flex items-center gap-1 cursor-pointer backdrop-blur-md',
+                'py-1 px-3 rounded-full border text-xs font-semibold transition-all active:scale-95 shadow-2xs flex items-center gap-1 cursor-pointer',
                 abLoop?.enabled
-                  ? 'bg-amber-500/15 border-amber-500/40 text-amber-300'
-                  : 'bg-white/[0.05] hover:bg-white/[0.10] border-white/10 hover:border-white/20 text-slate-200 hover:text-white'
+                  ? 'bg-amber-50 border-amber-200 text-amber-800'
+                  : 'bg-white hover:bg-slate-100 border-slate-200/90 text-slate-800'
               )}
               title="A-B Repeat Interval for memorization"
             >
-              <BookmarkCheck size={12} className={abLoop?.enabled ? 'text-amber-400' : 'text-slate-400'} />
+              <BookmarkCheck size={12} className={abLoop?.enabled ? 'text-amber-600' : 'text-slate-400'} />
               <span>{abLoop?.enabled ? 'Loop On' : 'A⇄B Loop'}</span>
             </button>
 
@@ -752,14 +779,14 @@ export const FullScreenPlayer: React.FC<FullScreenPlayerProps> = ({
                 setActiveModal('sleep');
               }}
               className={cn(
-                'py-1 px-3 rounded-full border text-xs font-medium transition-all active:scale-95 shadow-2xs flex items-center gap-1 cursor-pointer backdrop-blur-md',
+                'py-1 px-3 rounded-full border text-xs font-semibold transition-all active:scale-95 shadow-2xs flex items-center gap-1 cursor-pointer',
                 sleepTimerRemainingSeconds
-                  ? 'bg-emerald-500/15 border-emerald-500/40 text-emerald-300'
-                  : 'bg-white/[0.05] hover:bg-white/[0.10] border-white/10 hover:border-white/20 text-slate-200 hover:text-white'
+                  ? 'bg-emerald-50 border-emerald-200 text-emerald-800'
+                  : 'bg-white hover:bg-slate-100 border-slate-200/90 text-slate-800'
               )}
               title="Sleep timer"
             >
-              <Timer size={12} className={sleepTimerRemainingSeconds ? 'text-emerald-400' : 'text-slate-400'} />
+              <Timer size={12} className={sleepTimerRemainingSeconds ? 'text-emerald-600' : 'text-slate-400'} />
               <span>
                 {sleepTimerRemainingSeconds
                   ? `${Math.ceil(sleepTimerRemainingSeconds / 60)}m`
@@ -776,8 +803,8 @@ export const FullScreenPlayer: React.FC<FullScreenPlayerProps> = ({
             }}
             className={`size-9 flex items-center justify-center active:scale-90 transition-all cursor-pointer rounded-full ${
               viewMode === 'queue'
-                ? 'text-white bg-white/20 border border-white/30 shadow-md'
-                : 'text-slate-400 hover:text-white hover:bg-white/10 border border-transparent'
+                ? 'text-slate-900 bg-slate-200 border border-slate-300 shadow-xs'
+                : 'text-slate-400 hover:text-slate-900 hover:bg-slate-100 border border-transparent'
             }`}
             aria-label="Queue and library"
             title="Toggle playlist and queue"
@@ -787,14 +814,14 @@ export const FullScreenPlayer: React.FC<FullScreenPlayerProps> = ({
         </div>
       </footer>
 
-      {/* 5. DARK AESTHETIC STUDY TOOLS & OPTIONS MODAL SHEET */}
+      {/* 5. LIGHT AESTHETIC STUDY TOOLS & OPTIONS MODAL SHEET */}
       {activeModal !== 'none' && (
         <ModalPortal>
           <div
             role="dialog"
             aria-modal="true"
             aria-labelledby="player-modal-title"
-            className="fixed inset-0 z-[70] bg-black/80 backdrop-blur-md flex items-center justify-center p-4 sm:p-6 overflow-y-auto safe-top safe-bottom animate-in fade-in duration-150"
+            className="fixed inset-0 z-[70] bg-slate-950/40 backdrop-blur-sm flex items-center justify-center p-4 sm:p-6 overflow-y-auto safe-top safe-bottom animate-in fade-in duration-150"
             onClick={(e) => {
               if (e.target === e.currentTarget) {
                 setActiveModal('none');
@@ -802,146 +829,146 @@ export const FullScreenPlayer: React.FC<FullScreenPlayerProps> = ({
             }}
           >
             <div
-              className="w-full max-w-sm sm:max-w-md bg-zinc-950/98 backdrop-blur-2xl rounded-3xl border border-zinc-800 shadow-[0_25px_60px_rgba(0,0,0,0.85)] p-4 sm:p-5 space-y-4 my-auto max-h-[85vh] overflow-y-auto animate-in zoom-in-95 duration-150 text-white"
+              className="w-full max-w-sm sm:max-w-md bg-white rounded-3xl border border-slate-200 shadow-2xl p-4 sm:p-5 space-y-4 my-auto max-h-[85vh] overflow-y-auto animate-in zoom-in-95 duration-150 text-slate-900"
               onClick={(e) => e.stopPropagation()}
             >
               {/* Modal Header */}
-              <div className="flex items-center justify-between pb-2 border-b border-zinc-800/80">
+              <div className="flex items-center justify-between pb-2 border-b border-slate-100">
                 <div className="flex items-center gap-2">
-                  <div className="size-8 rounded-xl bg-zinc-900 border border-zinc-800 flex items-center justify-center text-white">
-                    {activeModal === 'ab_loop' && <BookmarkCheck size={16} className="text-amber-400" />}
-                    {activeModal === 'sleep' && <Timer size={16} className="text-emerald-400" />}
+                  <div className="size-8 rounded-xl bg-slate-100 border border-slate-200 flex items-center justify-center text-slate-800">
+                    {activeModal === 'ab_loop' && <BookmarkCheck size={16} className="text-amber-600" />}
+                    {activeModal === 'sleep' && <Timer size={16} className="text-emerald-600" />}
                     {activeModal === 'speed' && <SlidersHorizontal size={16} />}
                     {activeModal === 'tools' && <MoreHorizontal size={16} />}
                   </div>
                   <div>
-                    <h4 id="player-modal-title" className="text-sm font-bold text-white leading-tight">
-                    {activeModal === 'ab_loop' && 'A⇄B Repeat Segment'}
-                    {activeModal === 'sleep' && 'Sleep Timer'}
-                    {activeModal === 'speed' && 'Playback Speed'}
-                    {activeModal === 'tools' && 'Note Options & Tools'}
-                  </h4>
-                  <p className="text-[11px] text-zinc-400 font-medium">
-                    {activeModal === 'ab_loop' && 'Visual slider & selector for repeat interval'}
-                    {activeModal === 'sleep' && 'Automatically pause when timer completes'}
-                    {activeModal === 'speed' && 'Speed up or slow down narration'}
-                    {activeModal === 'tools' && 'Fine-tune loop interval, timer & speed'}
-                  </p>
+                    <h4 id="player-modal-title" className="text-sm font-bold text-slate-900 leading-tight">
+                      {activeModal === 'ab_loop' && 'A⇄B Repeat Segment'}
+                      {activeModal === 'sleep' && 'Sleep Timer'}
+                      {activeModal === 'speed' && 'Playback Speed'}
+                      {activeModal === 'tools' && 'Note Options & Tools'}
+                    </h4>
+                    <p className="text-[11px] text-slate-500 font-medium">
+                      {activeModal === 'ab_loop' && 'Visual slider & selector for repeat interval'}
+                      {activeModal === 'sleep' && 'Automatically pause when timer completes'}
+                      {activeModal === 'speed' && 'Speed up or slow down narration'}
+                      {activeModal === 'tools' && 'Fine-tune loop interval, timer & speed'}
+                    </p>
+                  </div>
                 </div>
+
+                <button
+                  onClick={() => {
+                    bridge.triggerHaptic('light');
+                    setActiveModal('none');
+                  }}
+                  className="size-8 rounded-full bg-slate-100 hover:bg-slate-200 border border-slate-200 text-slate-500 hover:text-slate-900 flex items-center justify-center transition-colors cursor-pointer"
+                  aria-label="Close dialog"
+                >
+                  <X size={16} />
+                </button>
               </div>
 
-              <button
-                onClick={() => {
-                  bridge.triggerHaptic('light');
-                  setActiveModal('none');
-                }}
-                className="size-8 rounded-full bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 text-zinc-400 hover:text-white flex items-center justify-center transition-colors cursor-pointer"
-                aria-label="Close dialog"
-              >
-                <X size={16} />
-              </button>
+              {/* Modal Body: A-B Repeat Tool */}
+              {(activeModal === 'ab_loop' || activeModal === 'tools') && (
+                <LoopIntervalSelector
+                  currentPosition={safePosition}
+                  duration={safeDuration}
+                  activeLoop={abLoop}
+                  onSetLoop={(start, end) => {
+                    bridge.triggerHaptic('medium');
+                    onToggleABLoop(start, end);
+                  }}
+                  onClearLoop={() => {
+                    bridge.triggerHaptic('medium');
+                    onToggleABLoop(undefined, undefined);
+                  }}
+                  onSeek={(sec) => {
+                    bridge.triggerHaptic('light');
+                    onSeek(sec);
+                  }}
+                />
+              )}
+
+              {/* Modal Body: Sleep Timer */}
+              {(activeModal === 'sleep' || activeModal === 'tools') && (
+                <div className="space-y-2.5 pt-1">
+                  <div className="flex items-center justify-between text-xs px-1">
+                    <span className="font-semibold text-slate-700">Timer Presets</span>
+                    <span className="text-[11px] font-mono text-emerald-700 font-bold">
+                      {sleepTimerRemainingSeconds
+                        ? `${Math.ceil(sleepTimerRemainingSeconds / 60)} min remaining`
+                        : 'Off'}
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-3 gap-2">
+                    {timerOptions.map((opt, i) => {
+                      const isSelected =
+                        (opt.minutes === null && !sleepTimerRemainingSeconds) ||
+                        (opt.minutes &&
+                          sleepTimerRemainingSeconds &&
+                          Math.abs(Math.ceil(sleepTimerRemainingSeconds / 60) - opt.minutes) <= 1);
+
+                      return (
+                        <button
+                          key={i}
+                          onClick={() => {
+                            bridge.triggerHaptic('light');
+                            onSetSleepTimer(opt.minutes);
+                            setActiveModal('none');
+                          }}
+                          className={`py-2 px-2 rounded-2xl text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1 shadow-2xs ${
+                            isSelected
+                              ? 'bg-slate-950 text-white shadow-sm font-black'
+                              : 'bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200'
+                          }`}
+                        >
+                          {isSelected && <Check size={12} />}
+                          <span>{opt.label}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* Modal Body: Speed Presets (when speed modal is selected or in tools) */}
+              {(activeModal === 'speed' || activeModal === 'tools') && (
+                <div className="space-y-2.5 pt-1">
+                  <div className="flex items-center justify-between text-xs px-1">
+                    <span className="font-semibold text-slate-700">Speed Presets</span>
+                    <span className="text-[11px] font-mono text-slate-600 font-bold">
+                      {playbackSpeed}×
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-4 gap-2">
+                    {speedCycleList.map((spd) => {
+                      const isSelected = Math.abs(playbackSpeed - spd) < 0.05;
+                      return (
+                        <button
+                          key={spd}
+                          onClick={() => {
+                            bridge.triggerHaptic('light');
+                            onSetSpeed(spd);
+                            setActiveModal('none');
+                          }}
+                          className={`py-2 px-2 rounded-2xl text-xs font-mono font-bold transition-all cursor-pointer flex items-center justify-center gap-1 shadow-2xs ${
+                            isSelected
+                              ? 'bg-slate-950 text-white shadow-sm font-black'
+                              : 'bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200'
+                          }`}
+                        >
+                          {spd}×
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
             </div>
-
-            {/* Modal Body: A-B Repeat Tool */}
-            {(activeModal === 'ab_loop' || activeModal === 'tools') && (
-              <LoopIntervalSelector
-                currentPosition={safePosition}
-                duration={safeDuration}
-                activeLoop={abLoop}
-                onSetLoop={(start, end) => {
-                  bridge.triggerHaptic('medium');
-                  onToggleABLoop(start, end);
-                }}
-                onClearLoop={() => {
-                  bridge.triggerHaptic('medium');
-                  onToggleABLoop(undefined, undefined);
-                }}
-                onSeek={(sec) => {
-                  bridge.triggerHaptic('light');
-                  onSeek(sec);
-                }}
-              />
-            )}
-
-            {/* Modal Body: Sleep Timer */}
-            {(activeModal === 'sleep' || activeModal === 'tools') && (
-              <div className="space-y-2.5 pt-1">
-                <div className="flex items-center justify-between text-xs px-1">
-                  <span className="font-semibold text-zinc-300">Timer Presets</span>
-                  <span className="text-[11px] font-mono text-emerald-400 font-bold">
-                    {sleepTimerRemainingSeconds
-                      ? `${Math.ceil(sleepTimerRemainingSeconds / 60)} min remaining`
-                      : 'Off'}
-                  </span>
-                </div>
-
-                <div className="grid grid-cols-3 gap-2">
-                  {timerOptions.map((opt, i) => {
-                    const isSelected =
-                      (opt.minutes === null && !sleepTimerRemainingSeconds) ||
-                      (opt.minutes &&
-                        sleepTimerRemainingSeconds &&
-                        Math.abs(Math.ceil(sleepTimerRemainingSeconds / 60) - opt.minutes) <= 1);
-
-                    return (
-                      <button
-                        key={i}
-                        onClick={() => {
-                          bridge.triggerHaptic('light');
-                          onSetSleepTimer(opt.minutes);
-                          setActiveModal('none');
-                        }}
-                        className={`py-2 px-2 rounded-2xl text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1 shadow-2xs ${
-                          isSelected
-                            ? 'bg-white text-black shadow-sm scale-102 font-black'
-                            : 'bg-zinc-900 hover:bg-zinc-800 text-zinc-300 border border-zinc-800'
-                        }`}
-                      >
-                        {isSelected && <Check size={12} />}
-                        <span>{opt.label}</span>
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
-
-            {/* Modal Body: Speed Presets (when speed modal is selected or in tools) */}
-            {(activeModal === 'speed' || activeModal === 'tools') && (
-              <div className="space-y-2.5 pt-1">
-                <div className="flex items-center justify-between text-xs px-1">
-                  <span className="font-semibold text-zinc-300">Speed Presets</span>
-                  <span className="text-[11px] font-mono text-zinc-400 font-bold">
-                    {playbackSpeed}×
-                  </span>
-                </div>
-
-                <div className="grid grid-cols-4 gap-2">
-                  {speedCycleList.map((spd) => {
-                    const isSelected = Math.abs(playbackSpeed - spd) < 0.05;
-                    return (
-                      <button
-                        key={spd}
-                        onClick={() => {
-                          bridge.triggerHaptic('light');
-                          onSetSpeed(spd);
-                          setActiveModal('none');
-                        }}
-                        className={`py-2 px-2 rounded-2xl text-xs font-mono font-bold transition-all cursor-pointer flex items-center justify-center gap-1 shadow-2xs ${
-                          isSelected
-                            ? 'bg-white text-black shadow-sm font-black'
-                            : 'bg-zinc-900 hover:bg-zinc-800 text-zinc-300 border border-zinc-800'
-                        }`}
-                      >
-                        {spd}×
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
           </div>
-        </div>
         </ModalPortal>
       )}
     </div>

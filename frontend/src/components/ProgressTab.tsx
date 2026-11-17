@@ -19,10 +19,10 @@ export const ProgressTab: React.FC<ProgressTabProps> = ({
   const avgMinutesPerActiveDay = activeDays > 0 ? Math.round((totalLifetimeSeconds / activeDays) / 60) : 0;
 
   return (
-    <div className="space-y-4 pb-28 pt-3 px-4 max-w-md mx-auto">
+    <div className="space-y-4 pb-36 pt-3 px-4 max-w-md mx-auto animate-in">
       {/* Header */}
       <div className="pt-1">
-        <h1 className="text-2xl font-black text-slate-950 tracking-tight">
+        <h1 className="text-2xl font-bold text-slate-900 tracking-tight">
           Study Progress
         </h1>
         <p className="text-xs text-slate-500 mt-0.5">
@@ -30,43 +30,43 @@ export const ProgressTab: React.FC<ProgressTabProps> = ({
         </p>
       </div>
 
-      {/* Overview Metrics Cards (Matching the 3 pastel palettes) */}
+      {/* Overview Metrics Cards */}
       <div className="grid grid-cols-3 gap-2">
-        {/* Exposure (Lavender / Blue) */}
-        <div className="bg-[#EEECFE] border border-indigo-150/70 p-3 rounded-2xl text-center space-y-1 shadow-2xs">
-          <div className="w-8 h-8 rounded-xl bg-indigo-100 text-indigo-700 flex items-center justify-center mx-auto shadow-2xs">
+        {/* Exposure (Indigo) */}
+        <div className="bg-white border border-slate-200/90 p-3 rounded-2xl text-center space-y-1 shadow-2xs hover:shadow-xs transition-all">
+          <div className="w-8 h-8 rounded-xl bg-indigo-50 border border-indigo-200/60 text-indigo-700 flex items-center justify-center mx-auto shadow-2xs">
             <Headphones size={15} />
           </div>
-          <span className="text-lg font-black font-mono text-slate-950 block">
+          <span className="text-lg font-bold font-mono text-slate-900 block">
             {totalHours}h
           </span>
-          <span className="text-[10px] uppercase font-bold text-indigo-900 block font-mono">
+          <span className="text-[10px] uppercase font-bold text-slate-500 block font-mono">
             Exposure
           </span>
         </div>
 
-        {/* Completed (Mint Green) */}
-        <div className="bg-[#E8F8F0] border border-emerald-200/70 p-3 rounded-2xl text-center space-y-1 shadow-2xs">
-          <div className="w-8 h-8 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center mx-auto shadow-2xs">
+        {/* Completed (Emerald) */}
+        <div className="bg-white border border-slate-200/90 p-3 rounded-2xl text-center space-y-1 shadow-2xs hover:shadow-xs transition-all">
+          <div className="w-8 h-8 rounded-xl bg-emerald-50 border border-emerald-200/60 text-emerald-700 flex items-center justify-center mx-auto shadow-2xs">
             <CheckCircle2 size={15} />
           </div>
-          <span className="text-lg font-black font-mono text-slate-950 block">
+          <span className="text-lg font-bold font-mono text-slate-900 block">
             {totalCompletedPlays}
           </span>
-          <span className="text-[10px] uppercase font-bold text-emerald-900 block font-mono">
+          <span className="text-[10px] uppercase font-bold text-slate-500 block font-mono">
             Completed
           </span>
         </div>
 
-        {/* Active Days (Yellow / Amber) */}
-        <div className="bg-[#FFF5D6] border border-amber-200/70 p-3 rounded-2xl text-center space-y-1 shadow-2xs">
-          <div className="w-8 h-8 rounded-xl bg-amber-100 text-amber-800 flex items-center justify-center mx-auto shadow-2xs">
+        {/* Active Days (Amber) */}
+        <div className="bg-white border border-slate-200/90 p-3 rounded-2xl text-center space-y-1 shadow-2xs hover:shadow-xs transition-all">
+          <div className="w-8 h-8 rounded-xl bg-amber-50 border border-amber-200/60 text-amber-700 flex items-center justify-center mx-auto shadow-2xs">
             <Calendar size={15} />
           </div>
-          <span className="text-lg font-black font-mono text-slate-950 block">
+          <span className="text-lg font-bold font-mono text-slate-900 block">
             {activeDays}d
           </span>
-          <span className="text-[10px] uppercase font-bold text-amber-900 block font-mono">
+          <span className="text-[10px] uppercase font-bold text-slate-500 block font-mono">
             Active Days
           </span>
         </div>

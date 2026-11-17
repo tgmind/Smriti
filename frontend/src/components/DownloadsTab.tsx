@@ -169,7 +169,7 @@ export const DownloadsTab: React.FC<DownloadsTabProps> = ({
   };
 
   return (
-    <div className="space-y-4 pb-28 pt-3 px-4 max-w-md mx-auto animate-in fade-in duration-200">
+    <div className="space-y-4 pb-36 pt-3 px-4 max-w-md mx-auto animate-in fade-in duration-200">
       {/* 1. Page Header with Title & Storage Badge */}
       <div className="flex items-center justify-between pt-1">
         <div>

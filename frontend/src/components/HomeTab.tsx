@@ -271,7 +271,7 @@ export const HomeTab: React.FC<HomeTabProps> = ({
   };
 
   return (
-    <div className="space-y-4 pb-28 pt-2 px-3">
+    <div className="space-y-4 pb-36 pt-2 px-3 animate-in">
       {/* Search & Restored User Greeting Header Bar */}
       <div className="space-y-3 pt-1">
         {/* Row 1: Profile & Greeting with Notification Bell */}
@@ -374,18 +374,18 @@ export const HomeTab: React.FC<HomeTabProps> = ({
       )}
 
       {/* Hero Container: Animated Horizontal Moving Subject Carousel */}
-      <div className="bg-[#EEECFE] border border-indigo-150/70 rounded-3xl p-4 space-y-3 shadow-2xs relative overflow-hidden">
+      <div className="bg-white border border-slate-200/90 rounded-3xl p-4 space-y-3 shadow-2xs relative overflow-hidden">
         {/* Subtle Header */}
         <div className="flex items-center justify-between relative z-10 px-0.5">
           <div className="flex items-center gap-2">
-            <span className="w-2.5 h-2.5 rounded-full bg-indigo-600 animate-pulse" />
-            <h2 className="text-xs font-bold uppercase tracking-wider text-indigo-950">
+            <span className="w-2 h-2 rounded-full bg-slate-900 animate-pulse" />
+            <h2 className="text-xs font-bold uppercase tracking-wider text-slate-900">
               Subject Folders
             </h2>
           </div>
           <button
             onClick={() => onNavigateToLibrary()}
-            className="text-[11px] font-semibold text-indigo-700 hover:text-indigo-950 flex items-center gap-0.5 transition-colors cursor-pointer"
+            className="text-[11px] font-semibold text-slate-600 hover:text-slate-950 flex items-center gap-0.5 transition-colors cursor-pointer"
           >
             <span>View All</span>
             <ChevronRight size={13} />
@@ -606,19 +606,23 @@ export const HomeTab: React.FC<HomeTabProps> = ({
       <div className="grid grid-cols-3 gap-2">
         <button
           onClick={onGoToRecord}
-          className="bg-[#E8F8F0] hover:bg-[#DCF3E7] text-emerald-800 border border-emerald-200/70 p-2.5 rounded-2xl flex items-center justify-center gap-1.5 text-xs font-semibold active:scale-95 transition-all shadow-2xs cursor-pointer"
+          className="bg-white hover:bg-slate-50 text-slate-800 border border-slate-200/90 p-2.5 rounded-2xl flex items-center justify-center gap-2 text-xs font-semibold active:scale-95 transition-all shadow-2xs cursor-pointer group"
           title="Open Audio Recorder"
         >
-          <Mic size={15} className="text-emerald-700" />
+          <div className="size-6 rounded-lg bg-emerald-50 text-emerald-700 flex items-center justify-center group-hover:scale-110 transition-transform">
+            <Mic size={14} />
+          </div>
           <span>Record</span>
         </button>
 
         <button
           onClick={() => onNavigateToLibrary()}
-          className="bg-[#FFEFEF] hover:bg-[#FFE5E5] text-rose-800 border border-rose-200/70 p-2.5 rounded-2xl flex items-center justify-center gap-1.5 text-xs font-semibold active:scale-95 transition-all shadow-2xs cursor-pointer"
+          className="bg-white hover:bg-slate-50 text-slate-800 border border-slate-200/90 p-2.5 rounded-2xl flex items-center justify-center gap-2 text-xs font-semibold active:scale-95 transition-all shadow-2xs cursor-pointer group"
           title="Open Library & Subject Folders"
         >
-          <Folder size={15} className="text-rose-700" />
+          <div className="size-6 rounded-lg bg-indigo-50 text-indigo-700 flex items-center justify-center group-hover:scale-110 transition-transform">
+            <Folder size={14} />
+          </div>
           <span>Folders</span>
         </button>
 
@@ -628,10 +632,12 @@ export const HomeTab: React.FC<HomeTabProps> = ({
             const el = document.getElementById('lessons-tabs-section');
             el?.scrollIntoView({ behavior: 'smooth' });
           }}
-          className="bg-[#EEF6FF] hover:bg-[#E0EEFF] text-sky-800 border border-sky-200/70 p-2.5 rounded-2xl flex items-center justify-center gap-1.5 text-xs font-semibold active:scale-95 transition-all shadow-2xs cursor-pointer"
+          className="bg-white hover:bg-slate-50 text-slate-800 border border-slate-200/90 p-2.5 rounded-2xl flex items-center justify-center gap-2 text-xs font-semibold active:scale-95 transition-all shadow-2xs cursor-pointer group"
           title="Open Sovereign Google Drive Tab"
         >
-          <Cloud size={15} className="text-sky-700" />
+          <div className="size-6 rounded-lg bg-sky-50 text-sky-700 flex items-center justify-center group-hover:scale-110 transition-transform">
+            <Cloud size={14} />
+          </div>
           <span>Drive</span>
         </button>
       </div>

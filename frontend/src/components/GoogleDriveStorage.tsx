@@ -417,13 +417,13 @@ export const GoogleDriveStorage: React.FC<GoogleDriveStorageProps> = ({
           </div>
         </div>
 
-        {/* Chart Container with Recharts */}
+        {/* Chart Container with Recharts - Compact & Elegant */}
         <div className="bg-slate-50/70 rounded-2xl p-2 border border-slate-100/80">
           {chartView === 'donut' ? (
-            <div className="relative h-44 w-full flex items-center justify-center">
+            <div className="relative h-32 w-full flex items-center justify-center">
               <ChartContainer
                 config={chartConfig}
-                className="h-44 w-full aspect-auto"
+                className="h-32 w-full aspect-auto"
               >
                 <PieChart>
                   <ChartTooltip
@@ -444,8 +444,8 @@ export const GoogleDriveStorage: React.FC<GoogleDriveStorageProps> = ({
                     data={pieData}
                     dataKey="value"
                     nameKey="name"
-                    innerRadius={46}
-                    outerRadius={68}
+                    innerRadius={36}
+                    outerRadius={52}
                     paddingAngle={3}
                     strokeWidth={2}
                     stroke="#ffffff"
@@ -459,24 +459,24 @@ export const GoogleDriveStorage: React.FC<GoogleDriveStorageProps> = ({
 
               {/* Center Donut Label */}
               <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-                <span className="text-sm font-black font-mono text-slate-950">
+                <span className="text-xs font-black font-mono text-slate-950">
                   {freePercent}%
                 </span>
-                <span className="text-[9px] font-mono text-slate-400 font-semibold uppercase tracking-wider">
+                <span className="text-[8.5px] font-mono text-slate-400 font-bold uppercase tracking-wider">
                   Available
                 </span>
               </div>
             </div>
           ) : (
-            <div className="h-28 w-full flex items-center">
+            <div className="h-24 w-full flex items-center">
               <ChartContainer
                 config={chartConfig}
-                className="h-28 w-full aspect-auto"
+                className="h-24 w-full aspect-auto"
               >
                 <BarChart
                   data={barData}
                   layout="vertical"
-                  margin={{ top: 10, right: 10, left: 10, bottom: 10 }}
+                  margin={{ top: 8, right: 10, left: 10, bottom: 8 }}
                 >
                   <XAxis type="number" hide domain={[0, Number((totalBytes / (1024 * 1024 * 1024)).toFixed(1))]} />
                   <YAxis type="category" dataKey="category" hide />
@@ -505,106 +505,106 @@ export const GoogleDriveStorage: React.FC<GoogleDriveStorageProps> = ({
         </div>
       </div>
 
-      {/* 5. Detailed Breakdown List */}
-      <div className="space-y-2 pt-1">
+      {/* 5. Detailed Breakdown List: Unified Inset Card */}
+      <div className="bg-white border border-slate-200/90 rounded-2xl overflow-hidden divide-y divide-slate-100 shadow-2xs">
         {/* Smriti Audio Notes */}
-        <div className="flex items-center justify-between p-2 rounded-xl bg-blue-50/50 border border-blue-100/60">
-          <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-xl bg-blue-600 text-white flex items-center justify-center shrink-0 shadow-2xs">
-              <Headphones size={15} />
+        <div className="flex items-center justify-between p-2.5 px-3 hover:bg-slate-50/60 transition-colors">
+          <div className="flex items-center gap-2.5 min-w-0">
+            <div className="size-7 rounded-lg bg-blue-50 text-blue-600 border border-blue-200/60 flex items-center justify-center shrink-0">
+              <Headphones size={13} />
             </div>
-            <div>
-              <h4 className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
-                <span>Smriti Audio Notes</span>
-                <span className="text-[9px] font-mono bg-blue-100 text-blue-800 px-1.5 py-0.2 rounded-full font-bold">
+            <div className="min-w-0">
+              <div className="flex items-center gap-1.5">
+                <span className="text-xs font-bold text-slate-900 truncate">Smriti Audio Notes</span>
+                <span className="text-[8.5px] font-mono bg-blue-50 text-blue-700 border border-blue-200/70 px-1.5 py-0.2 rounded-md font-bold shrink-0">
                   Active
                 </span>
-              </h4>
-              <p className="text-[10px] text-slate-500 font-mono">
+              </div>
+              <p className="text-[10px] text-slate-500 font-mono truncate">
                 {audioItems.length} {audioItems.length === 1 ? 'lesson note' : 'lesson notes'} stored in Drive
               </p>
             </div>
           </div>
-          <div className="text-right">
+          <div className="text-right shrink-0">
             <span className="text-xs font-bold font-mono text-blue-700 block">
               {formatBytes(smritiBytes)}
             </span>
-            <span className="text-[9px] font-mono text-slate-400">
+            <span className="text-[9.5px] font-mono text-slate-400">
               {((smritiBytes / totalBytes) * 100).toFixed(1)}%
             </span>
           </div>
         </div>
 
         {/* Google Drive Files */}
-        <div className="flex items-center justify-between p-2 rounded-xl bg-amber-50/40 border border-amber-100/60">
-          <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-xl bg-amber-500 text-white flex items-center justify-center shrink-0 shadow-2xs">
-              <Folder size={15} />
+        <div className="flex items-center justify-between p-2.5 px-3 hover:bg-slate-50/60 transition-colors">
+          <div className="flex items-center gap-2.5 min-w-0">
+            <div className="size-7 rounded-lg bg-amber-50 text-amber-700 border border-amber-200/60 flex items-center justify-center shrink-0">
+              <Folder size={13} />
             </div>
-            <div>
-              <h4 className="text-xs font-bold text-slate-900">
+            <div className="min-w-0">
+              <h4 className="text-xs font-bold text-slate-900 truncate">
                 Google Drive Documents
               </h4>
-              <p className="text-[10px] text-slate-500 font-mono">
-                Docs, sheets, PDFs & other files
+              <p className="text-[10px] text-slate-500 font-mono truncate">
+                Docs, sheets, PDFs &amp; other files
               </p>
             </div>
           </div>
-          <div className="text-right">
+          <div className="text-right shrink-0">
             <span className="text-xs font-bold font-mono text-slate-800 block">
               {formatBytes(otherDriveBytes)}
             </span>
-            <span className="text-[9px] font-mono text-slate-400">
+            <span className="text-[9.5px] font-mono text-slate-400">
               {((otherDriveBytes / totalBytes) * 100).toFixed(1)}%
             </span>
           </div>
         </div>
 
         {/* Gmail & Google Photos */}
-        <div className="flex items-center justify-between p-2 rounded-xl bg-rose-50/40 border border-rose-100/60">
-          <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-xl bg-rose-500 text-white flex items-center justify-center shrink-0 shadow-2xs">
-              <Mail size={15} />
+        <div className="flex items-center justify-between p-2.5 px-3 hover:bg-slate-50/60 transition-colors">
+          <div className="flex items-center gap-2.5 min-w-0">
+            <div className="size-7 rounded-lg bg-rose-50 text-rose-600 border border-rose-200/60 flex items-center justify-center shrink-0">
+              <Mail size={13} />
             </div>
-            <div>
-              <h4 className="text-xs font-bold text-slate-900">
-                Gmail & Google Photos
+            <div className="min-w-0">
+              <h4 className="text-xs font-bold text-slate-900 truncate">
+                Gmail &amp; Google Photos
               </h4>
-              <p className="text-[10px] text-slate-500 font-mono">
-                Messages, attachments & media
+              <p className="text-[10px] text-slate-500 font-mono truncate">
+                Messages, attachments &amp; media
               </p>
             </div>
           </div>
-          <div className="text-right">
+          <div className="text-right shrink-0">
             <span className="text-xs font-bold font-mono text-slate-800 block">
               {formatBytes(otherGoogleBytes)}
             </span>
-            <span className="text-[9px] font-mono text-slate-400">
+            <span className="text-[9.5px] font-mono text-slate-400">
               {((otherGoogleBytes / totalBytes) * 100).toFixed(1)}%
             </span>
           </div>
         </div>
 
         {/* Free Space */}
-        <div className="flex items-center justify-between p-2 rounded-xl bg-slate-50 border border-slate-200/60">
-          <div className="flex items-center gap-2.5">
-            <div className="w-8 h-8 rounded-xl bg-slate-200 text-slate-600 flex items-center justify-center shrink-0">
-              <Cloud size={15} />
+        <div className="flex items-center justify-between p-2.5 px-3 bg-slate-50/40">
+          <div className="flex items-center gap-2.5 min-w-0">
+            <div className="size-7 rounded-lg bg-slate-100 text-slate-600 border border-slate-200/60 flex items-center justify-center shrink-0">
+              <Cloud size={13} />
             </div>
-            <div>
-              <h4 className="text-xs font-bold text-slate-700">
+            <div className="min-w-0">
+              <h4 className="text-xs font-bold text-slate-700 truncate">
                 Free Quota Available
               </h4>
-              <p className="text-[10px] text-slate-400 font-mono">
+              <p className="text-[10px] text-slate-400 font-mono truncate">
                 Remaining capacity for recordings
               </p>
             </div>
           </div>
-          <div className="text-right">
+          <div className="text-right shrink-0">
             <span className="text-xs font-bold font-mono text-emerald-700 block">
               {formatBytes(freeBytes)}
             </span>
-            <span className="text-[9px] font-mono text-slate-400">
+            <span className="text-[9.5px] font-mono text-slate-400">
               {freePercent}%
             </span>
           </div>
@@ -624,40 +624,40 @@ export const GoogleDriveStorage: React.FC<GoogleDriveStorageProps> = ({
         </div>
       )}
 
-      <div className="space-y-2">
+      <div className="flex flex-col gap-2 pt-1">
         {onSyncDrive && (
           <button
             type="button"
             onClick={onSyncDrive}
             disabled={isSyncingDrive}
-            className="w-full py-2.5 px-4 rounded-2xl bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 text-xs font-semibold flex items-center justify-between active:scale-98 transition-all cursor-pointer shadow-2xs disabled:opacity-50"
+            className="w-full py-2.5 px-3.5 rounded-xl bg-sky-50 hover:bg-sky-100 text-sky-800 border border-sky-200/90 text-xs font-semibold flex items-center justify-between active:scale-[0.99] transition-all cursor-pointer shadow-2xs disabled:opacity-50"
           >
             <span className="flex items-center gap-2">
-              <RefreshCw size={14} className={isSyncingDrive ? 'animate-spin' : ''} />
+              <RefreshCw size={13} className={isSyncingDrive ? 'animate-spin text-sky-600' : 'text-sky-600'} />
               <span>Sync / Refresh from Google Drive</span>
             </span>
-            <ArrowRight size={14} />
+            <ArrowRight size={13} className="text-sky-500" />
           </button>
         )}
 
         <button
           type="button"
           onClick={onDisconnectDrive}
-          className="w-full py-2.5 px-4 rounded-2xl bg-slate-950 hover:bg-slate-800 text-white text-xs font-semibold flex items-center justify-between active:scale-98 transition-all cursor-pointer shadow-xs"
+          className="w-full py-2.5 px-3.5 rounded-xl bg-white hover:bg-rose-50 text-slate-700 hover:text-rose-700 border border-slate-200/90 hover:border-rose-200 text-xs font-semibold flex items-center justify-between active:scale-[0.99] transition-all cursor-pointer shadow-2xs"
         >
           <span className="flex items-center gap-2">
-            <LogOut size={14} className="text-rose-400" />
+            <LogOut size={13} className="text-rose-500" />
             <span>Disconnect Google Drive</span>
           </span>
-          <ArrowRight size={14} />
+          <ArrowRight size={13} className="text-slate-400" />
         </button>
       </div>
 
       {/* 7. Zero Central Server Privacy Banner */}
-      <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-200/60 flex items-start gap-2">
-        <Sparkles size={14} className="text-amber-500 shrink-0 mt-0.5" />
-        <p className="text-[11px] text-slate-500 leading-relaxed">
-          <strong className="text-slate-700 font-medium">Multi-Account &amp; Safe Disconnect:</strong> Connect multiple Google Drive accounts on one device. Disconnecting immediately and safely purges all local cache and audio files to safeguard user privacy.
+      <div className="p-2.5 rounded-xl bg-slate-50 border border-slate-200/70 flex items-start gap-2">
+        <Sparkles size={13} className="text-amber-500 shrink-0 mt-0.5" />
+        <p className="text-[10.5px] text-slate-500 leading-snug">
+          <strong className="text-slate-700 font-semibold">Multi-Account &amp; Safe Disconnect:</strong> Connect multiple Google Drive accounts on one device. Disconnecting immediately and safely purges all local cache and audio files to safeguard user privacy.
         </p>
       </div>
     </div>

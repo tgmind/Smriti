@@ -1109,14 +1109,15 @@ export const LibraryTab: React.FC<LibraryTabProps> = ({
   };
 
   // =========================================================================
-  // RENDER LEVEL 3: AUDIO NOTE VIEW
+  // RENDER LEVEL 3: AUDIO NOTE VIEW (PREMIUM LISTENING EXPERIENCE)
   // =========================================================================
   if (viewMode === 'note' && selectedAudio) {
     const audioSubject = subjects.find(s => s.id === selectedAudio.subject_id);
     const SubjectIcon = audioSubject ? getSubjectIcon(audioSubject.icon_name) : BookOpen;
+    const subjectTheme = audioSubject ? getSubjectTheme(audioSubject.color_hex) : getSubjectTheme('#38bdf8');
 
     return (
-      <div className="space-y-4 pb-28 pt-3 px-4 max-w-md mx-auto animate-in">
+      <div className="space-y-4 pb-36 pt-3 px-4 max-w-md mx-auto animate-in">
         {/* Navigation Breadcrumb Header with Back Button */}
         <div className="flex items-center justify-between border-b border-slate-200/80 pb-2.5">
           <div className="flex items-center gap-2 min-w-0">
@@ -1132,19 +1133,19 @@ export const LibraryTab: React.FC<LibraryTabProps> = ({
             <Breadcrumb className="min-w-0">
               <BreadcrumbList>
                 <BreadcrumbItem>
-                  <BreadcrumbLink onClick={handleBackToTopics} className="cursor-pointer font-medium text-slate-500 hover:text-slate-900">
+                  <BreadcrumbLink onClick={handleBackToTopics} className="cursor-pointer font-medium text-slate-500 hover:text-slate-900 text-xs">
                     Library
                   </BreadcrumbLink>
                 </BreadcrumbItem>
                 <BreadcrumbSeparator />
                 <BreadcrumbItem>
-                  <BreadcrumbLink onClick={handleBackToSubject} className="cursor-pointer font-medium text-slate-700 hover:text-slate-900">
+                  <BreadcrumbLink onClick={handleBackToSubject} className="cursor-pointer font-medium text-slate-700 hover:text-slate-900 text-xs">
                     {audioSubject?.name || 'Folder'}
                   </BreadcrumbLink>
                 </BreadcrumbItem>
                 <BreadcrumbSeparator />
                 <BreadcrumbItem>
-                  <BreadcrumbPage className="font-semibold text-slate-900 truncate max-w-[130px] sm:max-w-[190px]">
+                  <BreadcrumbPage className="font-semibold text-slate-900 truncate max-w-[120px] sm:max-w-[170px] text-xs">
                     {selectedAudio.title}
                   </BreadcrumbPage>
                 </BreadcrumbItem>
@@ -1152,7 +1153,7 @@ export const LibraryTab: React.FC<LibraryTabProps> = ({
             </Breadcrumb>
           </div>
 
-          {/* Quick Actions (Favorite, Offline, Trim) */}
+          {/* Quick Actions (Trim, Favorite, Offline, Delete) */}
           <div className="flex items-center gap-1.5 shrink-0">
             <button
               type="button"
@@ -1160,7 +1161,7 @@ export const LibraryTab: React.FC<LibraryTabProps> = ({
               className={`p-2 rounded-xl border transition-all cursor-pointer ${
                 isTrimmingNote
                   ? 'bg-blue-600 border-blue-600 text-white shadow-2xs'
-                  : 'bg-white border-slate-200 text-slate-600 hover:text-slate-900 hover:bg-slate-50'
+                  : 'bg-white border-slate-200 text-slate-600 hover:text-slate-900 hover:bg-slate-50 shadow-2xs'
               }`}
               title="Toggle Audio Trimmer"
             >
@@ -1172,7 +1173,7 @@ export const LibraryTab: React.FC<LibraryTabProps> = ({
               className={`p-2 rounded-xl border transition-all cursor-pointer ${
                 selectedAudio.is_favorite
                   ? 'bg-amber-50 border-amber-300 text-amber-600 shadow-2xs'
-                  : 'bg-white border-slate-200 text-slate-400 hover:text-slate-600'
+                  : 'bg-white border-slate-200 text-slate-400 hover:text-slate-600 shadow-2xs'
               }`}
               title={selectedAudio.is_favorite ? 'Favorited' : 'Add to Favorites'}
             >
@@ -1184,7 +1185,7 @@ export const LibraryTab: React.FC<LibraryTabProps> = ({
               className={`p-2 rounded-xl border transition-all cursor-pointer ${
                 selectedAudio.is_downloaded_offline
                   ? 'bg-emerald-50 border-emerald-300 text-emerald-700 shadow-2xs'
-                  : 'bg-white border-slate-200 text-slate-400 hover:text-slate-600'
+                  : 'bg-white border-slate-200 text-slate-400 hover:text-slate-600 shadow-2xs'
               }`}
               title={selectedAudio.is_downloaded_offline ? 'Downloaded offline' : 'Download for offline study'}
             >
@@ -1201,7 +1202,7 @@ export const LibraryTab: React.FC<LibraryTabProps> = ({
                     onDeleteAudio(id);
                   }
                 }}
-                className="p-2 rounded-xl border border-slate-200 text-slate-400 hover:text-rose-600 hover:bg-rose-50 hover:border-rose-200 transition-all cursor-pointer"
+                className="p-2 rounded-xl border border-slate-200 text-slate-400 hover:text-rose-600 hover:bg-rose-50 hover:border-rose-200 transition-all cursor-pointer shadow-2xs"
                 title="Delete audio note"
               >
                 <Trash2 size={14} />
@@ -1220,30 +1221,33 @@ export const LibraryTab: React.FC<LibraryTabProps> = ({
           />
         )}
 
-        {/* Audio Note Header Card (Whitish theme, minimal pill, beautiful text hierarchy) */}
-        <div className="bg-white border border-slate-200/80 rounded-2xl p-4.5 shadow-2xs space-y-3.5">
-          {/* Subject & Status */}
-          <div className="flex items-center gap-2 text-xs">
-            <span className="font-semibold text-slate-700 flex items-center gap-1.5">
-              <SubjectIcon size={14} className="text-slate-500" />
-              {audioSubject?.name || selectedAudio.subject_name || 'Academic'}
-            </span>
+        {/* Hero Listening Stage: Artwork & Track Identity */}
+        <div className="text-center pt-2 space-y-3">
+          {/* Album Art Squircle with Ambient Glow */}
+          <div className="relative inline-block">
+            <div className={`size-28 sm:size-32 rounded-3xl mx-auto flex items-center justify-center relative overflow-hidden transition-all duration-300 ${subjectTheme.bg} border ${subjectTheme.border} shadow-[0_12px_28px_rgba(0,0,0,0.06)]`}>
+              <SubjectIcon size={48} className="text-slate-800 transition-transform duration-300 group-hover:scale-105" />
+            </div>
             {selectedAudio.is_downloaded_offline && (
-              <>
-                <span className="text-slate-300">•</span>
-                <span className="text-emerald-700 font-medium inline-flex items-center gap-1 text-[11px]">
-                  <CheckCircle2 size={12} /> Offline Ready
-                </span>
-              </>
+              <div className="absolute -bottom-1 -right-1 bg-emerald-500 text-white p-1 rounded-full border-2 border-white shadow-xs" title="Offline Ready">
+                <CheckCircle2 size={12} strokeWidth={2.6} />
+              </div>
             )}
           </div>
 
-          {/* Title & Metadata (No text clipping) */}
-          <div>
-            <h1 className="text-lg sm:text-xl font-bold text-slate-900 leading-snug tracking-tight">
+          {/* Context pill & Title */}
+          <div className="space-y-1.5 px-2">
+            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-slate-100/90 text-slate-700 text-xs font-semibold border border-slate-200/60 shadow-2xs">
+              <SubjectIcon size={12} className="text-slate-500" />
+              <span>{audioSubject?.name || selectedAudio.subject_name || 'Academic'}</span>
+            </span>
+
+            <h1 className="text-xl sm:text-2xl font-black text-slate-950 tracking-tight leading-snug">
               {selectedAudio.title}
             </h1>
-            <div className="flex items-center gap-2 mt-1.5 text-xs text-slate-500 font-mono">
+
+            {/* Technical Metadata Row (Preserves tests for format duration, MP3 Audio, MB, Offline) */}
+            <div className="flex items-center justify-center gap-2 text-xs text-slate-500 font-mono flex-wrap">
               <span className="flex items-center gap-1 text-slate-700 font-semibold">
                 <Clock size={12} className="text-slate-400" />
                 {formatDuration(selectedAudio.duration_seconds)}
@@ -1253,143 +1257,153 @@ export const LibraryTab: React.FC<LibraryTabProps> = ({
                 {`${(selectedAudio.file_format || 'M4A').replace(/^audio\//i, '').toUpperCase()} Audio`}
               </span>
               <span className="text-slate-300">•</span>
-              <span className="text-slate-600">{(selectedAudio.file_size_bytes / 1024 / 1024).toFixed(1)} MB</span>
+              <span className="text-slate-600">
+                {(selectedAudio.file_size_bytes / 1024 / 1024).toFixed(1)} MB
+              </span>
+              {selectedAudio.is_downloaded_offline && (
+                <>
+                  <span className="text-slate-300">•</span>
+                  <span className="text-emerald-700 font-medium inline-flex items-center gap-1 text-[11px]">
+                    <CheckCircle2 size={12} /> Offline Ready
+                  </span>
+                </>
+              )}
             </div>
           </div>
-
-          {/* Upgraded Dedicated Playback Controller & Authoritative Seekbar Engine */}
-          {(() => {
-            const isCurrentPlayingAudio = playbackState?.currentAudio?.id === selectedAudio.id;
-            const isPlaying = isCurrentPlayingAudio && !!playbackState?.isPlaying;
-            const currentTrackPosition = isCurrentPlayingAudio ? (playbackState?.positionSeconds || 0) : 0;
-            const activePosition = scrubValue !== null ? scrubValue : currentTrackPosition;
-            const noteDuration = selectedAudio.duration_seconds || 1;
-            const progressPercent = Math.min(100, Math.max(0, (activePosition / noteDuration) * 100));
-
-            return (
-              <div className="bg-slate-50/80 border border-slate-200/80 rounded-xl p-3.5 space-y-3">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        if (isCurrentPlayingAudio && onTogglePlay) {
-                          onTogglePlay();
-                        } else {
-                          onPlayAudio(selectedAudio);
-                        }
-                      }}
-                      className="w-12 h-12 rounded-full bg-slate-950 hover:bg-slate-800 text-white flex items-center justify-center transition-all active:scale-95 shadow-md shadow-slate-950/20 cursor-pointer shrink-0"
-                      aria-label={isPlaying ? 'Pause audio' : 'Play audio note'}
-                    >
-                      {isPlaying ? (
-                        <Pause size={20} fill="currentColor" />
-                      ) : (
-                        <Play size={20} fill="currentColor" className="translate-x-0.5" />
-                      )}
-                    </button>
-
-                    <div>
-                      <span className="text-xs font-bold text-slate-900 block">
-                        {isPlaying ? 'Now Playing' : isCurrentPlayingAudio && currentTrackPosition > 0 ? 'Paused' : 'Ready to Listen'}
-                      </span>
-                      <span className="text-[11px] font-mono text-slate-500">
-                        {formatDuration(noteDuration)} full duration
-                      </span>
-                    </div>
-                  </div>
-
-                  {/* Clean speed selector */}
-                  {onSetSpeed && (
-                    <div className="flex items-center gap-0.5 bg-white p-0.5 rounded-lg border border-slate-200/90 shadow-2xs">
-                      {[1.0, 1.25, 1.5, 2.0].map((speed) => {
-                        const isSelected = (playbackState?.playbackSpeed || 1.0) === speed;
-                        return (
-                          <button
-                            key={speed}
-                            type="button"
-                            onClick={() => onSetSpeed(speed)}
-                            className={`px-1.5 py-0.5 rounded text-[10px] font-mono font-bold transition-all cursor-pointer ${
-                              isSelected
-                                ? 'bg-slate-900 text-white shadow-2xs'
-                                : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
-                            }`}
-                          >
-                            {`${speed}x`}
-                          </button>
-                        );
-                      })}
-                    </div>
-                  )}
-                </div>
-
-                {/* Authoritative Scrubber Progress Bar */}
-                <div className="space-y-1 pt-1">
-                  <input
-                    type="range"
-                    min={0}
-                    max={noteDuration}
-                    step={0.1}
-                    value={activePosition}
-                    onChange={(e) => {
-                      setScrubValue(Number(e.target.value));
-                    }}
-                    onPointerUp={(e) => {
-                      const val = Number((e.target as HTMLInputElement).value);
-                      setScrubValue(null);
-                      if (onSeek) onSeek(val);
-                    }}
-                    onKeyUp={(e) => {
-                      const val = Number((e.target as HTMLInputElement).value);
-                      setScrubValue(null);
-                      if (onSeek) onSeek(val);
-                    }}
-                    className="w-full h-1.5 bg-slate-200/90 rounded-lg appearance-none cursor-pointer accent-slate-900 transition-all hover:bg-slate-300"
-                  />
-                  <div className="flex justify-between text-[10px] font-mono text-slate-500">
-                    <span>{formatDuration(activePosition)}</span>
-                    <span>{formatDuration(noteDuration)}</span>
-                  </div>
-                </div>
-
-                {/* Waveform Visualization Bars */}
-                <div className="flex items-end justify-between h-8 gap-1 pt-1 px-1">
-                  {(selectedAudio.waveform_peaks && selectedAudio.waveform_peaks.length > 0
-                    ? selectedAudio.waveform_peaks.slice(0, 32)
-                    : [20, 35, 60, 45, 80, 65, 40, 70, 85, 55, 30, 65, 50, 75, 90, 60, 40, 80, 70, 50, 65, 85, 45, 60, 75, 40, 55, 70, 80, 50, 30, 20]
-                  ).map((peak, idx) => {
-                    const heightPercent = Math.max(15, Math.min(100, peak));
-                    const barIsActive = (idx / 32) <= (progressPercent / 100);
-                    return (
-                      <div
-                        key={idx}
-                        className={`flex-1 rounded-full transition-colors duration-150 ${
-                          barIsActive ? 'bg-slate-900' : 'bg-slate-300/80'
-                        }`}
-                        style={{ height: `${heightPercent}%` }}
-                      />
-                    );
-                  })}
-                </div>
-              </div>
-            );
-          })()}
         </div>
 
-        {/* Sovereign Storage & Audio File Status (Whitish theme, clean text hierarchy) */}
-        <div className="bg-white border border-slate-200/80 rounded-2xl p-4 shadow-2xs space-y-2">
-          <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-400 block">
-            Storage & Ownership
-          </span>
-          <div className="flex items-center justify-between text-xs text-slate-600 pt-0.5">
-            <span>Google Drive Location</span>
+        {/* Dedicated Modern Playback Controller & Authoritative Seekbar Engine */}
+        {(() => {
+          const isCurrentPlayingAudio = playbackState?.currentAudio?.id === selectedAudio.id;
+          const isPlaying = isCurrentPlayingAudio && !!playbackState?.isPlaying;
+          const currentTrackPosition = isCurrentPlayingAudio ? (playbackState?.positionSeconds || 0) : 0;
+          const activePosition = scrubValue !== null ? scrubValue : currentTrackPosition;
+          const noteDuration = selectedAudio.duration_seconds || 1;
+          const progressPercent = Math.min(100, Math.max(0, (activePosition / noteDuration) * 100));
+
+          return (
+            <div className="bg-white border border-slate-200/90 rounded-3xl p-4.5 sm:p-5 shadow-2xs space-y-4">
+              {/* Dynamic Waveform Visualization Bars */}
+              <div className="flex items-end justify-between h-10 gap-1 px-2 bg-slate-50/80 p-2.5 rounded-2xl border border-slate-100">
+                {(selectedAudio.waveform_peaks && selectedAudio.waveform_peaks.length >= 16
+                  ? selectedAudio.waveform_peaks.slice(0, 32)
+                  : [25, 45, 65, 40, 80, 60, 35, 75, 90, 55, 30, 70, 50, 85, 95, 60, 40, 80, 70, 50, 65, 85, 45, 60, 75, 40, 55, 70, 85, 50, 35, 20]
+                ).map((peak, idx) => {
+                  const heightPercent = Math.max(15, Math.min(100, peak));
+                  const barIsActive = (idx / 32) <= (progressPercent / 100);
+                  return (
+                    <div
+                      key={idx}
+                      className={`flex-1 rounded-full transition-colors duration-150 ${
+                        barIsActive ? 'bg-slate-900' : 'bg-slate-200/90'
+                      }`}
+                      style={{ height: `${heightPercent}%` }}
+                    />
+                  );
+                })}
+              </div>
+
+              {/* Authoritative Scrubber Progress Bar */}
+              <div className="space-y-1.5">
+                <input
+                  type="range"
+                  min={0}
+                  max={noteDuration}
+                  step={0.1}
+                  value={activePosition}
+                  onChange={(e) => {
+                    setScrubValue(Number(e.target.value));
+                  }}
+                  onPointerUp={(e) => {
+                    const val = Number((e.target as HTMLInputElement).value);
+                    setScrubValue(null);
+                    if (onSeek) onSeek(val);
+                  }}
+                  onKeyUp={(e) => {
+                    const val = Number((e.target as HTMLInputElement).value);
+                    setScrubValue(null);
+                    if (onSeek) onSeek(val);
+                  }}
+                  className="w-full h-1.5 bg-slate-200/90 rounded-lg appearance-none cursor-pointer accent-slate-900 transition-all hover:bg-slate-300"
+                />
+                <div className="flex justify-between text-[11px] font-mono text-slate-500">
+                  <span className="font-semibold text-slate-700">{formatDuration(activePosition)}</span>
+                  <span>{formatDuration(noteDuration)}</span>
+                </div>
+              </div>
+
+              {/* Transport Row: Status, Hero Play/Pause Button, and Speed Pills */}
+              <div className="flex items-center justify-between pt-1">
+                {/* Status Indicator */}
+                <div>
+                  <span className="px-2.5 py-1 rounded-full bg-slate-100 text-slate-800 font-bold text-[11px] font-mono border border-slate-200/70 inline-block">
+                    {isPlaying ? 'Now Playing' : isCurrentPlayingAudio && currentTrackPosition > 0 ? 'Paused' : 'Ready to Listen'}
+                  </span>
+                </div>
+
+                {/* Hero Play / Pause Controller */}
+                <div className="flex items-center gap-3">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (isCurrentPlayingAudio && onTogglePlay) {
+                        onTogglePlay();
+                      } else {
+                        onPlayAudio(selectedAudio);
+                      }
+                    }}
+                    className="w-14 h-14 rounded-full bg-slate-950 hover:bg-slate-800 text-white flex items-center justify-center transition-all active:scale-95 shadow-lg shadow-slate-950/20 cursor-pointer"
+                    aria-label={isPlaying ? 'Pause audio' : 'Play audio note'}
+                  >
+                    {isPlaying ? (
+                      <Pause size={22} fill="currentColor" />
+                    ) : (
+                      <Play size={22} fill="currentColor" className="translate-x-0.5" />
+                    )}
+                  </button>
+                </div>
+
+                {/* Clean Speed Selector */}
+                {onSetSpeed && (
+                  <div className="flex items-center gap-0.5 bg-slate-100 p-0.5 rounded-lg border border-slate-200/80 shadow-2xs">
+                    {[1.0, 1.25, 1.5, 2.0].map((speed) => {
+                      const isSelected = (playbackState?.playbackSpeed || 1.0) === speed;
+                      return (
+                        <button
+                          key={speed}
+                          type="button"
+                          onClick={() => onSetSpeed(speed)}
+                          className={`px-1.5 py-0.5 rounded text-[10px] font-mono font-bold transition-all cursor-pointer ${
+                            isSelected
+                              ? 'bg-slate-900 text-white shadow-2xs'
+                              : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
+                          }`}
+                        >
+                          {`${speed}x`}
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            </div>
+          );
+        })()}
+
+        {/* Storage & Ownership (Unified Inset Group, Not Clunky Boxes) */}
+        <div className="bg-white border border-slate-200/80 rounded-2xl overflow-hidden divide-y divide-slate-100 shadow-2xs">
+          <div className="px-3.5 py-2.5 bg-slate-50/70 text-[10.5px] font-mono font-bold uppercase tracking-wider text-slate-500">
+            Storage &amp; Ownership
+          </div>
+          <div className="flex items-center justify-between text-xs text-slate-600 p-3 px-3.5">
+            <span className="font-medium">Google Drive Location</span>
             <span className="font-mono text-slate-900 font-medium truncate max-w-[200px] sm:max-w-xs text-right">
               My Drive/Smriti/{audioSubject?.name || selectedAudio.subject_name || 'Academic'}/
             </span>
           </div>
-          <div className="flex items-center justify-between text-xs text-slate-600 border-t border-slate-100 pt-2">
-            <span>Audio Availability</span>
-            <span className={`font-mono font-medium ${selectedAudio.is_downloaded_offline ? 'text-emerald-700' : 'text-slate-500'}`}>
+          <div className="flex items-center justify-between text-xs text-slate-600 p-3 px-3.5">
+            <span className="font-medium">Audio Availability</span>
+            <span className={`font-mono font-semibold ${selectedAudio.is_downloaded_offline ? 'text-emerald-700' : 'text-slate-500'}`}>
               {selectedAudio.is_downloaded_offline ? 'Downloaded (Instant Local Play)' : 'Stream via Cloud'}
             </span>
           </div>
@@ -1408,10 +1422,10 @@ export const LibraryTab: React.FC<LibraryTabProps> = ({
     const totalSubjectDuration = subjectAudios.reduce((acc, curr) => acc + curr.duration_seconds, 0);
 
     return (
-      <div className="space-y-4 pb-28 pt-3 px-4 max-w-md mx-auto animate-in">
-        {/* Navigation Header with Back Button */}
+      <div className="space-y-4 pb-36 pt-3 px-4 max-w-md mx-auto animate-in">
+        {/* 1. Sleek Navigation Header with Back Button */}
         <div className="flex items-center justify-between border-b border-slate-200/80 pb-2.5">
-          <div className="flex items-center gap-2 min-w-0">
+          <div className="flex items-center gap-2.5 min-w-0">
             <button
               type="button"
               onClick={handleBackToTopics}
@@ -1424,13 +1438,13 @@ export const LibraryTab: React.FC<LibraryTabProps> = ({
             <Breadcrumb className="min-w-0">
               <BreadcrumbList>
                 <BreadcrumbItem>
-                  <BreadcrumbLink onClick={handleBackToTopics} className="cursor-pointer font-medium text-slate-500 hover:text-slate-900">
+                  <BreadcrumbLink onClick={handleBackToTopics} className="cursor-pointer font-medium text-slate-500 hover:text-slate-900 text-xs">
                     Library
                   </BreadcrumbLink>
                 </BreadcrumbItem>
                 <BreadcrumbSeparator />
                 <BreadcrumbItem>
-                  <BreadcrumbPage className="font-semibold text-slate-900 truncate max-w-[140px] sm:max-w-[200px]">
+                  <BreadcrumbPage className="font-bold text-slate-900 truncate max-w-[160px] sm:max-w-[220px] text-xs">
                     {selectedSubject.name}
                   </BreadcrumbPage>
                 </BreadcrumbItem>
@@ -1438,71 +1452,92 @@ export const LibraryTab: React.FC<LibraryTabProps> = ({
             </Breadcrumb>
           </div>
 
+          {/* Header Action: Delete Folder (Clean & Non-overlapping) */}
           <div className="flex items-center gap-1.5 shrink-0">
             {onDeleteSubject && selectedSubject.name.toLowerCase() !== 'general' && (
               <button
                 type="button"
                 onClick={() => setSubjectToDelete(selectedSubject)}
-                className="py-1 px-2.5 rounded-lg bg-rose-50 border border-rose-200 text-rose-700 hover:bg-rose-100 font-semibold text-xs flex items-center gap-1 transition-all active:scale-95 shadow-2xs cursor-pointer"
+                className="size-8 rounded-full text-slate-400 hover:text-rose-600 hover:bg-rose-50 flex items-center justify-center transition-all active:scale-95 cursor-pointer"
                 title={`Delete ${selectedSubject.name} folder`}
+                aria-label={`Delete ${selectedSubject.name} folder`}
               >
-                <Trash2 size={13} />
-                <span>Delete</span>
+                <Trash2 size={15} />
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* 2. Expansive Folder Hero Header (Open Layout - Apple Music / Spotify Playlist Standard) */}
+        <div className="space-y-3 pt-1">
+          <div className="flex items-start gap-3.5">
+            {/* Large Squircle Artwork Badge */}
+            <div className={`size-16 sm:size-18 rounded-2xl ${subjectTheme.bg} border ${subjectTheme.border} text-slate-800 flex items-center justify-center shadow-[0_8px_20px_rgba(0,0,0,0.06)] shrink-0`}>
+              <SubjectIcon size={28} />
+            </div>
+
+            {/* Folder Information */}
+            <div className="min-w-0 flex-1">
+              <h1 className="text-xl sm:text-2xl font-black text-slate-950 tracking-tight leading-tight">
+                {selectedSubject.name}
+              </h1>
+              <p className="text-xs text-slate-500 leading-snug mt-1 line-clamp-2">
+                {selectedSubject.description || `${subjectAudios.length} recorded audio study lessons`}
+              </p>
+              <div className="flex items-center gap-1.5 mt-2 text-xs text-slate-500 font-mono">
+                <span className="font-bold text-slate-700">
+                  {`${subjectAudios.length} ${subjectAudios.length === 1 ? 'lesson' : 'lessons'}`}
+                </span>
+                <span>•</span>
+                <span>{formatDuration(totalSubjectDuration)}</span>
+                {subjectAudios.filter(a => a.is_downloaded_offline).length > 0 && (
+                  <span className="text-emerald-700 font-medium ml-1">
+                    {`• ${subjectAudios.filter(a => a.is_downloaded_offline).length} offline`}
+                  </span>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Hero Action Toolbar (Play All, Upload, Record, Delete) */}
+          <div className="flex items-center gap-2 pt-1 flex-wrap">
+            {subjectAudios.length > 0 && (
+              <button
+                type="button"
+                onClick={() => {
+                  const firstAudio = subjectAudios[0];
+                  if (firstAudio) onPlayAudio(firstAudio);
+                }}
+                className="h-9 px-4 rounded-full bg-slate-950 hover:bg-slate-800 text-white font-bold text-xs flex items-center gap-2 transition-all active:scale-95 shadow-md shadow-slate-950/20 cursor-pointer"
+                title={`Play all ${selectedSubject.name} lessons`}
+                aria-label={`Play all ${selectedSubject.name} lessons`}
+              >
+                <Play size={14} fill="white" className="translate-x-0.5" />
+                <span>Play All</span>
               </button>
             )}
 
             <button
               type="button"
               onClick={() => handleTriggerUpload(selectedSubject.id)}
-              className="py-1 px-2.5 rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-800 hover:bg-emerald-100 font-semibold text-xs flex items-center gap-1 transition-all active:scale-95 shadow-2xs cursor-pointer"
+              className="h-9 px-3.5 rounded-full bg-white hover:bg-slate-50 text-slate-800 border border-slate-200/90 font-semibold text-xs flex items-center gap-1.5 transition-all active:scale-95 shadow-2xs cursor-pointer"
               title={`Upload audio to ${selectedSubject.name}`}
             >
-              <Upload size={13} className="text-emerald-700" />
+              <Upload size={13} className="text-emerald-600" />
               <span>Upload</span>
             </button>
 
             <button
               onClick={onGoToRecord}
-              className="py-1 px-2.5 rounded-lg bg-slate-950 text-white font-semibold text-xs flex items-center gap-1 hover:bg-slate-800 active:scale-95 transition-all shadow-xs cursor-pointer"
+              className="h-9 px-3.5 rounded-full bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs flex items-center gap-1.5 transition-all active:scale-95 shadow-2xs cursor-pointer"
             >
-              <Plus size={14} />
+              <Plus size={14} strokeWidth={2.4} />
               <span>Record</span>
             </button>
           </div>
         </div>
 
-        {/* Compact Subject Folder Header (Whitish theme, minimal pill, beautiful text hierarchy) */}
-        <div className="bg-white border border-slate-200/80 rounded-2xl p-4 shadow-2xs flex items-center justify-between gap-3">
-          <div className="flex items-center gap-3 min-w-0">
-            <div className={`w-11 h-11 rounded-xl ${subjectTheme.bg} flex items-center justify-center shrink-0 border ${subjectTheme.border} text-slate-800 shadow-2xs`}>
-              <SubjectIcon size={22} />
-            </div>
-            <div className="min-w-0">
-              <h1 className="text-base sm:text-lg font-bold text-slate-900 tracking-tight leading-tight truncate">
-                {selectedSubject.name}
-              </h1>
-              <p className="text-xs text-slate-500 leading-snug mt-0.5 truncate">
-                {selectedSubject.description || `${subjectAudios.length} recorded audio study lessons`}
-              </p>
-            </div>
-          </div>
-
-          <div className="text-right shrink-0">
-            <div className="text-xs font-bold text-slate-900">
-              {`${subjectAudios.length} ${subjectAudios.length === 1 ? 'lesson' : 'lessons'}`}
-            </div>
-            <div className="text-[11px] text-slate-500 font-mono mt-0.5">
-              <span>{formatDuration(totalSubjectDuration)}</span>
-              {subjectAudios.filter(a => a.is_downloaded_offline).length > 0 && (
-                <span className="text-emerald-700 font-medium ml-1.5">
-                  {`· ${subjectAudios.filter(a => a.is_downloaded_offline).length} offline`}
-                </span>
-              )}
-            </div>
-          </div>
-        </div>
-
-        {/* Search bar inside this Subject */}
+        {/* 3. Search Bar inside this Subject */}
         <div className="relative">
           <Search size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
           <input
@@ -1510,7 +1545,7 @@ export const LibraryTab: React.FC<LibraryTabProps> = ({
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder={`Search ${selectedSubject.name} formulas & notes...`}
-            className="w-full bg-white border border-slate-200/90 focus:border-slate-400 rounded-xl pl-9.5 pr-8 py-2 text-xs text-slate-900 placeholder:text-slate-400 focus:outline-none transition-all shadow-2xs"
+            className="w-full bg-slate-100/70 focus:bg-white border border-slate-200/70 focus:border-slate-300 rounded-xl pl-9.5 pr-8 py-2 text-xs text-slate-900 placeholder:text-slate-400 focus:outline-none transition-all shadow-2xs"
           />
           {searchQuery && (
             <button
@@ -1559,7 +1594,7 @@ export const LibraryTab: React.FC<LibraryTabProps> = ({
           </div>
         )}
 
-        {/* Sort & Scope Header */}
+        {/* 4. Sort & Scope Header */}
         <div className="flex items-center justify-between text-xs text-slate-500 px-0.5 pt-1">
           <span className="font-mono text-[11px] text-slate-600 font-medium">
             Showing {subjectAudios.length} audio notes
@@ -1593,8 +1628,8 @@ export const LibraryTab: React.FC<LibraryTabProps> = ({
           </div>
         </div>
 
-        {/* Audio Files List for Selected Subject */}
-        <div className="space-y-2.5">
+        {/* 5. Audio Files List: Unified Grouped Inset Track List */}
+        <div>
           {subjectAudios.length === 0 ? (
             <Empty className="bg-white border border-slate-200 rounded-2xl p-7 text-center shadow-2xs">
               <EmptyHeader>
@@ -1615,7 +1650,8 @@ export const LibraryTab: React.FC<LibraryTabProps> = ({
                 <button
                   type="button"
                   onClick={() => handleTriggerUpload(selectedSubject.id)}
-                  className="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold flex items-center gap-1.5 transition-all shadow-xs cursor-pointer"
+                  className="px-3.5 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold flex items-center gap-1.5 transition-all shadow-xs cursor-pointer"
+                  title={`Upload audio to ${selectedSubject.name}`}
                 >
                   <Upload size={13} />
                   <span>Upload Audio</span>
@@ -1623,7 +1659,7 @@ export const LibraryTab: React.FC<LibraryTabProps> = ({
                 <button
                   type="button"
                   onClick={onGoToRecord}
-                  className="px-3 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer"
+                  className="px-3.5 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer"
                 >
                   <Mic size={13} />
                   <span>Record Lesson</span>
@@ -1631,144 +1667,161 @@ export const LibraryTab: React.FC<LibraryTabProps> = ({
               </div>
             </Empty>
           ) : (
-            subjectAudios.map((audio) => {
-              const isPlaying = isAudioPlaying(audio.id);
+            <div className="bg-white border border-slate-200/90 rounded-2xl overflow-hidden divide-y divide-slate-100 shadow-2xs">
+              {subjectAudios.map((audio) => {
+                const isPlaying = isAudioPlaying(audio.id);
 
-              return (
-                <div
-                  key={audio.id}
-                  className="group bg-white border border-slate-200/90 hover:border-slate-300 rounded-2xl p-3.5 transition-all shadow-2xs hover:shadow-xs space-y-2.5"
-                >
-                  <div className="flex items-start justify-between gap-3">
-                    <div
-                      onClick={() => handleOpenAudioNote(audio)}
-                      className="flex-1 min-w-0 cursor-pointer"
-                    >
-                      <div className="flex items-center gap-1.5 mb-1.5 flex-wrap">
-                        {audio.is_downloaded_offline ? (
-                          <span className="px-1.5 py-0.5 rounded-md bg-emerald-50 text-emerald-700 border border-emerald-200/80 text-[9px] font-bold font-mono inline-flex items-center gap-1">
-                            <CheckCircle2 size={9} /> OFFLINE READY
-                          </span>
-                        ) : (
-                          <span className="px-1.5 py-0.5 rounded-md bg-sky-50 text-sky-700 border border-sky-200/80 text-[9px] font-medium font-mono inline-flex items-center gap-1">
-                            <Cloud size={9} /> IN DRIVE
-                          </span>
-                        )}
-                        {audio.audio_enhancement_applied && (
-                          <span className="px-1.5 py-0.5 rounded-md bg-sky-50 text-sky-700 border border-sky-200/80 text-[9px] font-bold font-mono flex items-center gap-0.5">
-                            <Sparkles size={8} /> DSP
-                          </span>
-                        )}
-                      </div>
-
-                      <h3 className="text-xs font-bold text-slate-900 leading-snug group-hover:text-amber-600 transition-colors">
-                        {audio.title}
-                      </h3>
-
-                      {audio.description && (
-                        <p className="text-[11px] text-slate-500 line-clamp-1 mt-0.5">
-                          {audio.description}
-                        </p>
-                      )}
-                    </div>
-
-                    {/* Quick Play, Download & Favorite Action Buttons */}
-                    <div className="flex items-center gap-1.5 shrink-0">
-                      <button
-                        onClick={() => onToggleFavorite(audio.id)}
-                        className={`p-1.5 rounded-lg border transition-all cursor-pointer ${
-                          audio.is_favorite
-                            ? 'bg-amber-50 border-amber-300 text-amber-500 shadow-2xs'
-                            : 'bg-white border-slate-200 text-slate-300 hover:text-slate-500'
-                        }`}
-                        title="Toggle Favorite"
-                      >
-                        <Star size={13} fill={audio.is_favorite ? 'currentColor' : 'none'} />
-                      </button>
-
-                      {/* Small Download Arrow Button or Downloaded Checked Symbol */}
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          onToggleOffline(audio);
-                        }}
-                        className={`size-8 rounded-lg border flex items-center justify-center transition-all active:scale-90 shadow-2xs cursor-pointer ${
-                          audio.is_downloaded_offline
-                            ? 'bg-emerald-50 border-emerald-300 text-emerald-600 hover:bg-emerald-100'
-                            : 'bg-white border-slate-200 text-slate-400 hover:text-sky-600 hover:border-sky-300 hover:bg-sky-50'
-                        }`}
-                        title={
-                          audio.is_downloaded_offline
-                            ? 'Downloaded offline (tap to remove)'
-                            : 'Download from Google Drive for fast local playback'
-                        }
-                        aria-label={audio.is_downloaded_offline ? 'Downloaded offline' : `Download ${audio.title}`}
-                      >
-                        {audio.is_downloaded_offline ? (
-                          <CheckCircle2 size={13} strokeWidth={2.4} />
-                        ) : (
-                          <Download size={13} strokeWidth={2.2} />
-                        )}
-                      </button>
-
-                      <button
-                        onClick={() => {
-                          if (isPlaying && onTogglePlay) {
-                            onTogglePlay();
-                          } else {
-                            onPlayAudio(audio);
-                          }
-                        }}
-                        className={`w-8 h-8 rounded-full flex items-center justify-center transition-all active:scale-90 shadow-2xs hover:scale-105 cursor-pointer ${
-                          isPlaying
-                            ? 'bg-amber-500 text-slate-950 ring-2 ring-amber-500/30'
-                            : 'bg-slate-950 text-white hover:bg-slate-800'
-                        }`}
-                        aria-label={isPlaying ? 'Pause' : 'Play'}
-                      >
-                        {isPlaying ? (
-                          <Pause size={13} fill="currentColor" />
-                        ) : (
-                          <Play size={13} fill="currentColor" className="translate-x-0.5" />
-                        )}
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* Card Footer: Tags & Detail CTA */}
-                  <div className="flex items-center justify-between pt-2 border-t border-slate-100 text-[11px] text-slate-400 font-mono">
-                    <span className="font-semibold text-slate-600">
-                      {formatDuration(audio.duration_seconds)}
-                    </span>
-
-                    <div className="flex items-center gap-2">
-                      {onDeleteAudio && (
+                return (
+                  <div
+                    key={audio.id}
+                    onClick={() => {
+                      if (isPlaying && onTogglePlay) {
+                        onTogglePlay();
+                      } else {
+                        onPlayAudio(audio);
+                      }
+                    }}
+                    className={`group p-3 sm:p-3.5 flex flex-col gap-2 transition-colors cursor-pointer hover:bg-slate-50/70 active:bg-slate-100/50 ${
+                      isPlaying ? 'bg-amber-50/40' : ''
+                    }`}
+                    role="button"
+                    tabIndex={0}
+                    aria-label={`Play ${audio.title}`}
+                  >
+                    {/* Top Tier: Play Disc, Uncramped Track Title, Star & Download */}
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="flex items-center gap-3 min-w-0 flex-1">
                         <button
                           type="button"
                           onClick={(e) => {
                             e.stopPropagation();
-                            if (window.confirm(`Delete audio note "${audio.title}"?`)) {
-                              onDeleteAudio(audio.id);
+                            if (isPlaying && onTogglePlay) {
+                              onTogglePlay();
+                            } else {
+                              onPlayAudio(audio);
                             }
                           }}
-                          className="p-1 text-slate-300 hover:text-rose-600 transition-colors cursor-pointer"
-                          title="Delete audio note"
+                          className={`size-10 rounded-xl flex items-center justify-center shrink-0 transition-all active:scale-90 shadow-2xs hover:scale-105 cursor-pointer ${
+                            isPlaying
+                              ? 'bg-amber-500 text-slate-950 ring-2 ring-amber-400/30'
+                              : 'bg-slate-100 group-hover:bg-slate-200 text-slate-700'
+                          }`}
+                          aria-label={isPlaying ? 'Pause' : 'Play'}
                         >
-                          <Trash2 size={13} />
+                          {isPlaying ? (
+                            <div className="flex items-end gap-0.5 h-3.5 w-3.5 text-slate-950" aria-label="Playing">
+                              <span className="w-0.5 bg-slate-950 rounded-full animate-eq-1 h-full" />
+                              <span className="w-0.5 bg-slate-950 rounded-full animate-eq-2 h-2/3" />
+                              <span className="w-0.5 bg-slate-950 rounded-full animate-eq-3 h-4/5" />
+                            </div>
+                          ) : (
+                            <Play size={14} fill="currentColor" className="translate-x-0.5 text-slate-800" />
+                          )}
                         </button>
-                      )}
-                      <button
-                        onClick={() => handleOpenAudioNote(audio)}
-                        className="text-slate-700 hover:text-slate-950 font-bold flex items-center gap-0.5 text-xs cursor-pointer"
-                      >
-                        <span>View Note</span>
-                        <ChevronRight size={14} />
-                      </button>
+
+                        <h3 className={`text-xs sm:text-[13px] font-bold leading-snug transition-colors line-clamp-1 ${
+                          isPlaying ? 'text-amber-800 font-extrabold' : 'text-slate-900 group-hover:text-amber-700'
+                        }`}>
+                          {audio.title}
+                        </h3>
+                      </div>
+
+                      {/* Right Quick Actions (Download & Favorite) */}
+                      <div className="flex items-center gap-1.5 shrink-0" onClick={(e) => e.stopPropagation()}>
+                        <button
+                          type="button"
+                          onClick={() => onToggleOffline(audio)}
+                          className={`size-8 rounded-lg border flex items-center justify-center transition-all active:scale-90 shadow-2xs cursor-pointer ${
+                            audio.is_downloaded_offline
+                              ? 'bg-emerald-50 border-emerald-300 text-emerald-600 hover:bg-emerald-100'
+                              : 'bg-white border-slate-200 text-slate-400 hover:text-sky-600 hover:border-sky-300 hover:bg-sky-50'
+                          }`}
+                          title={
+                            audio.is_downloaded_offline
+                              ? 'Downloaded offline (tap to remove)'
+                              : 'Download from Google Drive for fast local playback'
+                          }
+                          aria-label={audio.is_downloaded_offline ? 'Downloaded offline' : `Download ${audio.title}`}
+                        >
+                          {audio.is_downloaded_offline ? (
+                            <CheckCircle2 size={13} strokeWidth={2.4} />
+                          ) : (
+                            <Download size={13} strokeWidth={2.2} />
+                          )}
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => onToggleFavorite(audio.id)}
+                          className={`p-1.5 rounded-lg border transition-all cursor-pointer ${
+                            audio.is_favorite
+                              ? 'bg-amber-50 border-amber-300 text-amber-500 shadow-2xs'
+                              : 'bg-white border-slate-200 text-slate-300 hover:text-slate-500'
+                          }`}
+                          title="Toggle Favorite"
+                        >
+                          <Star size={13} fill={audio.is_favorite ? 'currentColor' : 'none'} />
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Bottom Tier: Metadata Pills (Duration, Offline status, DSP) & View Note CTA */}
+                    <div className="flex items-center justify-between pt-1 border-t border-slate-100/80 text-[11px] text-slate-500 font-mono">
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        {audio.is_downloaded_offline ? (
+                          <span className="px-1.5 py-0.5 rounded-md bg-emerald-50 text-emerald-700 border border-emerald-200/80 text-[8.5px] font-bold font-mono inline-flex items-center gap-1">
+                            <CheckCircle2 size={8.5} /> OFFLINE READY
+                          </span>
+                        ) : (
+                          <span className="px-1.5 py-0.5 rounded-md bg-sky-50 text-sky-700 border border-sky-200/80 text-[8.5px] font-medium font-mono inline-flex items-center gap-1">
+                            <Cloud size={8.5} /> IN DRIVE
+                          </span>
+                        )}
+                        {audio.audio_enhancement_applied && (
+                          <span className="px-1.5 py-0.5 rounded-md bg-sky-50 text-sky-700 border border-sky-200/80 text-[8.5px] font-bold font-mono flex items-center gap-0.5">
+                            <Sparkles size={8} /> DSP
+                          </span>
+                        )}
+                        <span className="text-[10.5px] font-mono text-slate-500 font-semibold ml-0.5">
+                          {formatDuration(audio.duration_seconds)}
+                        </span>
+                        <span className="text-slate-300">•</span>
+                        <span className="text-[10px] text-slate-400">
+                          {(audio.file_size_bytes / 1048576).toFixed(1)} MB
+                        </span>
+                      </div>
+
+                      <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+                        {onDeleteAudio && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (window.confirm(`Delete audio note "${audio.title}"?`)) {
+                                onDeleteAudio(audio.id);
+                              }
+                            }}
+                            className="p-1 text-slate-300 hover:text-rose-600 transition-colors cursor-pointer"
+                            title="Delete audio note"
+                          >
+                            <Trash2 size={13} />
+                          </button>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => handleOpenAudioNote(audio)}
+                          className="py-1 px-2.5 rounded-lg bg-slate-100 hover:bg-slate-200/90 text-slate-800 font-semibold flex items-center gap-1 text-[11px] transition-colors cursor-pointer border border-slate-200/70 shadow-2xs"
+                          title="View note and study flashcards"
+                        >
+                          <BookOpen size={12} className="text-slate-600" />
+                          <span>View Note</span>
+                          <ChevronRight size={12} className="text-slate-400" />
+                        </button>
+                      </div>
                     </div>
                   </div>
-                </div>
-              );
-            })
+                );
+              })}
+            </div>
           )}
         </div>
         {renderCreateFolderModal()}

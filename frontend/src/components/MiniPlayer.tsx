@@ -95,7 +95,7 @@ export const MiniPlayer: React.FC<MiniPlayerProps> = ({
 
   return (
     <div
-      className="w-full bg-slate-950/98 backdrop-blur-2xl text-white select-none transition-all duration-200 border-b border-white/10"
+      className="w-full bg-white/95 backdrop-blur-2xl text-slate-900 select-none transition-all duration-200 border-b border-slate-200/70"
       data-testid="compact-music-player"
     >
       <div className="w-full">
@@ -116,28 +116,28 @@ export const MiniPlayer: React.FC<MiniPlayerProps> = ({
           {/* Left: Track Metadata & Title */}
           <div className="flex-1 min-w-0 flex flex-col justify-center">
             <div className="flex items-center gap-2 min-w-0">
-              <h4 className="text-[13px] sm:text-[13.5px] font-semibold text-white truncate leading-tight group-hover/player:text-slate-200 transition-colors tracking-tight">
+              <h4 className="text-[13px] sm:text-[13.5px] font-bold text-slate-900 truncate leading-tight group-hover/player:text-amber-600 transition-colors tracking-tight">
                 {currentAudio.title}
               </h4>
               {isPlaying && (
                 <span
-                  className="inline-flex items-end gap-0.5 h-2.5 w-2.5 shrink-0 text-slate-300 mb-0.5"
+                  className="inline-flex items-end gap-0.5 h-2.5 w-2.5 shrink-0 text-amber-500 mb-0.5"
                   title="Playing"
                   aria-hidden="true"
                 >
-                  <span className="w-0.5 bg-slate-300 rounded-full animate-eq-1 h-full" />
-                  <span className="w-0.5 bg-slate-300 rounded-full animate-eq-2 h-2/3" />
-                  <span className="w-0.5 bg-slate-300 rounded-full animate-eq-3 h-4/5" />
+                  <span className="w-0.5 bg-amber-500 rounded-full animate-eq-1 h-full" />
+                  <span className="w-0.5 bg-amber-500 rounded-full animate-eq-2 h-2/3" />
+                  <span className="w-0.5 bg-amber-500 rounded-full animate-eq-3 h-4/5" />
                 </span>
               )}
             </div>
 
-            <div className="flex items-center gap-1.5 text-[11px] text-zinc-400 font-medium leading-none mt-1">
-              <span className="text-zinc-300 font-medium truncate">
+            <div className="flex items-center gap-1.5 text-[11px] text-slate-500 font-medium leading-none mt-1">
+              <span className="text-slate-600 font-medium truncate">
                 {currentAudio.subject_name || 'Academic Audio'}
               </span>
-              <span className="text-zinc-600 font-bold">•</span>
-              <span className="font-mono text-zinc-400 text-[10.5px] tracking-tight shrink-0">
+              <span className="text-slate-300 font-bold">•</span>
+              <span className="font-mono text-slate-500 text-[10.5px] tracking-tight shrink-0">
                 {formatDuration(currentDisplayPos)} / {formatDuration(safeDuration)}
               </span>
             </div>
@@ -150,7 +150,7 @@ export const MiniPlayer: React.FC<MiniPlayerProps> = ({
               <button
                 type="button"
                 onClick={onCycleSpeed}
-                className="px-2 py-0.5 rounded-lg border border-slate-700 bg-slate-900/90 hover:bg-slate-800 text-slate-200 font-mono text-[10px] font-bold active:scale-90 transition-all cursor-pointer shadow-2xs"
+                className="px-2 py-0.5 rounded-lg border border-slate-200 bg-slate-50 hover:bg-slate-100 text-slate-700 font-mono text-[10px] font-bold active:scale-90 transition-all cursor-pointer shadow-2xs"
                 title="Cycle playback speed"
                 aria-label={`Playback speed ${playbackSpeed}x`}
               >
@@ -162,13 +162,13 @@ export const MiniPlayer: React.FC<MiniPlayerProps> = ({
             <button
               type="button"
               onClick={onOpenFullScreen}
-              className="size-7 rounded-full text-zinc-400 hover:text-white hover:bg-white/10 flex items-center justify-center active:scale-90 transition-all cursor-pointer relative"
+              className="size-7 rounded-full text-slate-400 hover:text-slate-900 hover:bg-slate-100 flex items-center justify-center active:scale-90 transition-all cursor-pointer relative"
               title={`Open full player & queue (${activeSubjectQueue.length} notes)`}
               aria-label="Open playlist queue"
             >
               <ListMusic size={15} />
               {activeSubjectQueue.length > 1 && (
-                <span className="absolute -top-1 -right-1 size-3.5 rounded-full bg-slate-200 text-slate-950 text-[8px] font-mono font-bold flex items-center justify-center shadow-xs">
+                <span className="absolute -top-1 -right-1 size-3.5 rounded-full bg-slate-900 text-white text-[8px] font-mono font-bold flex items-center justify-center shadow-xs">
                   {activeSubjectQueue.length}
                 </span>
               )}
@@ -179,7 +179,7 @@ export const MiniPlayer: React.FC<MiniPlayerProps> = ({
               <button
                 type="button"
                 onClick={onDismiss}
-                className="size-7 rounded-full text-zinc-400 hover:text-rose-400 hover:bg-rose-500/20 flex items-center justify-center active:scale-90 transition-all cursor-pointer"
+                className="size-7 rounded-full text-slate-400 hover:text-rose-600 hover:bg-rose-50 flex items-center justify-center active:scale-90 transition-all cursor-pointer"
                 title="Close player"
                 aria-label="Close and dismiss player"
               >
@@ -207,20 +207,20 @@ export const MiniPlayer: React.FC<MiniPlayerProps> = ({
           }}
         >
           {/* Base Track */}
-          <div className="relative w-full h-[2.5px] group-hover/midprogress:h-[3.5px] bg-white/[0.08] transition-all overflow-visible">
-            {/* Luminous Modern Slate-White Progress Fill */}
+          <div className="relative w-full h-[2.5px] group-hover/midprogress:h-[3.5px] bg-slate-200/80 transition-all overflow-visible">
+            {/* Luminous Modern Slate Progress Fill */}
             <div
-              className="h-full bg-gradient-to-r from-slate-400 via-slate-200 to-white relative shadow-[0_0_8px_rgba(255,255,255,0.4)] transition-[width] duration-100"
+              className="h-full bg-gradient-to-r from-slate-400 via-slate-600 to-white relative shadow-2xs transition-[width] duration-100"
               style={{ width: `${progressPercent}%` }}
             >
-              <div className="absolute right-0 top-1/2 -translate-y-1/2 translate-x-1/2 size-2 bg-white rounded-full shadow-[0_0_6px_rgba(255,255,255,0.9)] opacity-0 group-hover/midprogress:opacity-100 transition-opacity pointer-events-none" />
+              <div className="absolute right-0 top-1/2 -translate-y-1/2 translate-x-1/2 size-2 bg-slate-900 rounded-full shadow-sm opacity-0 group-hover/midprogress:opacity-100 transition-opacity pointer-events-none" />
             </div>
           </div>
 
           {/* Hover Time Tooltip */}
           {hoverTime && (
             <div
-              className="absolute -top-6 -translate-x-1/2 rounded bg-slate-900/95 backdrop-blur-sm px-1.5 py-0.5 text-[9px] font-mono text-slate-200 pointer-events-none z-30 shadow-md border border-white/10"
+              className="absolute -top-6 -translate-x-1/2 rounded bg-slate-900/95 backdrop-blur-sm px-1.5 py-0.5 text-[9px] font-mono text-white pointer-events-none z-30 shadow-md border border-slate-800"
               style={{ left: `${hoverTime.x}px` }}
             >
               {hoverTime.time}
