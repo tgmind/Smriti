@@ -20,11 +20,11 @@ export const Navigation: React.FC<NavigationProps> = ({
 }) => {
   const leftTabs = [
     { id: 'library' as TabType, label: 'Library', ariaLabel: 'Home', title: 'Library (Home)', icon: Folder },
-    { id: 'downloads' as TabType, label: 'Downloads', ariaLabel: 'Downloads', title: 'Downloads & Drive Sync', icon: Download }
+    { id: 'progress' as TabType, label: 'Progress', ariaLabel: 'Study Progress', title: 'Study Progress', icon: BarChart3 }
   ];
 
   const rightTabs = [
-    { id: 'progress' as TabType, label: 'Progress', ariaLabel: 'Study Progress', title: 'Study Progress', icon: BarChart3 },
+    { id: 'downloads' as TabType, label: 'Downloads', ariaLabel: 'Downloads', title: 'Downloads & Drive Sync', icon: Download },
     { id: 'profile' as TabType, label: 'Account', ariaLabel: 'Account', title: 'Account Profile', icon: User }
   ];
 
