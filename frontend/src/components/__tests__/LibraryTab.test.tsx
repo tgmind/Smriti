@@ -2,6 +2,7 @@ import { describe, it, expect, vi } from 'vitest';
 import { renderToString } from 'react-dom/server';
 import { LibraryTab } from '../LibraryTab';
 import { Subject, AudioItem } from '@/types';
+import { networkService } from '../../services/networkService';
 
 describe('LibraryTab Apple Music Redesign', () => {
   const mockSubjects: Subject[] = [
@@ -67,7 +68,7 @@ describe('LibraryTab Apple Music Redesign', () => {
     expect(html).not.toContain('Catalog');
   });
 
-  it('renders drill-down subject view when initialSubjectId is provided', () => {
+  it('renders drill-down subject view when initialSubjectId is provided with minimalist playlist rows and eliminates View Note', () => {
     const html = renderToString(
       <LibraryTab
         audioItems={mockAudioItems}
@@ -82,7 +83,13 @@ describe('LibraryTab Apple Music Redesign', () => {
 
     expect(html).toContain('Physics');
     expect(html).toContain('Gauss Law &amp; Electric Flux');
-    expect(html).toContain('View Note');
+    // Ensure "View Note" is eliminated completely
+    expect(html).not.toContain('View Note');
+    // Minimalist playlist track layout: track number '1', Play All, duration, and file size
+    expect(html).toContain('Play All');
+    expect(html).toContain('3:00');
+    expect(html).toContain('1.95 MB');
+    expect(html).toContain('aria-label="Play Gauss Law &amp; Electric Flux"');
   });
 
   it('renders New Topic button in root view', () => {
@@ -138,7 +145,7 @@ describe('LibraryTab Apple Music Redesign', () => {
     expect(html).toContain('Create Folder');
   });
 
-  it('categorizes both downloaded and non-downloaded Drive audio notes subject-wise and provides individual download arrows', () => {
+  it('categorizes both downloaded and non-downloaded Drive audio notes subject-wise with minimalist playlist layout and overflow actions', () => {
     const multiAudioItems: AudioItem[] = [
       {
         id: 'audio-downloaded',
@@ -191,14 +198,13 @@ describe('LibraryTab Apple Music Redesign', () => {
     expect(html).toContain('Maxwell Equations in Differential Form');
     expect(html).toContain('audio notes');
 
-    // 2. Downloaded item shows OFFLINE READY and downloaded button
-    expect(html).toContain('OFFLINE READY');
-    expect(html).toContain('aria-label="Downloaded offline"');
+    // 2. Downloaded item shows Offline status
+    expect(html).toContain('Offline');
 
-    // 3. Non-downloaded item shows IN DRIVE and individual download arrow button
-    expect(html).toContain('IN DRIVE');
-    expect(html).toContain('aria-label="Download Maxwell Equations in Differential Form"');
-    expect(html).toContain('title="Download from Google Drive for fast local playback"');
+    // 3. Both items provide overflow actions menu and eliminate View Note
+    expect(html).not.toContain('View Note');
+    expect(html).toContain('aria-label="More actions for Gauss Law &amp; Electric Flux"');
+    expect(html).toContain('aria-label="More actions for Maxwell Equations in Differential Form"');
   });
 
   it('renders delete folder action button on subject cards when onDeleteSubject is provided', () => {
@@ -309,7 +315,7 @@ describe('LibraryTab Apple Music Redesign', () => {
     expect(html).toContain('offline');
   });
 
-  it('renders View Note with back button, upgraded player, authoritative seekbar, and removes Concept & Formula Summary card', () => {
+  it('eliminates View Note screen completely and navigates directly to folder view for initialAudioId', () => {
     const html = renderToString(
       <LibraryTab
         audioItems={mockAudioItems}
@@ -335,21 +341,50 @@ describe('LibraryTab Apple Music Redesign', () => {
       />
     );
 
-    // 1. Back button to subject folder exists
-    expect(html).toContain('aria-label="Back to subject folder"');
-
-    // 2. Note title & clean metadata
+    // 1. Directly navigates into the subject folder without intermediate View Note screen
+    expect(html).toContain('Physics');
     expect(html).toContain('Gauss Law &amp; Electric Flux');
-    expect(html).toContain('MP3 Audio');
 
-    // 3. Upgraded player authoratative engine maintains paused position and speed
-    expect(html).toContain('Paused');
-    expect(html).toContain('1.25x');
-    expect(html).toContain('0:45'); // Accurately displays 45s position even when paused!
-
-    // 4. "Concept & Formula Summary" card is completely removed
+    // 2. "View Note" button and old detail page are completely eliminated
+    expect(html).not.toContain('View Note');
+    expect(html).not.toContain('aria-label="Back to subject folder"');
     expect(html).not.toContain('Concept &amp; Formula Summary');
-    expect(html).not.toContain('Concept & Formula Summary');
+
+    // 3. Minimalist playlist rows and Play All action are rendered directly
+    expect(html).toContain('Play All');
+    expect(html).toContain('aria-label="Play Gauss Law &amp; Electric Flux"');
+  });
+
+  it('renders active playing equalizer and highlighted track styling when track is actively playing', () => {
+    const html = renderToString(
+      <LibraryTab
+        audioItems={mockAudioItems}
+        subjects={mockSubjects}
+        initialSubjectId="sub-phys"
+        onPlayAudio={vi.fn()}
+        onToggleFavorite={vi.fn()}
+        onToggleOffline={vi.fn()}
+        onGoToRecord={vi.fn()}
+        playbackState={{
+          currentAudio: mockAudioItems[0],
+          isPlaying: true,
+          positionSeconds: 20,
+          durationSeconds: 180,
+          playbackSpeed: 1.0,
+          isRepeatTrack: false,
+          isRepeatQueue: false,
+          abLoop: { enabled: false, startSeconds: 0, endSeconds: 0 },
+          sleepTimerRemainingSeconds: null,
+          learningModeActive: false
+        }}
+      />
+    );
+
+    // Active track renders equalizer animation bars and colored accent
+    expect(html).toContain('bg-slate-900/[0.04]');
+    expect(html).toContain('aria-label="Playing"');
+    expect(html).toContain('animate-eq-1');
+    expect(html).toContain('aria-label="Pause Gauss Law &amp; Electric Flux"');
   });
 
   it('renders audio file input and Upload button configured for device audio uploads', () => {
@@ -432,5 +467,111 @@ describe('LibraryTab Apple Music Redesign', () => {
 
     expect(htmlSyncing).toContain('Syncing...');
     expect(htmlSyncing).toContain('Active');
+  });
+
+  it('renders compact morphing Wi-Fi Only sync pill in top header by default', () => {
+    networkService.setWifiOnlyMode(true);
+    const handleUpdateSettings = vi.fn();
+    const html = renderToString(
+      <LibraryTab
+        audioItems={mockAudioItems}
+        subjects={mockSubjects}
+        userSettings={{
+          daily_listening_goal_minutes: 30,
+          default_playback_speed: 1.0,
+          auto_rewind_seconds: 5,
+          cache_limit_mb: 250,
+          theme_mode: 'light',
+          offline_sync_wifi_only: true
+        }}
+        onUpdateSettings={handleUpdateSettings}
+        onPlayAudio={vi.fn()}
+        onToggleFavorite={vi.fn()}
+        onToggleOffline={vi.fn()}
+        onGoToRecord={vi.fn()}
+      />
+    );
+
+    // 1. Wi-Fi pill in top header bar with morphing state
+    expect(html).toContain('Wi-Fi Sync');
+    expect(html).toContain('All files auto-sync');
+    expect(html).toContain('lucide-wifi');
+    expect(html).toContain('border-emerald-200/90');
+    expect(html).toContain('bg-emerald-50/90');
+    expect(html).toContain('role="button"');
+  });
+
+  it('renders Mobile Data active pill when offline_sync_wifi_only is false', () => {
+    networkService.setWifiOnlyMode(false);
+    const handleUpdateSettings = vi.fn();
+    const html = renderToString(
+      <LibraryTab
+        audioItems={mockAudioItems}
+        subjects={mockSubjects}
+        userSettings={{
+          daily_listening_goal_minutes: 30,
+          default_playback_speed: 1.0,
+          auto_rewind_seconds: 5,
+          cache_limit_mb: 250,
+          theme_mode: 'light',
+          offline_sync_wifi_only: false
+        }}
+        onUpdateSettings={handleUpdateSettings}
+        onPlayAudio={vi.fn()}
+        onToggleFavorite={vi.fn()}
+        onToggleOffline={vi.fn()}
+        onGoToRecord={vi.fn()}
+      />
+    );
+
+    // 1. Wi-Fi + Data dynamic mode indicator
+    expect(html).toContain('Wi-Fi + Data');
+    expect(html).toContain('Syncing all files');
+    expect(html).toContain('lucide-signal');
+    expect(html).toContain('border-sky-200/90');
+    expect(html).toContain('bg-sky-50/90');
+  });
+
+  it('renders sleek compact folder header with Search Lens icon, symbol micro-stats, and minimal sort tabs', () => {
+    const html = renderToString(
+      <LibraryTab
+        audioItems={mockAudioItems}
+        subjects={mockSubjects}
+        initialSubjectId="sub-phys"
+        onPlayAudio={vi.fn()}
+        onPlayQueue={vi.fn()}
+        onToggleFavorite={vi.fn()}
+        onToggleOffline={vi.fn()}
+        onGoToRecord={vi.fn()}
+        onDeleteSubject={vi.fn()}
+      />
+    );
+
+    // 1. Top bar: Back button + Library breadcrumb (no duplicate Physics in breadcrumb link)
+    expect(html).toContain('aria-label="Back to folders"');
+    expect(html).toContain('Library');
+
+    // 2. Top-right actions: Search Lens button and Delete folder button
+    expect(html).toContain('aria-label="Search folder"');
+    expect(html).toContain('title="Search Physics"');
+    expect(html).toContain('aria-label="Delete Physics folder"');
+
+    // 3. Compact symbol-driven folder hero
+    expect(html).toContain('Physics');
+    expect(html).toContain('1 lesson');
+    expect(html).toContain('3:00');
+    expect(html).toContain('1 offline');
+
+    // 4. Action toolbar buttons (Play All, Upload, Record) remain untouched
+    expect(html).toContain('Play All');
+    expect(html).toContain('Upload');
+    expect(html).toContain('Record');
+
+    // 5. Card header with borderless sort tabs
+    expect(html).toContain('Folder Tracks');
+    expect(html).toContain('Hold to select');
+    expect(html).toContain('Recent');
+    expect(html).toContain('Length');
+    expect(html).toContain('A–Z');
   });
 });

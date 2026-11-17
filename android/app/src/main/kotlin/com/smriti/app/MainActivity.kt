@@ -56,11 +56,17 @@ class MainActivity : ComponentActivity() {
 
         onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
             override fun handleOnBackPressed() {
-                if (webView?.canGoBack() == true) {
-                    webView?.goBack()
-                } else {
-                    isEnabled = false
-                    onBackPressedDispatcher.onBackPressed()
+                webView?.evaluateJavascript(
+                    "if (typeof window.handleSmritiBackPress === 'function') { window.handleSmritiBackPress(); } else { false; }"
+                ) { result ->
+                    if (result == "false" || result == null) {
+                        if (webView?.canGoBack() == true) {
+                            webView?.goBack()
+                        } else {
+                            isEnabled = false
+                            onBackPressedDispatcher.onBackPressed()
+                        }
+                    }
                 }
             }
         })
@@ -218,6 +224,8 @@ class MainActivity : ComponentActivity() {
     }
 
     override fun onDestroy() {
+        bridge?.destroy()
+        bridge = null
         controllerFuture?.let { MediaController.releaseFuture(it) }
         webView?.destroy()
         webView = null

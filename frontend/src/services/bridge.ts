@@ -23,12 +23,16 @@ interface ISmritiBridgeNative {
   purgeAllLocalData(): void;
   triggerHapticFeedback(patternType: string): void;
   getNetworkStatus?(): string;
+  getNetworkTransportType?(): string;
+  exitApp?(): void;
+  shareText?(title: string, text: string): void;
 }
 
 declare global {
   interface Window {
     SmritiBridge?: ISmritiBridgeNative;
     onSmritiNativeEvent?: (eventName: string, payloadJson: string) => void;
+    onNativeNetworkChange?: (transportType: string) => void;
   }
 }
 
@@ -56,6 +60,38 @@ class BridgeManager {
     return typeof window !== 'undefined' && !!window.SmritiBridge;
   }
 
+  public exitApp(): void {
+    if (this.isNativeApp() && window.SmritiBridge?.exitApp) {
+      window.SmritiBridge.exitApp();
+    } else if (typeof window !== 'undefined') {
+      if (window.history.length > 1) {
+        window.history.back();
+      }
+    }
+  }
+
+  public async shareText(title: string, text: string): Promise<boolean> {
+    if (this.isNativeApp() && window.SmritiBridge?.shareText) {
+      try {
+        window.SmritiBridge.shareText(title, text);
+        return true;
+      } catch (err) {
+        console.warn('[Bridge] Native shareText failed', err);
+      }
+    }
+    if (typeof navigator !== 'undefined' && navigator.share) {
+      try {
+        await navigator.share({ title, text, url: text });
+        return true;
+      } catch (e: any) {
+        if (e.name !== 'AbortError') {
+          console.warn('[Bridge] Web Share failed', e);
+        }
+      }
+    }
+    return false;
+  }
+
   public getNetworkStatus(): {
     isOnline: boolean;
     connectionType: 'wifi' | 'cellular' | 'ethernet' | 'other' | 'none' | 'unknown';
@@ -68,6 +104,20 @@ class BridgeManager {
         if (raw) return JSON.parse(raw);
       } catch (e) {
         console.warn('[Bridge] Failed getting native network status', e);
+      }
+    }
+    return null;
+  }
+
+  public getNetworkTransportType(): 'wifi' | 'cellular' | 'offline' | null {
+    if (this.isNativeApp() && window.SmritiBridge?.getNetworkTransportType) {
+      try {
+        const raw = window.SmritiBridge.getNetworkTransportType();
+        if (raw === 'wifi' || raw === 'cellular' || raw === 'offline') {
+          return raw;
+        }
+      } catch (e) {
+        console.warn('[Bridge] Failed getting native network transport type', e);
       }
     }
     return null;

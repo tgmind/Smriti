@@ -14,7 +14,6 @@ import {
   Cloud,
   CheckCircle2,
   ChevronRight,
-  ShieldCheck,
   X,
   Upload,
   Download,
@@ -25,6 +24,7 @@ import { AudioItem, Subject, UserSettings, PlaybackState } from '../types';
 import { formatDuration } from '../services/learningEngine';
 import { DEFAULT_SUBJECTS } from '../services/supabase';
 import { resolveSubjectVisual, type SubjectVisualTheme } from '../utils/subjectVisuals';
+import { toastService } from '../services/toastService';
 import {
   googleDriveService,
   DriveTransferItem,
@@ -104,7 +104,6 @@ export const HomeTab: React.FC<HomeTabProps> = ({
   onNavigateToAccount
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
-  const [showNotificationToast, setShowNotificationToast] = useState(false);
   const [storageQuota, setStorageQuota] = useState<GoogleDriveStorageQuota | null>(null);
 
   // Drive transfers subscription
@@ -289,7 +288,12 @@ export const HomeTab: React.FC<HomeTabProps> = ({
 
           {/* Notification Bell Button */}
           <button
-            onClick={() => setShowNotificationToast(true)}
+            onClick={() => {
+              toastService.progress(
+                'Daily Revision Plan Active',
+                'Your spaced intervals are automatically scheduled with high-retention audio repeats.'
+              );
+            }}
             className="size-10 rounded-full bg-white border border-slate-200/80 text-slate-700 hover:text-slate-950 hover:bg-slate-50 shadow-2xs transition-all active:scale-90 flex items-center justify-center relative cursor-pointer"
             title="Daily Revision Reminders"
           >
@@ -336,29 +340,6 @@ export const HomeTab: React.FC<HomeTabProps> = ({
           )}
         </div>
       </div>
-
-      {/* Notification Toast Modal */}
-      {showNotificationToast && (
-        <div className="p-3 bg-emerald-50 border border-emerald-200/90 rounded-2xl flex items-start justify-between gap-3 shadow-xs animate-in fade-in duration-200">
-          <div className="flex items-start gap-2.5">
-            <div className="p-1.5 rounded-xl bg-emerald-100 text-emerald-800 shrink-0 mt-0.5">
-              <ShieldCheck size={16} />
-            </div>
-            <div>
-              <h4 className="text-xs font-bold text-emerald-950">Daily Revision Plan Active</h4>
-              <p className="text-[11px] text-emerald-800 mt-0.5 leading-snug">
-                Your spaced intervals are automatically scheduled with high-retention audio repeats.
-              </p>
-            </div>
-          </div>
-          <button
-            onClick={() => setShowNotificationToast(false)}
-            className="text-emerald-700 hover:text-emerald-900 p-1 cursor-pointer shrink-0"
-          >
-            <X size={15} />
-          </button>
-        </div>
-      )}
 
       {/* Hero Container: Animated Horizontal Moving Subject Carousel */}
       <div className="bg-white border border-slate-200/90 rounded-3xl p-4 space-y-3 shadow-2xs relative overflow-hidden">

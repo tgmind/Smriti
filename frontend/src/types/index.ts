@@ -33,6 +33,7 @@ export interface Subject {
   description?: string;
   sort_order: number;
   item_count?: number;
+  google_drive_folder_id?: string;
 }
 
 export interface Collection {
@@ -52,6 +53,7 @@ export interface PlaybackState {
   playbackSpeed: number;
   isRepeatTrack: boolean;
   isRepeatQueue: boolean;
+  repeatMode?: 'off' | 'one' | 'all';
   abLoop: {
     enabled: boolean;
     startSeconds: number;

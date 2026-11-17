@@ -20,6 +20,7 @@ import { formatDuration } from '../services/learningEngine';
 import { AudioTrimmer } from './AudioTrimmer';
 import { trimAudioBlob } from '../services/audioTrimmerEngine';
 import { resolveSubjectVisual } from '../utils/subjectVisuals';
+import { toastService } from '../services/toastService';
 
 interface RecordTabProps {
   subjects: Subject[];
@@ -296,8 +297,14 @@ export const RecordTab: React.FC<RecordTabProps> = ({
       setRecordedUrl(null);
       setTags([]);
       setUploadProgress(null);
+
+      toastService.record(
+        'Recording Saved',
+        `"${title.trim()}" organized into ${sub?.name || 'General'}.`
+      );
     } catch (e) {
       console.error('Failed to save audio', e);
+      toastService.danger('Failed to Save Recording', 'An error occurred while saving the audio note.');
     } finally {
       setIsSaving(false);
     }
@@ -309,6 +316,7 @@ export const RecordTab: React.FC<RecordTabProps> = ({
     setRecordedBlob(null);
     setRecordedUrl(null);
     setTags([]);
+    toastService.neutral('Recording discarded');
     onCancel();
   };
 

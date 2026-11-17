@@ -1,4 +1,6 @@
 import { bridge } from './bridge';
+import { googleDriveService } from './googleDrive';
+import { toastService } from './toastService';
 
 export type ConnectionType = 'wifi' | 'cellular' | 'ethernet' | 'other' | 'none' | 'unknown';
 
@@ -30,10 +32,182 @@ class NetworkService {
 
   private listeners: Set<NetworkListener> = new Set();
   private mockStatus: NetworkStatus | null = null;
+  private mockCanDetectCellular: boolean | null = null;
   private isInitialized = false;
 
+  private wifiOnly: boolean = true;
+  private cellularSessionOverride: boolean = false;
+  private autoSwitchedOnCellular: boolean = false;
+  private currentNetType: 'wifi' | 'cellular' | 'offline' = 'wifi';
+
+  private onSettingsUpdateCallback?: (settings: { offline_sync_wifi_only: boolean }) => void;
+  private onTriggerSyncCallback?: () => void;
+
   constructor() {
+    if (typeof localStorage !== 'undefined') {
+      try {
+        const stored = localStorage.getItem('smriti_user_settings');
+        if (stored) {
+          const parsed = JSON.parse(stored);
+          if (typeof parsed.offline_sync_wifi_only === 'boolean') {
+            this.wifiOnly = parsed.offline_sync_wifi_only;
+          }
+        }
+      } catch {
+        // ignore
+      }
+    }
     this.init();
+  }
+
+  public get offline_sync_wifi_only(): boolean {
+    return this.wifiOnly;
+  }
+
+  public set offline_sync_wifi_only(val: boolean) {
+    this.setWifiOnlyMode(val);
+  }
+
+  public setWifiOnly(wifiOnly: boolean): void {
+    this.setWifiOnlyMode(wifiOnly);
+  }
+
+  public getWifiOnly(): boolean {
+    return this.wifiOnly;
+  }
+
+  public wasAutoSwitchedOnCellular(): boolean {
+    return this.autoSwitchedOnCellular;
+  }
+
+  public isCellularSessionOverride(): boolean {
+    return this.cellularSessionOverride;
+  }
+
+  public registerSettingsUpdater(callback: (settings: { offline_sync_wifi_only: boolean }) => void): () => void {
+    this.onSettingsUpdateCallback = callback;
+    return () => {
+      if (this.onSettingsUpdateCallback === callback) {
+        this.onSettingsUpdateCallback = undefined;
+      }
+    };
+  }
+
+  public registerSyncTrigger(callback: () => void): () => void {
+    this.onTriggerSyncCallback = callback;
+    return () => {
+      if (this.onTriggerSyncCallback === callback) {
+        this.onTriggerSyncCallback = undefined;
+      }
+    };
+  }
+
+  public canDetectCellular(): boolean {
+    if (this.mockCanDetectCellular !== null) {
+      return this.mockCanDetectCellular;
+    }
+    if (this.mockStatus) {
+      return true;
+    }
+    // 1. Android Native App Bridge has exact network transport capabilities
+    if (bridge.isNativeApp()) {
+      return true;
+    }
+    // 2. Web / PWA NetworkInformation API
+    if (typeof navigator !== 'undefined') {
+      const nav = navigator as any;
+      const connection = nav?.connection || nav?.mozConnection || nav?.webkitConnection;
+      if (connection) {
+        if (connection.type === 'cellular') {
+          return true;
+        }
+        if (connection.saveData === true && /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent || '')) {
+          return true;
+        }
+      }
+    }
+    return false;
+  }
+
+  public getNetworkType(): 'wifi' | 'cellular' | 'offline' {
+    const s = this.getStatus();
+    if (!s.isOnline || s.connectionType === 'none') {
+      return 'offline';
+    }
+
+    if (this.canDetectCellular()) {
+      if (s.isCellular || s.connectionType === 'cellular') {
+        return 'cellular';
+      }
+      return 'wifi';
+    }
+
+    // When progressive cellular detection is not supported (Desktop browsers, Safari),
+    // treat online connection as unrestricted 'wifi' so sync is never falsely paused
+    return 'wifi';
+  }
+
+  public enableMobileDataForSession(): void {
+    this.cellularSessionOverride = true;
+    this.autoSwitchedOnCellular = false;
+    this.setWifiOnlyMode(false);
+    toastService.downloads(
+      'Mobile Data Sync Allowed',
+      'All files sync across Wi-Fi and mobile data for this session.'
+    );
+  }
+
+  public setWifiOnlyMode(wifiOnly: boolean): void {
+    this.wifiOnly = wifiOnly;
+
+    if (!wifiOnly) {
+      // User explicitly allowed Wi-Fi + Data
+      if (this.getNetworkType() === 'cellular') {
+        this.cellularSessionOverride = true;
+      }
+      this.autoSwitchedOnCellular = false;
+      if (this.onTriggerSyncCallback) {
+        try {
+          this.onTriggerSyncCallback();
+        } catch (e) {
+          console.warn('[NetworkService] onTriggerSyncCallback error:', e);
+        }
+      }
+    } else {
+      // Switched to Wi-Fi Only
+      this.cellularSessionOverride = false;
+      if (this.getNetworkType() === 'cellular') {
+        try {
+          googleDriveService.cancelActiveTransfers('Paused: Device in Wi-Fi Only mode on mobile data');
+        } catch (e) {
+          console.warn('[NetworkService] cancelActiveTransfers error:', e);
+        }
+      }
+    }
+
+    this.persistWifiOnlySetting(wifiOnly);
+    this.notifySubscribers();
+  }
+
+  private persistWifiOnlySetting(wifiOnly: boolean) {
+    if (typeof localStorage !== 'undefined') {
+      try {
+        const stored = localStorage.getItem('smriti_user_settings');
+        const settings = stored ? JSON.parse(stored) : {};
+        settings.offline_sync_wifi_only = wifiOnly;
+        localStorage.setItem('smriti_user_settings', JSON.stringify(settings));
+      } catch (e) {
+        console.warn('[NetworkService] Failed saving settings to localStorage', e);
+      }
+    }
+
+    if (this.onSettingsUpdateCallback) {
+      try {
+        this.onSettingsUpdateCallback({ offline_sync_wifi_only: wifiOnly });
+      } catch (e) {
+        console.warn('[NetworkService] onSettingsUpdateCallback error:', e);
+      }
+    }
   }
 
   public init() {
@@ -66,6 +240,35 @@ class NetworkService {
 
     // 3. Listen to standard browser web events
     if (typeof window !== 'undefined') {
+      // Global hook from Android native bridge
+      window.onNativeNetworkChange = (transport: string) => {
+        if (transport === 'wifi') {
+          this.updateStatus({
+            isOnline: true,
+            connectionType: 'wifi',
+            isWifi: true,
+            isCellular: false,
+            details: 'Native onNativeNetworkChange (wifi)'
+          });
+        } else if (transport === 'cellular') {
+          this.updateStatus({
+            isOnline: true,
+            connectionType: 'cellular',
+            isWifi: false,
+            isCellular: true,
+            details: 'Native onNativeNetworkChange (cellular)'
+          });
+        } else if (transport === 'offline') {
+          this.updateStatus({
+            isOnline: false,
+            connectionType: 'none',
+            isWifi: false,
+            isCellular: false,
+            details: 'Native onNativeNetworkChange (offline)'
+          });
+        }
+      };
+
       window.addEventListener('online', () => {
         this.detectCurrentStatus();
       });
@@ -80,7 +283,7 @@ class NetworkService {
         });
       });
 
-      // Network Information API if available (Chrome, Android WebView, Edge)
+      // Network Information API if available (Chrome, Android WebView)
       const nav = navigator as any;
       const connection = nav?.connection || nav?.mozConnection || nav?.webkitConnection;
       if (connection && typeof connection.addEventListener === 'function') {
@@ -101,6 +304,19 @@ class NetworkService {
 
     // A. Native Android Bridge
     if (bridge.isNativeApp()) {
+      const transport = bridge.getNetworkTransportType();
+      if (transport) {
+        const next: NetworkStatus = {
+          isOnline: transport !== 'offline',
+          connectionType: transport === 'wifi' ? 'wifi' : transport === 'cellular' ? 'cellular' : 'none',
+          isWifi: transport === 'wifi',
+          isCellular: transport === 'cellular',
+          details: 'Android Native Transport Type'
+        };
+        this.updateStatus(next);
+        return next;
+      }
+
       const native = bridge.getNetworkStatus();
       if (native) {
         const next: NetworkStatus = {
@@ -131,7 +347,7 @@ class NetworkService {
       }
 
       const nav = navigator as any;
-      const connection = nav.connection || nav.mozConnection || nav.webkitConnection;
+      const connection = nav?.connection || nav?.mozConnection || nav?.webkitConnection;
 
       if (connection) {
         const rawType = String(connection.type || '').toLowerCase();
@@ -152,23 +368,14 @@ class NetworkService {
           isWifi = false;
           isCellular = false;
         } else {
-          // If connection.type is unspecified, inspect effectiveType / mobile user-agent
-          const effType = String(connection.effectiveType || '').toLowerCase();
+          // If connection.type is unspecified, inspect saveData / mobile device
           const isMobileDevice = /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent || '');
-          
-          if (isMobileDevice && (effType === '4g' || effType === '3g' || effType === '2g' || effType === 'slow-2g')) {
-            // When on mobile without explicit type, check saveData or default to cellular if metered
-            if (connection.saveData === true) {
-              connType = 'cellular';
-              isCellular = true;
-              isWifi = false;
-            } else {
-              // Unverified on mobile device: do not claim verified Wi-Fi
-              connType = 'unknown';
-              isWifi = false;
-              isCellular = true;
-            }
+          if (isMobileDevice && connection.saveData === true) {
+            connType = 'cellular';
+            isCellular = true;
+            isWifi = false;
           } else {
+            // When connection.type is not explicit, treat as unrestricted wifi / generic online
             connType = 'wifi';
             isWifi = true;
             isCellular = false;
@@ -180,13 +387,13 @@ class NetworkService {
           connectionType: connType,
           isWifi,
           isCellular,
-          details: `Web Network Information API (${rawType || connection.effectiveType || 'active'})`
+          details: `Web Network Information API (${rawType || 'active'})`
         };
         this.updateStatus(next);
         return next;
       }
 
-      // Default web online state
+      // Default web online state (Desktop Chrome, Safari, Firefox)
       const next: NetworkStatus = {
         isOnline: true,
         connectionType: 'wifi',
@@ -207,6 +414,7 @@ class NetworkService {
     }
 
     const prev = this.currentStatus;
+    const prevNetType = this.currentNetType;
     const hasChanged =
       prev.isOnline !== newStatus.isOnline ||
       prev.connectionType !== newStatus.connectionType ||
@@ -214,21 +422,63 @@ class NetworkService {
       prev.isCellular !== newStatus.isCellular;
 
     this.currentStatus = newStatus;
+    const newNetType = this.getNetworkType();
+    this.currentNetType = newNetType;
+
+    // Self-Aware Mobile Data Auto-Switch & Protection
+    if (newNetType === 'cellular' && prevNetType !== 'cellular') {
+      if (!this.cellularSessionOverride) {
+        this.wifiOnly = true;
+        this.autoSwitchedOnCellular = true;
+        this.persistWifiOnlySetting(true);
+
+        try {
+          googleDriveService.cancelActiveTransfers('Auto-switched to Wi-Fi Only: Cellular mobile data detected');
+        } catch (e) {
+          console.warn('[NetworkService] cancelActiveTransfers error:', e);
+        }
+
+        toastService.show({
+          title: 'Mobile Data Active • Sync Paused',
+          description: 'Auto-switched to Wi-Fi Only mode. Files will sync to Google Drive on Wi-Fi.',
+          section: 'downloads',
+          duration: 6000,
+          action: {
+            label: 'Sync Anyway',
+            onClick: () => {
+              this.enableMobileDataForSession();
+            }
+          }
+        });
+      }
+    } else if (newNetType === 'wifi' && prevNetType === 'cellular') {
+      // Reconnected to Wi-Fi: automatically re-arm auto-protection and reset session override
+      this.cellularSessionOverride = false;
+      this.autoSwitchedOnCellular = false;
+      if (this.onTriggerSyncCallback) {
+        try {
+          this.onTriggerSyncCallback();
+        } catch (e) {
+          console.warn('[NetworkService] onTriggerSyncCallback error:', e);
+        }
+      }
+    }
 
     if (hasChanged) {
-      for (const listener of this.listeners) {
-        try {
-          listener(newStatus, prev);
-        } catch (err) {
-          console.error('[NetworkService] Listener error:', err);
-        }
+      this.notifySubscribers(prev);
+    }
+  }
+
+  private notifySubscribers(prev: NetworkStatus = this.currentStatus) {
+    for (const listener of this.listeners) {
+      try {
+        listener(this.currentStatus, prev);
+      } catch (err) {
+        console.error('[NetworkService] Listener error:', err);
       }
     }
   }
 
-  /**
-   * Returns current active network status
-   */
   public getStatus(): NetworkStatus {
     return this.mockStatus || this.currentStatus;
   }
@@ -247,10 +497,7 @@ class NetworkService {
     return this.getStatus().isOnline;
   }
 
-  /**
-   * Evaluates if Google Drive Sync is permitted based on user's Wi-Fi Only preference
-   */
-  public canSync(wifiOnlyPreference: boolean): SyncPermission {
+  public canSync(wifiOnlyPreference: boolean = this.wifiOnly): SyncPermission {
     const status = this.getStatus();
 
     if (!status.isOnline) {
@@ -263,7 +510,7 @@ class NetworkService {
     }
 
     if (wifiOnlyPreference) {
-      if (status.isCellular) {
+      if (status.isCellular || this.getNetworkType() === 'cellular') {
         return {
           allowed: false,
           reason: 'wifi_only_on_cellular',
@@ -272,7 +519,6 @@ class NetworkService {
         };
       }
 
-      // If connection cannot be verified as Wi-Fi or Ethernet, hold sync
       if (!status.isWifi && status.connectionType !== 'ethernet') {
         return {
           allowed: false,
@@ -289,13 +535,10 @@ class NetworkService {
     };
   }
 
-  public isSyncEligible(wifiOnlyPreference: boolean): boolean {
+  public isSyncEligible(wifiOnlyPreference: boolean = this.wifiOnly): boolean {
     return this.canSync(wifiOnlyPreference).allowed;
   }
 
-  /**
-   * Subscribe to network changes
-   */
   public subscribe(listener: NetworkListener): () => void {
     this.listeners.add(listener);
     return () => {
@@ -303,9 +546,10 @@ class NetworkService {
     };
   }
 
-  /**
-   * Test & Mocking utilities for Vitest test suite
-   */
+  public setMockCanDetectCellular(val: boolean | null) {
+    this.mockCanDetectCellular = val;
+  }
+
   public setMockStatus(status: Partial<NetworkStatus> | null) {
     if (!status) {
       this.mockStatus = null;
@@ -313,7 +557,6 @@ class NetworkService {
       return;
     }
 
-    const prev = this.currentStatus;
     const isOnline = status.isOnline !== undefined ? status.isOnline : true;
     const connType = status.connectionType || (status.isCellular ? 'cellular' : status.isWifi ? 'wifi' : 'unknown');
     const isWifi = status.isWifi !== undefined ? status.isWifi : connType === 'wifi' || connType === 'ethernet';
@@ -327,19 +570,17 @@ class NetworkService {
       details: status.details || 'Mocked Network Status'
     };
 
-    this.currentStatus = this.mockStatus;
-
-    for (const listener of this.listeners) {
-      try {
-        listener(this.currentStatus, prev);
-      } catch (err) {
-        console.error('[NetworkService] Mock listener error:', err);
-      }
-    }
+    this.updateStatus(this.mockStatus);
   }
 
   public resetMockStatus() {
-    this.setMockStatus(null);
+    this.mockStatus = null;
+    this.mockCanDetectCellular = null;
+    this.cellularSessionOverride = false;
+    this.autoSwitchedOnCellular = false;
+    this.wifiOnly = true;
+    this.currentNetType = 'wifi';
+    this.detectCurrentStatus();
   }
 }
 

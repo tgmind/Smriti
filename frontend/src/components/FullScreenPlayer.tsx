@@ -33,6 +33,8 @@ import { ModalPortal } from '@/components/ui/modal-portal';
 
 export interface FullScreenPlayerProps {
   playbackState: PlaybackState;
+  playbackQueue?: AudioItem[];
+  currentQueueIndex?: number;
   audioQueue?: AudioItem[];
   subjects?: Subject[];
   initialView?: 'player' | 'queue';
@@ -46,16 +48,18 @@ export interface FullScreenPlayerProps {
   onSetSleepTimer: (minutes: number | null) => void;
   onToggleFavorite: (audioId: string) => void;
   onToggleOffline: (audio: AudioItem) => void;
-  onSelectTrack?: (audio: AudioItem) => void;
+  onSelectTrack?: (audio: AudioItem, index?: number) => void;
   onNext?: () => void;
   onPrevious?: () => void;
 }
 
 type ModalType = 'none' | 'tools' | 'ab_loop' | 'sleep' | 'speed';
-type QueueScope = 'subject' | 'all' | 'favorites';
+type QueueScope = 'queue' | 'subject' | 'all' | 'favorites';
 
 export const FullScreenPlayer: React.FC<FullScreenPlayerProps> = ({
   playbackState,
+  playbackQueue = [],
+  currentQueueIndex = 0,
   audioQueue = [],
   subjects = [],
   initialView = 'player',
@@ -85,8 +89,13 @@ export const FullScreenPlayer: React.FC<FullScreenPlayerProps> = ({
     sleepTimerRemainingSeconds
   } = playbackState;
 
+  const repeatMode: 'off' | 'one' | 'all' =
+    playbackState.repeatMode ||
+    (isRepeatTrack ? 'one' : isRepeatQueue ? 'all' : 'off');
+
+  const hasCustomQueue = playbackQueue && playbackQueue.length > 0;
   const [viewMode, setViewMode] = useState<'player' | 'queue'>(initialView);
-  const [queueScope, setQueueScope] = useState<QueueScope>('subject');
+  const [queueScope, setQueueScope] = useState<QueueScope>(hasCustomQueue ? 'queue' : 'subject');
   const [searchQuery, setSearchQuery] = useState('');
   const [activeModal, setActiveModal] = useState<ModalType>('none');
   const [scrubPosition, setScrubPosition] = useState<number | null>(null);
@@ -148,6 +157,9 @@ export const FullScreenPlayer: React.FC<FullScreenPlayerProps> = ({
   }, [audioQueue]);
 
   const displayQueue = useMemo(() => {
+    if (queueScope === 'queue' && hasCustomQueue) {
+      return playbackQueue;
+    }
     if (queueScope === 'subject') {
       return activeSubjectQueue.length > 0 ? activeSubjectQueue : audioQueue;
     }
@@ -155,19 +167,30 @@ export const FullScreenPlayer: React.FC<FullScreenPlayerProps> = ({
       return favoriteAudioList;
     }
     return audioQueue;
-  }, [queueScope, activeSubjectQueue, favoriteAudioList, audioQueue]);
+  }, [queueScope, hasCustomQueue, playbackQueue, activeSubjectQueue, favoriteAudioList, audioQueue]);
 
-  // CRITICAL DEDUPLICATION: Up Next strictly excludes the currently playing audio track!
+  // CRITICAL DEDUPLICATION: Up Next strictly follows queue order and repeat rules!
   const upNextQueue = useMemo(() => {
+    if (queueScope === 'queue' && hasCustomQueue) {
+      const curIdx = currentQueueIndex >= 0 ? currentQueueIndex : playbackQueue.findIndex(a => a.id === currentAudio.id);
+      if (curIdx >= 0) {
+        if (repeatMode === 'all') {
+          const after = playbackQueue.slice(curIdx + 1);
+          const before = playbackQueue.slice(0, curIdx);
+          return [...after, ...before];
+        }
+        return playbackQueue.slice(curIdx + 1);
+      }
+      return playbackQueue.filter(a => a.id !== currentAudio.id);
+    }
     const curIdx = displayQueue.findIndex((a) => a.id === currentAudio.id);
     if (curIdx >= 0) {
-      // Remaining upcoming tracks, followed by preceding tracks (wrap-around queue)
       const after = displayQueue.slice(curIdx + 1);
       const before = displayQueue.slice(0, curIdx);
       return [...after, ...before];
     }
     return displayQueue.filter((a) => a.id !== currentAudio.id);
-  }, [displayQueue, currentAudio.id]);
+  }, [queueScope, hasCustomQueue, playbackQueue, currentQueueIndex, repeatMode, displayQueue, currentAudio.id]);
 
   const filteredUpNextQueue = useMemo(() => {
     if (!searchQuery.trim()) return upNextQueue;
@@ -413,51 +436,102 @@ export const FullScreenPlayer: React.FC<FullScreenPlayerProps> = ({
           <div className="space-y-2 mb-2 shrink-0">
             {/* 3-Segment Scope Controller */}
             <div className="grid grid-cols-3 gap-1 bg-slate-100/90 border border-slate-200/90 rounded-2xl p-1 shadow-2xs">
-              <button
-                onClick={() => {
-                  bridge.triggerHaptic('light');
-                  setQueueScope('subject');
-                }}
-                className={cn(
-                  'py-2 px-2.5 rounded-xl text-xs font-semibold truncate transition-all cursor-pointer text-center',
-                  queueScope === 'subject'
-                    ? 'bg-white text-black font-extrabold shadow-sm'
-                    : 'text-slate-500 hover:text-slate-900 hover:bg-white/50'
-                )}
-              >
-                {displaySubjectName} ({activeSubjectQueue.length})
-              </button>
+              {hasCustomQueue ? (
+                <>
+                  <button
+                    onClick={() => {
+                      bridge.triggerHaptic('light');
+                      setQueueScope('queue');
+                    }}
+                    className={cn(
+                      'py-2 px-2.5 rounded-xl text-xs font-semibold truncate transition-all cursor-pointer text-center',
+                      queueScope === 'queue'
+                        ? 'bg-white text-black font-extrabold shadow-sm'
+                        : 'text-slate-500 hover:text-slate-900 hover:bg-white/50'
+                    )}
+                  >
+                    Queue ({playbackQueue.length})
+                  </button>
 
-              <button
-                onClick={() => {
-                  bridge.triggerHaptic('light');
-                  setQueueScope('all');
-                }}
-                className={cn(
-                  'py-2 px-2.5 rounded-xl text-xs font-semibold truncate transition-all cursor-pointer text-center',
-                  queueScope === 'all'
-                    ? 'bg-white text-black font-extrabold shadow-sm'
-                    : 'text-slate-500 hover:text-slate-900 hover:bg-white/50'
-                )}
-              >
-                All Notes ({audioQueue.length})
-              </button>
+                  <button
+                    onClick={() => {
+                      bridge.triggerHaptic('light');
+                      setQueueScope('subject');
+                    }}
+                    className={cn(
+                      'py-2 px-2.5 rounded-xl text-xs font-semibold truncate transition-all cursor-pointer text-center',
+                      queueScope === 'subject'
+                        ? 'bg-white text-black font-extrabold shadow-sm'
+                        : 'text-slate-500 hover:text-slate-900 hover:bg-white/50'
+                    )}
+                  >
+                    {displaySubjectName} ({activeSubjectQueue.length})
+                  </button>
 
-              <button
-                onClick={() => {
-                  bridge.triggerHaptic('light');
-                  setQueueScope('favorites');
-                }}
-                className={cn(
-                  'py-2 px-2.5 rounded-xl text-xs font-semibold truncate transition-all cursor-pointer flex items-center justify-center gap-1.5',
-                  queueScope === 'favorites'
-                    ? 'bg-white text-black font-extrabold shadow-sm'
-                    : 'text-slate-500 hover:text-slate-900 hover:bg-white/50'
-                )}
-              >
-                <Heart size={12} className={queueScope === 'favorites' ? 'fill-rose-500 text-rose-500' : 'text-slate-400'} />
-                <span>Favorites ({favoriteAudioList.length})</span>
-              </button>
+                  <button
+                    onClick={() => {
+                      bridge.triggerHaptic('light');
+                      setQueueScope('all');
+                    }}
+                    className={cn(
+                      'py-2 px-2.5 rounded-xl text-xs font-semibold truncate transition-all cursor-pointer text-center',
+                      queueScope === 'all'
+                        ? 'bg-white text-black font-extrabold shadow-sm'
+                        : 'text-slate-500 hover:text-slate-900 hover:bg-white/50'
+                    )}
+                  >
+                    All Notes ({audioQueue.length})
+                  </button>
+                </>
+              ) : (
+                <>
+                  <button
+                    onClick={() => {
+                      bridge.triggerHaptic('light');
+                      setQueueScope('subject');
+                    }}
+                    className={cn(
+                      'py-2 px-2.5 rounded-xl text-xs font-semibold truncate transition-all cursor-pointer text-center',
+                      queueScope === 'subject'
+                        ? 'bg-white text-black font-extrabold shadow-sm'
+                        : 'text-slate-500 hover:text-slate-900 hover:bg-white/50'
+                    )}
+                  >
+                    {displaySubjectName} ({activeSubjectQueue.length})
+                  </button>
+
+                  <button
+                    onClick={() => {
+                      bridge.triggerHaptic('light');
+                      setQueueScope('all');
+                    }}
+                    className={cn(
+                      'py-2 px-2.5 rounded-xl text-xs font-semibold truncate transition-all cursor-pointer text-center',
+                      queueScope === 'all'
+                        ? 'bg-white text-black font-extrabold shadow-sm'
+                        : 'text-slate-500 hover:text-slate-900 hover:bg-white/50'
+                    )}
+                  >
+                    All Notes ({audioQueue.length})
+                  </button>
+
+                  <button
+                    onClick={() => {
+                      bridge.triggerHaptic('light');
+                      setQueueScope('favorites');
+                    }}
+                    className={cn(
+                      'py-2 px-2.5 rounded-xl text-xs font-semibold truncate transition-all cursor-pointer flex items-center justify-center gap-1.5',
+                      queueScope === 'favorites'
+                        ? 'bg-white text-black font-extrabold shadow-sm'
+                        : 'text-slate-500 hover:text-slate-900 hover:bg-white/50'
+                    )}
+                  >
+                    <Heart size={12} className={queueScope === 'favorites' ? 'fill-rose-500 text-rose-500' : 'text-slate-400'} />
+                    <span>Favorites ({favoriteAudioList.length})</span>
+                  </button>
+                </>
+              )}
             </div>
 
             {/* Modern Light Search Bar */}
@@ -551,7 +625,10 @@ export const FullScreenPlayer: React.FC<FullScreenPlayerProps> = ({
                     key={item.id}
                     onClick={() => {
                       bridge.triggerHaptic('medium');
-                      if (onSelectTrack) onSelectTrack(item);
+                      if (onSelectTrack) {
+                        const targetIdx = displayQueue.findIndex((a) => a.id === item.id);
+                        onSelectTrack(item, targetIdx >= 0 ? targetIdx : undefined);
+                      }
                     }}
                     className="p-3 rounded-2xl bg-white hover:bg-slate-50 border border-slate-200/80 hover:border-slate-300 transition-all duration-150 flex items-center justify-between gap-3 cursor-pointer group active:scale-[0.985] shadow-2xs"
                   >
@@ -722,22 +799,27 @@ export const FullScreenPlayer: React.FC<FullScreenPlayerProps> = ({
             <SkipForward size={26} className="text-slate-900 fill-slate-900 hover:scale-105 transition-transform" />
           </button>
 
-          {/* Repeat Track Toggle */}
+          {/* Repeat Mode Toggle */}
           <button
             onClick={handleToggleRepeatMode}
-            className="size-11 flex items-center justify-center active:scale-85 transition-transform cursor-pointer"
-            aria-label="Repeat track"
-            title={isRepeatTrack ? 'Repeat Track' : isRepeatQueue ? 'Repeat All' : 'Repeat Off'}
+            className="size-11 flex items-center justify-center active:scale-85 transition-transform cursor-pointer relative"
+            aria-label="Toggle repeat mode"
+            title={repeatMode === 'one' ? 'Repeat One' : repeatMode === 'all' ? 'Repeat All' : 'Repeat Off'}
           >
-            {isRepeatTrack ? (
+            {repeatMode === 'one' ? (
               <Repeat1 size={21} className="text-emerald-600" />
             ) : (
               <Repeat
                 size={21}
                 className={
-                  isRepeatQueue ? 'text-slate-900' : 'text-slate-400 hover:text-slate-900 transition-colors'
+                  repeatMode === 'all' ? 'text-emerald-600' : 'text-slate-400 hover:text-slate-900 transition-colors'
                 }
               />
+            )}
+            {repeatMode !== 'off' && (
+              <span className="absolute -bottom-1 text-[8px] font-mono font-bold uppercase text-emerald-600">
+                {repeatMode === 'one' ? '1' : 'ALL'}
+              </span>
             )}
           </button>
         </div>

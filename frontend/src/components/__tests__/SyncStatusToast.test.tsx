@@ -28,7 +28,8 @@ describe('SyncStatusToast UI Component', () => {
     expect(html).toContain('Mobile Data');
     expect(html).toContain('Wi-Fi Only Sync is active');
     expect(html).toContain('Sync Anyway');
-    expect(html).toContain('border-amber-200');
+    expect(html).toContain('bg-slate-900/95');
+    expect(html).toContain('text-amber-400');
     expect(html).toContain('aria-label="Dismiss notification"');
   });
 
@@ -46,7 +47,8 @@ describe('SyncStatusToast UI Component', () => {
 
     expect(html).toContain('Wi-Fi Connected');
     expect(html).toContain('Google Drive sync resumed automatically.');
-    expect(html).toContain('border-emerald-200');
+    expect(html).toContain('text-emerald-400');
+    expect(html).toContain('bg-slate-900/95');
   });
 
   it('renders offline toast with alert styling', () => {
@@ -62,7 +64,8 @@ describe('SyncStatusToast UI Component', () => {
     );
 
     expect(html).toContain('Offline Mode');
-    expect(html).toContain('border-rose-200');
+    expect(html).toContain('text-rose-400');
     expect(html).toContain('No internet connection');
+    expect(html).toContain('bg-slate-900/95');
   });
 });

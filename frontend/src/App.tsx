@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react';
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { TabType, Navigation } from './components/Navigation';
 import { MiniPlayer } from './components/MiniPlayer';
 import { FullScreenPlayer } from './components/FullScreenPlayer';
@@ -27,7 +27,9 @@ import { googleDriveService } from './services/googleDrive';
 import { audioStorage } from './services/audioStorage';
 import { networkService } from './services/networkService';
 import { BackgroundSyncBanner, ActiveSyncTask } from './components/BackgroundSyncBanner';
-import { SyncStatusToast, SyncToastState } from './components/SyncStatusToast';
+import { SyncToastState } from './components/SyncStatusToast';
+import { ToastContainer } from './components/ui/ToastContainer';
+import { toastService, ToastSection } from './services/toastService';
 
 export const App: React.FC = () => {
   const [currentTab, setCurrentTab] = useState<TabType>('library');
@@ -120,13 +122,28 @@ export const App: React.FC = () => {
   const [activeSyncTasks, setActiveSyncTasks] = useState<ActiveSyncTask[]>([]);
   const [syncState, setSyncState] = useState<'idle' | 'syncing' | 'waiting_for_wifi' | 'offline' | 'error' | 'disconnected'>('idle');
 
-  // Wi-Fi Only Sync & Network Status Toast
-  const [syncToast, setSyncToast] = useState<SyncToastState | null>(null);
-
+  // Unified Obsidian Dark Toast System for Network & Sync Status
   const showSyncToast = (toast: Omit<SyncToastState, 'id'>) => {
-    setSyncToast({
-      id: `toast-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
-      ...toast
+    const isPaused = toast.type === 'wifi_only_paused';
+    const isWifiConnected = toast.type === 'wifi_connected';
+    const isSynced = toast.type === 'synced';
+    const isOffline = toast.type === 'offline';
+
+    const section: ToastSection = isPaused || isWifiConnected || isSynced
+      ? 'downloads'
+      : isOffline
+      ? 'danger'
+      : 'neutral';
+
+    toastService.show({
+      title: toast.title || (isPaused ? 'Wi-Fi Only Sync' : isWifiConnected ? 'Wi-Fi Connected' : 'Sync Status'),
+      description: toast.message,
+      section,
+      duration: toast.durationMs,
+      action: toast.actionLabel && toast.onAction ? {
+        label: toast.actionLabel,
+        onClick: toast.onAction
+      } : undefined
     });
   };
 
@@ -191,6 +208,9 @@ export const App: React.FC = () => {
 
   // Playback & UI Modals
   const [isFullScreenPlayerOpen, setIsFullScreenPlayerOpen] = useState(false);
+  const [playbackQueue, setPlaybackQueue] = useState<AudioItem[]>([]);
+  const [currentQueueIndex, setCurrentQueueIndex] = useState<number>(0);
+  const [repeatMode, setRepeatMode] = useState<'off' | 'one' | 'all'>('off');
 
   const [playbackState, setPlaybackState] = useState<PlaybackState>({
     currentAudio: null,
@@ -200,6 +220,7 @@ export const App: React.FC = () => {
     playbackSpeed: 1.0,
     isRepeatTrack: false,
     isRepeatQueue: false,
+    repeatMode: 'off',
     abLoop: null,
     sleepTimerRemainingSeconds: null,
     learningModeActive: false
@@ -208,6 +229,43 @@ export const App: React.FC = () => {
   // Track listening metrics per session for completed-play rules
   const currentSessionListeningSeconds = useRef<number>(0);
   const completedPlayRecordedForSession = useRef<boolean>(false);
+
+  // Synchronized refs to avoid stale closure state during native/bridge events
+  const playbackStateRef = useRef(playbackState);
+  playbackStateRef.current = playbackState;
+  const playbackQueueRef = useRef(playbackQueue);
+  playbackQueueRef.current = playbackQueue;
+  const currentQueueIndexRef = useRef(currentQueueIndex);
+  currentQueueIndexRef.current = currentQueueIndex;
+  const repeatModeRef = useRef(repeatMode);
+  repeatModeRef.current = repeatMode;
+
+  const recordCompletedPlayStats = (listeningSeconds: number) => {
+    const todayStr = new Date().toISOString().split('T')[0];
+    setDailyStats(prev => {
+      const existingIdx = prev.findIndex(s => s.study_date === todayStr);
+      if (existingIdx >= 0) {
+        const updated = [...prev];
+        updated[existingIdx] = {
+          ...updated[existingIdx],
+          completed_plays: updated[existingIdx].completed_plays + 1,
+          total_listening_seconds: updated[existingIdx].total_listening_seconds + Math.round(listeningSeconds)
+        };
+        return updated;
+      } else {
+        return [
+          ...prev,
+          {
+            study_date: todayStr,
+            total_listening_seconds: Math.round(listeningSeconds),
+            completed_plays: 1,
+            assessments_taken: 0,
+            successful_recalls: 0
+          }
+        ];
+      }
+    });
+  };
 
   // Sync to localStorage
   useEffect(() => {
@@ -228,6 +286,7 @@ export const App: React.FC = () => {
 
   useEffect(() => {
     localStorage.setItem('smriti_settings', JSON.stringify(userSettings));
+    networkService.offline_sync_wifi_only = userSettings.offline_sync_wifi_only;
   }, [userSettings]);
 
   // Real-time Network Monitoring & Wi-Fi Only Sync Handshake
@@ -356,31 +415,7 @@ export const App: React.FC = () => {
 
           if (evalResult.isCompleted) {
             completedPlayRecordedForSession.current = true;
-            // Record completed play in today's daily statistics
-            const todayStr = new Date().toISOString().split('T')[0];
-            setDailyStats(prev => {
-              const existingIdx = prev.findIndex(s => s.study_date === todayStr);
-              if (existingIdx >= 0) {
-                const updated = [...prev];
-                updated[existingIdx] = {
-                  ...updated[existingIdx],
-                  completed_plays: updated[existingIdx].completed_plays + 1,
-                  total_listening_seconds: updated[existingIdx].total_listening_seconds + Math.round(currentSessionListeningSeconds.current)
-                };
-                return updated;
-              } else {
-                return [
-                  ...prev,
-                  {
-                    study_date: todayStr,
-                    total_listening_seconds: Math.round(currentSessionListeningSeconds.current),
-                    completed_plays: 1,
-                    assessments_taken: 0,
-                    successful_recalls: 0
-                  }
-                ];
-              }
-            });
+            recordCompletedPlayStats(currentSessionListeningSeconds.current);
           }
         }
       } else if (eventName === 'playbackStateChanged') {
@@ -390,18 +425,80 @@ export const App: React.FC = () => {
         }));
 
         if (data.isEnded) {
-          if (playbackState.isRepeatTrack && playbackState.currentAudio) {
-            bridge.seek(0);
-            bridge.play(playbackState.currentAudio, playbackState.playbackSpeed);
-          } else if (playbackState.isRepeatQueue) {
-            handleNextTrack();
-          }
+          handleTrackEnded();
         }
       }
     });
 
     return () => unsubscribe();
-  }, [playbackState.currentAudio, playbackState.durationSeconds, playbackState.isRepeatTrack, playbackState.isRepeatQueue, playbackState.playbackSpeed, audioItems]);
+  }, [playbackState.currentAudio, playbackState.durationSeconds, playbackState.playbackSpeed, audioItems]);
+
+  // Strict End-of-Track / End-of-Queue Transition Rules Engine
+  const handleTrackEnded = () => {
+    const state = playbackStateRef.current;
+    const queue = playbackQueueRef.current;
+    const qIndex = currentQueueIndexRef.current;
+    const repMode = repeatModeRef.current;
+
+    // 1. Transparent SM-2 Completed-Play Metric Evaluation
+    if (
+      !completedPlayRecordedForSession.current &&
+      state.currentAudio &&
+      state.durationSeconds > 0
+    ) {
+      const evalResult = evaluateCompletedPlay(
+        currentSessionListeningSeconds.current,
+        state.durationSeconds
+      );
+      if (evalResult.isCompleted) {
+        completedPlayRecordedForSession.current = true;
+        recordCompletedPlayStats(currentSessionListeningSeconds.current);
+      }
+    }
+
+    // 2. Strict Transition Rules
+    // Rule A: If A-B Loop is active: seek back to Point A and keep looping
+    if (state.abLoop?.enabled) {
+      bridge.seek(state.abLoop.startSeconds);
+      if (state.currentAudio) {
+        bridge.play(state.currentAudio, state.playbackSpeed);
+      }
+      setPlaybackState(prev => ({ ...prev, isPlaying: true, positionSeconds: state.abLoop!.startSeconds }));
+      return;
+    }
+
+    // Rule B: Else if repeatMode === 'one': restart the current track from 0:00
+    if (repMode === 'one' && state.currentAudio) {
+      currentSessionListeningSeconds.current = 0;
+      completedPlayRecordedForSession.current = false;
+      bridge.seek(0);
+      bridge.play(state.currentAudio, state.playbackSpeed);
+      setPlaybackState(prev => ({ ...prev, isPlaying: true, positionSeconds: 0 }));
+      return;
+    }
+
+    // Rule C: Else if currentQueueIndex < playbackQueue.length - 1: advance by 1
+    if (queue.length > 0 && qIndex < queue.length - 1) {
+      const nextIndex = qIndex + 1;
+      handlePlayQueue(queue, nextIndex, false);
+      return;
+    }
+
+    // Rule D: Else if repeatMode === 'all': wrap to currentQueueIndex = 0 and replay queue
+    if (repMode === 'all' && queue.length > 0) {
+      handlePlayQueue(queue, 0, false);
+      return;
+    }
+
+    // Rule E: Else (repeatMode === 'off' and final track in queue finished):
+    // Stop playback completely! Never auto-advance into unselected folder tracks outside queue.
+    bridge.pause();
+    setPlaybackState(prev => ({
+      ...prev,
+      isPlaying: false,
+      positionSeconds: prev.durationSeconds
+    }));
+  };
 
   // Sleep Timer countdown
   useEffect(() => {
@@ -420,13 +517,18 @@ export const App: React.FC = () => {
     return () => clearInterval(interval);
   }, [playbackState.sleepTimerRemainingSeconds]);
 
-  // Audio Playback Handlers
-  const handlePlayAudio = (audio: AudioItem) => {
-    // If tapping the currently playing audio, toggle pause/resume
-    if (playbackState.currentAudio?.id === audio.id) {
-      handleTogglePlay();
-      return;
-    }
+  // Unified Playback Queue Engine Handlers
+  const handlePlayQueue = (
+    queue: AudioItem[],
+    startIndex: number = 0,
+    openFullScreen: boolean = true
+  ) => {
+    if (queue.length === 0) return;
+    const safeIndex = Math.max(0, Math.min(queue.length - 1, startIndex));
+    const audio = queue[safeIndex];
+
+    setPlaybackQueue(queue);
+    setCurrentQueueIndex(safeIndex);
 
     currentSessionListeningSeconds.current = 0;
     completedPlayRecordedForSession.current = false;
@@ -457,6 +559,33 @@ export const App: React.FC = () => {
     );
 
     bridge.play(audio, playbackState.playbackSpeed);
+    if (openFullScreen) {
+      setIsFullScreenPlayerOpen(true);
+    }
+  };
+
+  // Audio Playback Handler (Single tap track row -> sets 1-track queue, plays, and opens FullScreenPlayer)
+  const handlePlayAudio = (
+    audio: AudioItem,
+    queue?: AudioItem[],
+    startIndex?: number,
+    openFullScreen: boolean = true
+  ) => {
+    // If tapping the currently playing audio without specifying a new queue, toggle play/pause
+    if (!queue && playbackState.currentAudio?.id === audio.id) {
+      handleTogglePlay();
+      if (openFullScreen) {
+        setIsFullScreenPlayerOpen(true);
+      }
+      return;
+    }
+
+    const effectiveQueue = queue && queue.length > 0 ? queue : [audio];
+    const effectiveIndex = startIndex !== undefined && startIndex >= 0
+      ? startIndex
+      : effectiveQueue.findIndex(a => a.id === audio.id);
+
+    handlePlayQueue(effectiveQueue, effectiveIndex >= 0 ? effectiveIndex : 0, openFullScreen);
   };
 
   const handleTogglePlay = () => {
@@ -471,6 +600,8 @@ export const App: React.FC = () => {
 
   const handleDismissPlayer = () => {
     bridge.pause();
+    setPlaybackQueue([]);
+    setCurrentQueueIndex(0);
     setPlaybackState(prev => ({
       ...prev,
       currentAudio: null,
@@ -495,14 +626,24 @@ export const App: React.FC = () => {
   };
 
   const handleToggleRepeat = () => {
-    setPlaybackState(prev => {
-      if (!prev.isRepeatTrack && !prev.isRepeatQueue) {
-        return { ...prev, isRepeatTrack: true, isRepeatQueue: false };
-      }
-      if (prev.isRepeatTrack) {
-        return { ...prev, isRepeatTrack: false, isRepeatQueue: true };
-      }
-      return { ...prev, isRepeatTrack: false, isRepeatQueue: false };
+    setRepeatMode(prevMode => {
+      const nextMode: 'off' | 'one' | 'all' =
+        prevMode === 'off' ? 'one' : prevMode === 'one' ? 'all' : 'off';
+
+      setPlaybackState(prev => ({
+        ...prev,
+        repeatMode: nextMode,
+        isRepeatTrack: nextMode === 'one',
+        isRepeatQueue: nextMode === 'all'
+      }));
+
+      toastService.library(
+        nextMode === 'one' ? 'Repeat Track Active' : nextMode === 'all' ? 'Repeat Queue Active' : 'Repeat Off',
+        undefined,
+        undefined,
+        1800
+      );
+      return nextMode;
     });
   };
 
@@ -529,9 +670,17 @@ export const App: React.FC = () => {
   };
 
   const handleToggleFavorite = (audioId: string) => {
-    setAudioItems(prev =>
-      prev.map(item => (item.id === audioId ? { ...item, is_favorite: !item.is_favorite } : item))
-    );
+    setAudioItems(prev => {
+      const target = prev.find(item => item.id === audioId);
+      const isFav = !target?.is_favorite;
+      toastService.library(
+        isFav ? 'Added to Favorites' : 'Removed from Favorites',
+        target?.title,
+        undefined,
+        2000
+      );
+      return prev.map(item => (item.id === audioId ? { ...item, is_favorite: isFav } : item));
+    });
     if (playbackState.currentAudio?.id === audioId) {
       setPlaybackState(prev => ({
         ...prev,
@@ -550,6 +699,7 @@ export const App: React.FC = () => {
     } else {
       bridge.removeOfflineDownload(audio.id);
       audioStorage.deleteAudioBlob(audio.id).catch(() => {});
+      toastService.downloads('Removed from Offline Storage', audio.title);
     }
     setAudioItems(prev =>
       prev.map(item => (item.id === audio.id ? { ...item, is_downloaded_offline: nextState } : item))
@@ -580,44 +730,49 @@ export const App: React.FC = () => {
     const curIdx = speeds.indexOf(playbackState.playbackSpeed);
     const nextSpeed = speeds[(curIdx + 1) % speeds.length];
     handleSetSpeed(nextSpeed);
+    toastService.library(`Playback Speed: ${nextSpeed}x`, undefined, undefined, 1800);
   };
 
-  const handleNextTrack = (subjectScoped: boolean = true) => {
-    if (!playbackState.currentAudio || audioItems.length === 0) return;
-    const currentSubId = playbackState.currentAudio.subject_id;
-    const currentSubName = playbackState.currentAudio.subject_name?.toLowerCase();
-    const subjectItems = subjectScoped
-      ? audioItems.filter(
-          a =>
-            (currentSubId && a.subject_id === currentSubId) ||
-            (currentSubName && a.subject_name && a.subject_name.toLowerCase() === currentSubName)
-        )
-      : audioItems;
-    const queue = subjectItems.length > 0 ? subjectItems : audioItems;
-    const currentIndex = queue.findIndex(a => a.id === playbackState.currentAudio?.id);
-    const nextIndex = currentIndex >= 0 ? (currentIndex + 1) % queue.length : 0;
-    handlePlayAudio(queue[nextIndex]);
+  const handleNextTrack = () => {
+    const queue = playbackQueueRef.current;
+    const qIndex = currentQueueIndexRef.current;
+    const repMode = repeatModeRef.current;
+
+    if (!playbackState.currentAudio || queue.length === 0) return;
+
+    if (qIndex < queue.length - 1) {
+      handlePlayQueue(queue, qIndex + 1, false);
+    } else if (repMode === 'all') {
+      handlePlayQueue(queue, 0, false);
+    } else if (repMode === 'one') {
+      handleSeek(0);
+      bridge.play(playbackState.currentAudio, playbackState.playbackSpeed);
+    } else {
+      // Reached end of queue with repeat off: pause and hold at end
+      bridge.pause();
+      setPlaybackState(prev => ({ ...prev, isPlaying: false, positionSeconds: prev.durationSeconds }));
+    }
   };
 
-  const handlePreviousTrack = (subjectScoped: boolean = true) => {
-    if (!playbackState.currentAudio || audioItems.length === 0) return;
+  const handlePreviousTrack = () => {
+    const queue = playbackQueueRef.current;
+    const qIndex = currentQueueIndexRef.current;
+    const repMode = repeatModeRef.current;
+
+    if (!playbackState.currentAudio || queue.length === 0) return;
+
     if (playbackState.positionSeconds > 3) {
       handleSeek(0);
       return;
     }
-    const currentSubId = playbackState.currentAudio.subject_id;
-    const currentSubName = playbackState.currentAudio.subject_name?.toLowerCase();
-    const subjectItems = subjectScoped
-      ? audioItems.filter(
-          a =>
-            (currentSubId && a.subject_id === currentSubId) ||
-            (currentSubName && a.subject_name && a.subject_name.toLowerCase() === currentSubName)
-        )
-      : audioItems;
-    const queue = subjectItems.length > 0 ? subjectItems : audioItems;
-    const currentIndex = queue.findIndex(a => a.id === playbackState.currentAudio?.id);
-    const prevIndex = currentIndex > 0 ? currentIndex - 1 : queue.length - 1;
-    handlePlayAudio(queue[prevIndex]);
+
+    if (qIndex > 0) {
+      handlePlayQueue(queue, qIndex - 1, false);
+    } else if (repMode === 'all') {
+      handlePlayQueue(queue, queue.length - 1, false);
+    } else {
+      handleSeek(0);
+    }
   };
 
   // Check Google Drive connection status on mount and load cloud data if connected
@@ -933,6 +1088,29 @@ export const App: React.FC = () => {
     }
   };
 
+  // Listen to networkService automatic and UI sync policy changes
+  useEffect(() => {
+    const unsubSettings = networkService.registerSettingsUpdater(({ offline_sync_wifi_only }) => {
+      setUserSettings((prev) => {
+        if (prev.offline_sync_wifi_only === offline_sync_wifi_only) return prev;
+        const next = { ...prev, offline_sync_wifi_only };
+        localStorage.setItem('smriti_settings', JSON.stringify(next));
+        return next;
+      });
+    });
+
+    const unsubSyncTrigger = networkService.registerSyncTrigger(() => {
+      if (googleDriveService.isConnected()) {
+        handleSyncDrive({ silent: true }).catch(() => {});
+      }
+    });
+
+    return () => {
+      unsubSettings();
+      unsubSyncTrigger();
+    };
+  }, [handleSyncDrive]);
+
   const computedSyncState: 'idle' | 'syncing' | 'waiting_for_wifi' | 'offline' | 'error' | 'disconnected' = useMemo(() => {
     if (!isDriveConnected) return 'disconnected';
     if (isSyncingDrive) return 'syncing';
@@ -943,11 +1121,63 @@ export const App: React.FC = () => {
     return syncState;
   }, [isDriveConnected, isSyncingDrive, userSettings.offline_sync_wifi_only, syncState]);
 
+  const handleUpdateSettings = useCallback(
+    (updates: Partial<UserSettings>) => {
+      setUserSettings((prev) => {
+        const next = { ...prev, ...updates };
+        localStorage.setItem('smriti_settings', JSON.stringify(next));
+        return next;
+      });
+
+      // Side effects when offline_sync_wifi_only changes
+      if (updates.offline_sync_wifi_only !== undefined) {
+        const wifiOnly = updates.offline_sync_wifi_only;
+        networkService.offline_sync_wifi_only = wifiOnly;
+
+        if (wifiOnly) {
+          // Switched to Wi-Fi Only:
+          // Immediately halt in-flight network activity if on cellular / mobile data
+          if (networkService.isCellular() || !networkService.isWifi()) {
+            googleDriveService.cancelActiveTransfers(
+              'Paused: Device switched to Wi-Fi Only mode on mobile data'
+            );
+            setIsSyncingDrive(false);
+            setSyncState('waiting_for_wifi');
+            showSyncToast({
+              type: 'wifi_only_paused',
+              title: 'Wi-Fi Only Sync Active',
+              message:
+                'Switched to Wi-Fi Only. Google Drive sync is paused on mobile data to preserve your cellular allowance.',
+              durationMs: 4000,
+            });
+          }
+        } else {
+          // Switched to Mobile Data:
+          // Immediately notify networkService and trigger a sync check so any queued uploads/downloads begin right away over cellular data
+          if (googleDriveService.isConnected()) {
+            setSyncState('idle');
+            showSyncToast({
+              type: 'info',
+              title: 'Mobile Data Sync Enabled',
+              message: 'Google Drive sync is now allowed over mobile data.',
+              durationMs: 3000,
+            });
+            handleSyncDrive({ silent: true }).catch(() => {});
+          }
+        }
+      }
+    },
+    [handleSyncDrive]
+  );
+
   // Google Drive disconnect trigger: Stops playback, safely purges all local cache/audio files across Android and Web, clears UI to protect privacy
   const handleDisconnectDrive = async () => {
     try {
       // 1. Immediately halt playback and reset player
       bridge.stopAudio();
+      setPlaybackQueue([]);
+      setCurrentQueueIndex(0);
+      setRepeatMode('off');
       setPlaybackState({
         currentAudio: null,
         isPlaying: false,
@@ -956,6 +1186,7 @@ export const App: React.FC = () => {
         playbackSpeed: 1.0,
         isRepeatTrack: false,
         isRepeatQueue: false,
+        repeatMode: 'off',
         abLoop: null,
         sleepTimerRemainingSeconds: null,
         learningModeActive: false
@@ -1087,8 +1318,19 @@ export const App: React.FC = () => {
     }
   };
 
-  // Navigation helper for targeted subject opening
+  // Navigation helper for targeted subject opening and unconditional root return
   const [selectedSubjectForLibrary, setSelectedSubjectForLibrary] = useState<string | null>(null);
+  const [forceResetLibraryRootKey, setForceResetLibraryRootKey] = useState<number>(0);
+
+  const handleSelectTab = useCallback((tab: TabType) => {
+    if (tab === 'library' || tab === 'home') {
+      setSelectedSubjectForLibrary(null);
+      setForceResetLibraryRootKey(k => k + 1);
+      setCurrentTab('library');
+    } else {
+      setCurrentTab(tab);
+    }
+  }, []);
 
   const handleNavigateToLibrary = (subjectId?: string) => {
     setSelectedSubjectForLibrary(subjectId || null);
@@ -1109,6 +1351,207 @@ export const App: React.FC = () => {
       googleDriveService.getOrCreateSubjectFolder(newSubject.name).catch(e => {
         console.warn('Could not create subject folder on Google Drive:', newSubject.name, e);
       });
+    }
+  };
+
+  // 1. Rename Subject Folder
+  const handleRenameSubject = async (subjectId: string, newName: string) => {
+    const trimmed = newName.trim();
+    if (!trimmed) return;
+    const oldSubject = subjects.find(s => s.id === subjectId || s.name.toLowerCase() === subjectId.toLowerCase());
+    const oldName = oldSubject?.name || subjectId;
+    const nextSubjects = subjects.map(s => {
+      if (s.id === subjectId || s.name.toLowerCase() === subjectId.toLowerCase()) {
+        return { ...s, name: trimmed };
+      }
+      return s;
+    });
+    const nextAudioItems = audioItems.map(a => {
+      if (a.subject_id === subjectId || a.subject_name?.toLowerCase() === oldName.toLowerCase()) {
+        return { ...a, subject_name: trimmed };
+      }
+      return a;
+    });
+    setSubjects(nextSubjects);
+    setAudioItems(nextAudioItems);
+    localStorage.setItem('smriti_subjects', JSON.stringify(nextSubjects));
+    localStorage.setItem('smriti_audio_items', JSON.stringify(nextAudioItems));
+
+    if (googleDriveService.isConnected()) {
+      try {
+        const driveFolderId = oldSubject?.google_drive_folder_id || await googleDriveService.getOrCreateSubjectFolder(oldName).catch(() => null);
+        if (driveFolderId) {
+          await googleDriveService.renameDriveItem(driveFolderId, trimmed);
+        }
+        await googleDriveService.saveCatalog({ subjects: nextSubjects, audioItems: nextAudioItems });
+      } catch (e) {
+        console.warn('Failed to rename subject folder on Drive:', e);
+      }
+    }
+  };
+
+  // 2. Duplicate / Make a Copy of Subject Folder
+  const handleCopySubject = async (subjectId: string) => {
+    const sourceSubject = subjects.find(s => s.id === subjectId || s.name.toLowerCase() === subjectId.toLowerCase());
+    if (!sourceSubject) return;
+
+    const newId = `sub_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
+    const newName = `${sourceSubject.name} (Copy)`;
+    const newSubject: Subject = {
+      ...sourceSubject,
+      id: newId,
+      name: newName,
+      sort_order: subjects.length
+    };
+
+    const subjectAudios = audioItems.filter(
+      a => a.subject_id === sourceSubject.id || a.subject_name?.toLowerCase() === sourceSubject.name.toLowerCase()
+    );
+
+    const copiedAudios: AudioItem[] = subjectAudios.map(a => ({
+      ...a,
+      id: `audio_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+      subject_id: newId,
+      subject_name: newName,
+      title: `${a.title} (Copy)`,
+      created_at: new Date().toISOString()
+    }));
+
+    const nextSubjects = [...subjects, newSubject];
+    const nextAudioItems = [...copiedAudios, ...audioItems];
+
+    setSubjects(nextSubjects);
+    setAudioItems(nextAudioItems);
+    localStorage.setItem('smriti_subjects', JSON.stringify(nextSubjects));
+    localStorage.setItem('smriti_audio_items', JSON.stringify(nextAudioItems));
+
+    if (googleDriveService.isConnected()) {
+      try {
+        const sourceFolderId = sourceSubject.google_drive_folder_id || await googleDriveService.getOrCreateSubjectFolder(sourceSubject.name).catch(() => null);
+        if (sourceFolderId) {
+          await googleDriveService.copyDriveFolder(sourceFolderId, newName);
+        }
+        await googleDriveService.saveCatalog({ subjects: nextSubjects, audioItems: nextAudioItems });
+      } catch (e) {
+        console.warn('Failed to copy subject on Google Drive:', e);
+      }
+    }
+  };
+
+  // 3. Rename Audio Track
+  const handleRenameAudio = async (audioId: string, newTitle: string) => {
+    const trimmed = newTitle.trim();
+    if (!trimmed) return;
+    const item = audioItems.find(a => a.id === audioId);
+    if (!item) return;
+
+    const nextAudioItems = audioItems.map(a => {
+      if (a.id === audioId) {
+        return { ...a, title: trimmed };
+      }
+      return a;
+    });
+
+    setAudioItems(nextAudioItems);
+    localStorage.setItem('smriti_audio_items', JSON.stringify(nextAudioItems));
+
+    if (playbackState.currentAudio?.id === audioId) {
+      setPlaybackState(prev => ({
+        ...prev,
+        currentAudio: prev.currentAudio ? { ...prev.currentAudio, title: trimmed } : null
+      }));
+    }
+
+    if (googleDriveService.isConnected()) {
+      try {
+        if (item.google_drive_file_id) {
+          await googleDriveService.renameDriveItem(item.google_drive_file_id, trimmed);
+        }
+        await googleDriveService.saveCatalog({ subjects, audioItems: nextAudioItems });
+      } catch (e) {
+        console.warn('Failed to rename audio on Drive:', e);
+      }
+    }
+  };
+
+  // 4. Duplicate / Make a Copy of Audio Track
+  const handleCopyAudio = async (audioId: string) => {
+    const item = audioItems.find(a => a.id === audioId);
+    if (!item) return;
+
+    const newId = `audio_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+    const newTitle = `${item.title} (Copy)`;
+    const newItem: AudioItem = {
+      ...item,
+      id: newId,
+      title: newTitle,
+      created_at: new Date().toISOString()
+    };
+
+    const nextAudioItems = [newItem, ...audioItems];
+    setAudioItems(nextAudioItems);
+    localStorage.setItem('smriti_audio_items', JSON.stringify(nextAudioItems));
+
+    if (googleDriveService.isConnected()) {
+      try {
+        if (item.google_drive_file_id) {
+          const parentFolderId = item.subject_name
+            ? await googleDriveService.getOrCreateSubjectFolder(item.subject_name).catch(() => undefined)
+            : undefined;
+          await googleDriveService.copyDriveFile(item.google_drive_file_id, newTitle, parentFolderId);
+        }
+        await googleDriveService.saveCatalog({ subjects, audioItems: nextAudioItems });
+      } catch (e) {
+        console.warn('Failed to copy audio on Drive:', e);
+      }
+    }
+  };
+
+  // 5. Move Audio Track to another Subject Folder
+  const handleMoveAudio = async (audioId: string, targetSubjectId: string) => {
+    const item = audioItems.find(a => a.id === audioId);
+    const targetSubject = subjects.find(s => s.id === targetSubjectId || s.name.toLowerCase() === targetSubjectId.toLowerCase());
+    if (!item || !targetSubject) return;
+
+    const oldSubjectName = item.subject_name;
+    const nextAudioItems = audioItems.map(a => {
+      if (a.id === audioId) {
+        return {
+          ...a,
+          subject_id: targetSubject.id,
+          subject_name: targetSubject.name
+        };
+      }
+      return a;
+    });
+
+    setAudioItems(nextAudioItems);
+    localStorage.setItem('smriti_audio_items', JSON.stringify(nextAudioItems));
+
+    if (playbackState.currentAudio?.id === audioId) {
+      setPlaybackState(prev => ({
+        ...prev,
+        currentAudio: prev.currentAudio ? {
+          ...prev.currentAudio,
+          subject_id: targetSubject.id,
+          subject_name: targetSubject.name
+        } : null
+      }));
+    }
+
+    if (googleDriveService.isConnected() && item.google_drive_file_id) {
+      try {
+        const oldParentId = oldSubjectName
+          ? await googleDriveService.getOrCreateSubjectFolder(oldSubjectName).catch(() => undefined)
+          : undefined;
+        const newParentId = await googleDriveService.getOrCreateSubjectFolder(targetSubject.name).catch(() => undefined);
+        if (newParentId) {
+          await googleDriveService.moveDriveFile(item.google_drive_file_id, oldParentId, newParentId);
+        }
+        await googleDriveService.saveCatalog({ subjects, audioItems: nextAudioItems });
+      } catch (e) {
+        console.warn('Failed to move audio on Drive:', e);
+      }
     }
   };
 
@@ -1406,6 +1849,71 @@ export const App: React.FC = () => {
     setCurrentTab('profile');
   };
 
+  // Double-Back Management
+  const lastBackPressTimeRef = useRef<number>(0);
+
+  const handleGlobalBackPress = useCallback((): boolean => {
+    // Priority 1: If FullScreenPlayer is open, close it
+    if (isFullScreenPlayerOpen) {
+      setIsFullScreenPlayerOpen(false);
+      return true;
+    }
+
+    // Priority 1 & 2: Delegate to LibraryTab back handler (closes open modal, overflow menu, search bar, selection mode, or folder view)
+    if (typeof (window as any).__smritiLibraryBackHandler === 'function') {
+      const handled = (window as any).__smritiLibraryBackHandler();
+      if (handled) {
+        return true;
+      }
+    }
+
+    // Priority 2: If on non-library tab, return to root Homepage
+    if (currentTab !== 'library' && currentTab !== 'home') {
+      setSelectedSubjectForLibrary(null);
+      setForceResetLibraryRootKey(k => k + 1);
+      setCurrentTab('library');
+      return true;
+    }
+
+    // Priority 3: On root Homepage, double-back within 2000ms exits app
+    const now = Date.now();
+    if (now - lastBackPressTimeRef.current < 2000) {
+      toastService.dismiss();
+      bridge.exitApp();
+      return false; // Exit app
+    }
+
+    // First back press on root homepage: show sleek Obsidian Dark micro-toast
+    lastBackPressTimeRef.current = now;
+    toastService.show({
+      title: 'Press back again to exit.',
+      section: 'neutral',
+      duration: 2000
+    });
+    return true;
+  }, [isFullScreenPlayerOpen, currentTab]);
+
+  useEffect(() => {
+    // Register global window bridge hook for Android MainActivity.kt
+    (window as any).handleSmritiBackPress = handleGlobalBackPress;
+
+    // Handle browser / PWA history back navigation
+    const handlePopState = () => {
+      const handled = handleGlobalBackPress();
+      if (handled) {
+        // Push state again so next back press will also be caught
+        window.history.pushState(null, '', window.location.pathname);
+      }
+    };
+    window.history.pushState(null, '', window.location.pathname);
+    window.addEventListener('popstate', handlePopState);
+
+    return () => {
+      delete (window as any).handleSmritiBackPress;
+      window.removeEventListener('popstate', handlePopState);
+    };
+  }, [handleGlobalBackPress]);
+
   return (
     <div className="min-h-screen bg-[#F8F9FD] text-slate-900 flex flex-col font-sans select-none">
       {/* Sleek, Non-Blocking Background Sync Banner with animated progress */}
@@ -1415,10 +1923,10 @@ export const App: React.FC = () => {
         onRetryTask={handleRetryTask}
       />
 
-      {/* Real-time Wi-Fi & Cellular Sync Status Toast */}
-      <SyncStatusToast
-        toast={syncToast}
-        onDismiss={() => setSyncToast(null)}
+      {/* Unified High-Contrast Obsidian Dark Notification System */}
+      <ToastContainer
+        hasMiniPlayer={Boolean(!isFullScreenPlayerOpen && playbackState.currentAudio)}
+        isFullScreenPlayerOpen={isFullScreenPlayerOpen}
       />
 
       {/* Active Tab Screen */}
@@ -1428,6 +1936,7 @@ export const App: React.FC = () => {
             audioItems={audioItems}
             subjects={subjects}
             initialSubjectId={selectedSubjectForLibrary}
+            forceResetRootKey={forceResetLibraryRootKey}
             playbackState={playbackState}
             userSettings={userSettings}
             isDriveConnected={isDriveConnected}
@@ -1439,14 +1948,21 @@ export const App: React.FC = () => {
             onSeek={handleSeek}
             onSetSpeed={handleSetSpeed}
             onPlayAudio={handlePlayAudio}
+            onPlayQueue={handlePlayQueue}
             onToggleFavorite={handleToggleFavorite}
             onToggleOffline={handleToggleOffline}
             onGoToRecord={() => setCurrentTab('record')}
             onNavigateToAccount={handleNavigateToAccount}
             onCreateSubject={handleCreateSubject}
+            onRenameSubject={handleRenameSubject}
+            onCopySubject={handleCopySubject}
             onDeleteSubject={handleDeleteSubject}
+            onRenameAudio={handleRenameAudio}
+            onCopyAudio={handleCopyAudio}
+            onMoveAudio={handleMoveAudio}
             onDeleteAudio={handleDeleteAudio}
             onSaveAudio={handleSaveAudio}
+            onUpdateSettings={handleUpdateSettings}
           />
         )}
 
@@ -1491,7 +2007,7 @@ export const App: React.FC = () => {
             dailyStats={dailyStats}
             isDriveConnected={isDriveConnected}
             isSyncingDrive={isSyncingDrive}
-            onUpdateSettings={(s) => setUserSettings(prev => ({ ...prev, ...s }))}
+            onUpdateSettings={handleUpdateSettings}
             onConnectDrive={handleConnectDrive}
             onDisconnectDrive={handleDisconnectDrive}
             onSyncDrive={handleSyncDrive}
@@ -1508,9 +2024,13 @@ export const App: React.FC = () => {
       {isFullScreenPlayerOpen && (
         <FullScreenPlayer
           playbackState={playbackState}
-          audioQueue={audioItems}
+          playbackQueue={playbackQueue}
+          currentQueueIndex={currentQueueIndex}
+          audioQueue={playbackQueue.length > 0 ? playbackQueue : audioItems}
           subjects={subjects}
-          onSelectTrack={handlePlayAudio}
+          onSelectTrack={(track, index) => {
+            handlePlayQueue(playbackQueue.length > 0 ? playbackQueue : [track], index ?? 0, false);
+          }}
           onClose={() => setIsFullScreenPlayerOpen(false)}
           onTogglePlay={handleTogglePlay}
           onSeek={handleSeek}
@@ -1521,22 +2041,22 @@ export const App: React.FC = () => {
           onSetSleepTimer={handleSetSleepTimer}
           onToggleFavorite={handleToggleFavorite}
           onToggleOffline={handleToggleOffline}
-          onNext={() => handleNextTrack(true)}
-          onPrevious={() => handlePreviousTrack(true)}
+          onNext={handleNextTrack}
+          onPrevious={handlePreviousTrack}
         />
       )}
 
       {/* Bottom Navigation with Beautifully Attached Telegram-Style Compact Player */}
       <Navigation
         currentTab={currentTab}
-        onSelectTab={setCurrentTab}
+        onSelectTab={handleSelectTab}
         isPlaying={playbackState.isPlaying}
         onTogglePlay={handleTogglePlay}
         attachedPlayer={
           !isFullScreenPlayerOpen && playbackState.currentAudio ? (
             <MiniPlayer
               playbackState={playbackState}
-              audioQueue={audioItems}
+              audioQueue={playbackQueue.length > 0 ? playbackQueue : audioItems}
               onTogglePlay={handleTogglePlay}
               onSeek={handleSeek}
               onSeekRelative={handleSeekRelative}
@@ -1544,9 +2064,9 @@ export const App: React.FC = () => {
               onCycleSpeed={handleCycleSpeed}
               onSetSpeed={handleSetSpeed}
               onDismiss={handleDismissPlayer}
-              onSelectTrack={handlePlayAudio}
-              onNextTrack={() => handleNextTrack(true)}
-              onPreviousTrack={() => handlePreviousTrack(true)}
+              onSelectTrack={(track) => handlePlayAudio(track)}
+              onNextTrack={handleNextTrack}
+              onPreviousTrack={handlePreviousTrack}
               onToggleRepeat={handleToggleRepeat}
               onToggleFavorite={handleToggleFavorite}
               onToggleOffline={handleToggleOffline}

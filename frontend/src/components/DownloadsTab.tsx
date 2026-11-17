@@ -16,6 +16,7 @@ import {
 } from 'lucide-react';
 import { AudioItem, PlaybackState } from '../types';
 import { resolveSubjectVisual } from '../utils/subjectVisuals';
+import { toastService } from '../services/toastService';
 import {
   googleDriveService,
   DriveTransferItem,
@@ -79,7 +80,6 @@ export const DownloadsTab: React.FC<DownloadsTabProps> = ({
 }) => {
   const [showConfirmDeleteModal, setShowConfirmDeleteModal] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
-  const [deleteSuccessMessage, setDeleteSuccessMessage] = useState<string | null>(null);
 
   // Active Transfers from Google Drive Service
   const [transfers, setTransfers] = useState<DriveTransferItem[]>(() =>
@@ -127,12 +127,16 @@ export const DownloadsTab: React.FC<DownloadsTabProps> = ({
     setIsDeleting(true);
     bridge.triggerHaptic('heavy');
     try {
+      const count = downloadedNotes.length;
       await onDeleteAllDownloads();
       setShowConfirmDeleteModal(false);
-      setDeleteSuccessMessage(`Successfully deleted ${downloadedNotes.length} offline audio files from local storage.`);
-      setTimeout(() => setDeleteSuccessMessage(null), 4000);
+      toastService.danger(
+        'Offline Downloads Cleared',
+        `Successfully deleted ${count} offline audio files from local storage.`
+      );
     } catch (err) {
       console.error('Failed to clear downloads:', err);
+      toastService.danger('Failed to Clear Downloads', 'An error occurred while removing files.');
     } finally {
       setIsDeleting(false);
     }
@@ -182,22 +186,6 @@ export const DownloadsTab: React.FC<DownloadsTabProps> = ({
           </button>
         )}
       </div>
-
-      {/* Success Notification Banner */}
-      {deleteSuccessMessage && (
-        <div className="p-3 bg-emerald-50 border border-emerald-200 rounded-2xl flex items-center justify-between gap-2 text-xs text-emerald-800 shadow-2xs animate-in fade-in">
-          <div className="flex items-center gap-2">
-            <CheckCircle2 size={16} className="text-emerald-600 shrink-0" />
-            <span className="font-medium">{deleteSuccessMessage}</span>
-          </div>
-          <button
-            onClick={() => setDeleteSuccessMessage(null)}
-            className="p-1 text-emerald-600 hover:text-emerald-800 cursor-pointer"
-          >
-            <X size={14} />
-          </button>
-        </div>
-      )}
 
       {/* 2. Google Drive Account & Sovereign Sync Card (from Image 2) */}
       <div className="p-3.5 bg-gradient-to-br from-white via-sky-50/40 to-blue-50/30 border border-sky-200/80 rounded-2xl shadow-2xs space-y-2.5">
@@ -473,6 +461,7 @@ export const DownloadsTab: React.FC<DownloadsTabProps> = ({
                       onClick={() => {
                         bridge.triggerHaptic('light');
                         onToggleOffline(audio);
+                        toastService.downloads('Offline Download Removed', `"${audio.title}" removed from device cache.`);
                       }}
                       className="size-8 rounded-lg hover:bg-rose-50 text-slate-400 hover:text-rose-600 flex items-center justify-center transition-colors cursor-pointer"
                       title="Remove from offline storage"

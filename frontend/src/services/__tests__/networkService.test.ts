@@ -1,12 +1,16 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { networkService } from '../networkService';
+import { googleDriveService } from '../googleDrive';
+import { toastService } from '../toastService';
 
 describe('NetworkService & Wi-Fi Only Sync Engine', () => {
   beforeEach(() => {
+    vi.restoreAllMocks();
     networkService.resetMockStatus();
   });
 
   afterEach(() => {
+    vi.restoreAllMocks();
     networkService.resetMockStatus();
   });
 
@@ -165,5 +169,98 @@ describe('NetworkService & Wi-Fi Only Sync Engine', () => {
     expect(prev.isWifi).toBe(true);
 
     unsubscribe();
+  });
+
+  it('automatically switches to Wi-Fi Only, aborts transfers, and fires toast on cellular transition', () => {
+    const cancelSpy = vi.spyOn(googleDriveService, 'cancelActiveTransfers').mockImplementation(() => {});
+    const toastSpy = vi.spyOn(toastService, 'show').mockImplementation(() => '');
+
+    // Start on Wi-Fi with unrestricted mode
+    networkService.setWifiOnlyMode(false);
+    expect(networkService.getWifiOnly()).toBe(false);
+
+    networkService.setMockStatus({
+      isOnline: true,
+      connectionType: 'wifi',
+      isWifi: true,
+      isCellular: false
+    });
+
+    // Transition to cellular
+    networkService.setMockStatus({
+      isOnline: true,
+      connectionType: 'cellular',
+      isWifi: false,
+      isCellular: true
+    });
+
+    expect(networkService.getWifiOnly()).toBe(true);
+    expect(networkService.wasAutoSwitchedOnCellular()).toBe(true);
+    expect(cancelSpy).toHaveBeenCalledTimes(1);
+    expect(toastSpy).toHaveBeenCalledTimes(1);
+    const toastArg = toastSpy.mock.calls[0][0];
+    if (typeof toastArg === 'object') {
+      expect(toastArg.title).toContain('Mobile Data Active');
+      expect(toastArg.action?.label).toBe('Sync Anyway');
+    }
+  });
+
+  it('honors session override when user enables mobile data via Sync Anyway', () => {
+    const triggerSpy = vi.fn();
+    networkService.registerSyncTrigger(triggerSpy);
+
+    // Put on cellular
+    networkService.setMockStatus({
+      isOnline: true,
+      connectionType: 'cellular',
+      isWifi: false,
+      isCellular: true
+    });
+
+    expect(networkService.getWifiOnly()).toBe(true);
+    expect(networkService.canSync().allowed).toBe(false);
+
+    // User chooses Sync Anyway
+    networkService.enableMobileDataForSession();
+
+    expect(networkService.getWifiOnly()).toBe(false);
+    expect(networkService.isCellularSessionOverride()).toBe(true);
+    expect(networkService.canSync().allowed).toBe(true);
+  });
+
+  it('re-arms auto-protection and clears override when reconnecting to Wi-Fi', () => {
+    const triggerSpy = vi.fn();
+    networkService.registerSyncTrigger(triggerSpy);
+
+    // Start on cellular with session override
+    networkService.setMockStatus({
+      isOnline: true,
+      connectionType: 'cellular',
+      isWifi: false,
+      isCellular: true
+    });
+    networkService.enableMobileDataForSession();
+    expect(networkService.isCellularSessionOverride()).toBe(true);
+
+    // Reconnect to Wi-Fi
+    networkService.setMockStatus({
+      isOnline: true,
+      connectionType: 'wifi',
+      isWifi: true,
+      isCellular: false
+    });
+
+    expect(networkService.isCellularSessionOverride()).toBe(false);
+    expect(networkService.wasAutoSwitchedOnCellular()).toBe(false);
+    expect(triggerSpy).toHaveBeenCalled();
+  });
+
+  it('treats online connection as wifi when cellular detection is unsupported (desktop browsers)', () => {
+    networkService.setMockCanDetectCellular(false);
+    networkService.setMockStatus(null);
+
+    // When canDetectCellular is false, getNetworkType returns 'wifi'
+    expect(networkService.canDetectCellular()).toBe(false);
+    expect(networkService.getNetworkType()).toBe('wifi');
   });
 });

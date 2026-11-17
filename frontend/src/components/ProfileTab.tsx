@@ -1,22 +1,26 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import {
   Trash2,
   FileSpreadsheet,
   FileJson,
   ShieldCheck,
-  CheckCircle2,
   Sliders,
   Database,
   ChevronRight,
   Sparkles,
-  User
+  User,
+  Wifi,
+  Signal,
+  PauseCircle,
+  CloudOff
 } from 'lucide-react';
 import { UserSettings, StorageOverview, AudioItem, RevisionItem, DailyStudyStats } from '../types';
 import { exportDataAsJSON, exportDataAsCSV } from '../services/supabase';
 import { bridge } from '../services/bridge';
+import { toastService } from '../services/toastService';
 import { GoogleDriveStorage } from './GoogleDriveStorage';
 import { googleDriveService } from '../services/googleDrive';
-import { networkService, NetworkStatus } from '../services/networkService';
+import { useDriveSyncPolicy } from '../hooks/useDriveSyncPolicy';
 
 interface ProfileTabProps {
   userSettings: UserSettings;
@@ -49,21 +53,122 @@ export const ProfileTab: React.FC<ProfileTabProps> = ({
   onConnectWithToken,
   onClearCache
 }) => {
-  const [cacheClearedSuccess, setCacheClearedSuccess] = useState(false);
-  const [networkStatus, setNetworkStatus] = useState<NetworkStatus>(() => networkService.getStatus());
-
-  useEffect(() => {
-    return networkService.subscribe(status => {
-      setNetworkStatus(status);
-    });
-  }, []);
+  const {
+    wifiOnly,
+    networkType,
+    canDetectCellular,
+    setWifiOnlyMode,
+    enableMobileDataForSession,
+  } = useDriveSyncPolicy();
 
   const formatMb = (bytes: number) => (bytes / (1024 * 1024)).toFixed(1);
 
   const handleClear = () => {
     onClearCache();
-    setCacheClearedSuccess(true);
-    setTimeout(() => setCacheClearedSuccess(false), 3000);
+    toastService.downloads(
+      'Cache Cleared',
+      'Streaming cache removed. Pinned offline downloads preserved!'
+    );
+  };
+
+  const handleSelectSyncPolicy = (targetWifiOnly: boolean) => {
+    bridge.triggerHaptic('medium');
+    if (targetWifiOnly === wifiOnly) return;
+
+    if (targetWifiOnly) {
+      setWifiOnlyMode(true);
+      onUpdateSettings({ offline_sync_wifi_only: true });
+      toastService.downloads(
+        'Wi-Fi Only Sync Active',
+        'Files will only sync to Google Drive on Wi-Fi to preserve mobile data.'
+      );
+    } else {
+      if (networkType === 'cellular') {
+        enableMobileDataForSession();
+      } else {
+        setWifiOnlyMode(false);
+        toastService.downloads(
+          'Wi-Fi + Mobile Data Active',
+          'Files will sync to Google Drive across both Wi-Fi and mobile data.'
+        );
+      }
+      onUpdateSettings({ offline_sync_wifi_only: false });
+    }
+  };
+
+  const renderSyncCallout = () => {
+    if (networkType === 'offline') {
+      return (
+        <div className="p-3 rounded-xl bg-slate-50 border border-slate-200/80 flex items-start gap-2.5">
+          <CloudOff size={16} className="text-slate-500 shrink-0 mt-0.5" />
+          <div className="min-w-0 flex-1 text-slate-700">
+            <div className="text-[11.5px] font-bold leading-tight">Offline • Local Storage Active</div>
+            <p className="text-[11px] text-slate-500 mt-1 leading-relaxed break-words">
+              No internet connection detected. Changes are saved safely on this device and will auto-sync to Google Drive once reconnected.
+            </p>
+          </div>
+        </div>
+      );
+    }
+
+    if (wifiOnly) {
+      if (networkType === 'cellular') {
+        return (
+          <div className="p-3 rounded-xl bg-amber-50/90 border border-amber-300/80 flex items-start justify-between gap-3 flex-wrap sm:flex-nowrap">
+            <div className="flex items-start gap-2.5 min-w-0 flex-1">
+              <PauseCircle size={16} className="text-amber-600 shrink-0 mt-0.5" />
+              <div className="min-w-0 flex-1 text-amber-950">
+                <div className="text-[11.5px] font-bold leading-tight">Mobile Data Detected • Sync Paused</div>
+                <p className="text-[11px] text-amber-800/90 mt-1 leading-relaxed break-words">
+                  Sync is paused to protect your cellular data plan. Files remain safely stored on this device until you connect to Wi-Fi.
+                </p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                bridge.triggerHaptic('medium');
+                enableMobileDataForSession();
+                onUpdateSettings({ offline_sync_wifi_only: false });
+              }}
+              className="px-3 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-bold shrink-0 transition active:scale-95 shadow-2xs cursor-pointer self-start sm:self-center"
+            >
+              Sync on Mobile Data
+            </button>
+          </div>
+        );
+      }
+
+      return (
+        <div className="p-3 rounded-xl bg-emerald-50/80 border border-emerald-200/90 flex items-start gap-2.5">
+          <div className="relative flex h-2 w-2 shrink-0 mt-1">
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+            <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+          </div>
+          <div className="min-w-0 flex-1 text-emerald-950">
+            <div className="text-[11.5px] font-bold leading-tight">Wi-Fi Connected • Auto-Sync Active</div>
+            <p className="text-[11px] text-emerald-800/90 mt-1 leading-relaxed break-words">
+              Audio recordings, notes, and revisions automatically sync to Google Drive over Wi-Fi without using mobile data.
+            </p>
+          </div>
+        </div>
+      );
+    }
+
+    return (
+      <div className="p-3 rounded-xl bg-sky-50/80 border border-sky-200/90 flex items-start gap-2.5">
+        <div className="relative flex h-2 w-2 shrink-0 mt-1">
+          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-sky-400 opacity-75"></span>
+          <span className="relative inline-flex rounded-full h-2 w-2 bg-sky-500"></span>
+        </div>
+        <div className="min-w-0 flex-1 text-sky-950">
+          <div className="text-[11.5px] font-bold leading-tight">Unrestricted Sync Active</div>
+          <p className="text-[11px] text-sky-800/90 mt-1 leading-relaxed break-words">
+            Files sync to Google Drive across all available networks, including cellular mobile data and Wi-Fi.
+          </p>
+        </div>
+      </div>
+    );
   };
 
   return (
@@ -168,12 +273,6 @@ export const ProfileTab: React.FC<ProfileTabProps> = ({
               </button>
             </div>
 
-            {cacheClearedSuccess && (
-              <p className="text-[11px] text-emerald-700 flex items-center gap-1 font-medium bg-emerald-50 px-2.5 py-1.5 rounded-xl border border-emerald-200 animate-in fade-in">
-                <CheckCircle2 size={13} className="shrink-0" /> Cache cleared. Pinned offline downloads preserved!
-              </p>
-            )}
-
             {/* Cache Size Selector */}
             <div className="flex items-center justify-between gap-2 pt-1.5 border-t border-slate-100">
               <span className="text-[11px] text-slate-500 flex items-center gap-1.5 font-medium shrink-0">
@@ -198,69 +297,71 @@ export const ProfileTab: React.FC<ProfileTabProps> = ({
             </div>
           </div>
 
-          {/* Row 2: Wi-Fi Only Sync */}
-          <div
-            onClick={() => {
-              bridge.triggerHaptic('medium');
-              onUpdateSettings({ offline_sync_wifi_only: !userSettings.offline_sync_wifi_only });
-            }}
-            className="p-3.5 flex items-center justify-between gap-3 cursor-pointer hover:bg-slate-50/60 transition-colors group"
-          >
-            <div className="flex items-center gap-2.5 min-w-0 flex-1">
-              <div className="size-9 rounded-xl bg-indigo-50 text-indigo-700 border border-indigo-200/60 flex items-center justify-center shrink-0">
-                <Sparkles size={17} />
+          {/* Row 2: Self-Aware Wi-Fi / Mobile Data Sync Policy */}
+          <div className="p-3.5 space-y-3">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div className="flex items-center gap-2.5 min-w-0">
+                <div className="size-9 rounded-xl bg-indigo-50 text-indigo-700 border border-indigo-200/60 flex items-center justify-center shrink-0">
+                  <Sparkles size={17} />
+                </div>
+                <div className="min-w-0">
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <h4 className="text-xs font-bold text-slate-900">
+                      Cloud Sync Network Policy
+                    </h4>
+                    <span
+                      className={`text-[9.5px] font-mono font-bold px-1.5 py-0.2 rounded-md ${
+                        wifiOnly
+                          ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                          : 'bg-sky-50 text-sky-700 border border-sky-200'
+                      }`}
+                    >
+                      {wifiOnly ? 'WI-FI ONLY' : 'WI-FI + DATA'}
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-slate-500 mt-0.5 leading-snug">
+                    Prevent unexpected mobile data consumption for audio sync
+                  </p>
+                </div>
               </div>
-              <div className="min-w-0 flex-1">
-                <div className="flex items-center gap-1.5">
-                  <h4 className="text-xs font-bold text-slate-900 group-hover:text-indigo-700 transition-colors">
-                    Wi-Fi Only Sync
-                  </h4>
-                  <span className={`text-[9.5px] font-mono font-bold px-1.5 py-0.2 rounded-md ${
-                    userSettings.offline_sync_wifi_only
-                      ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-                      : 'bg-slate-100 text-slate-500 border border-slate-200'
-                  }`}>
-                    {userSettings.offline_sync_wifi_only ? 'ENABLED' : 'DISABLED'}
-                  </span>
-                </div>
-                <p className="text-[11px] text-slate-500 mt-0.5 truncate">
-                  Prevent mobile data consumption for audio sync
-                </p>
-                <div className="mt-1 flex items-center gap-1.5">
-                  <span
-                    className={`w-1.5 h-1.5 rounded-full shrink-0 ${
-                      !networkStatus.isOnline
-                        ? 'bg-slate-400'
-                        : networkStatus.isCellular
-                        ? (userSettings.offline_sync_wifi_only ? 'bg-amber-500 animate-pulse' : 'bg-slate-400')
-                        : 'bg-emerald-500'
-                    }`}
-                  />
-                  <span className="text-[10px] text-slate-500 font-medium truncate">
-                    {!networkStatus.isOnline
-                      ? 'Offline • Local storage active'
-                      : networkStatus.isCellular
-                      ? (userSettings.offline_sync_wifi_only ? 'Mobile Data active • Sync paused' : 'Mobile Data active • Sync allowed')
-                      : 'Wi-Fi active • Ready to sync'}
-                  </span>
-                </div>
+
+              {/* 2-Option Sliding Segmented Control */}
+              <div className="bg-slate-100/90 p-1 rounded-xl flex items-center gap-1 border border-slate-200/80 shrink-0 self-start sm:self-center">
+                <button
+                  type="button"
+                  onClick={() => handleSelectSyncPolicy(true)}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer ${
+                    wifiOnly
+                      ? 'bg-white text-slate-950 font-bold shadow-2xs border border-slate-200/80'
+                      : 'text-slate-600 hover:text-slate-900 border border-transparent'
+                  }`}
+                >
+                  <Wifi size={13} className={wifiOnly ? 'text-emerald-600' : 'text-slate-500'} />
+                  <span>Wi-Fi Only</span>
+                  {canDetectCellular && (
+                    <span className="text-[9px] font-mono font-bold px-1.5 py-0.2 rounded-full bg-emerald-100/80 text-emerald-800">
+                      Smart Auto
+                    </span>
+                  )}
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => handleSelectSyncPolicy(false)}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer ${
+                    !wifiOnly
+                      ? 'bg-white text-slate-950 font-bold shadow-2xs border border-slate-200/80'
+                      : 'text-slate-600 hover:text-slate-900 border border-transparent'
+                  }`}
+                >
+                  <Signal size={13} className={!wifiOnly ? 'text-sky-600' : 'text-slate-500'} />
+                  <span>Wi-Fi + Data</span>
+                </button>
               </div>
             </div>
 
-            {/* Tactile Switch */}
-            <div
-              role="switch"
-              aria-checked={userSettings.offline_sync_wifi_only}
-              className={`w-10 h-5.5 rounded-full transition-colors relative flex items-center px-0.5 shrink-0 ${
-                userSettings.offline_sync_wifi_only ? 'bg-slate-900' : 'bg-slate-200'
-              }`}
-            >
-              <div
-                className={`w-4.5 h-4.5 rounded-full bg-white shadow-xs transition-transform ${
-                  userSettings.offline_sync_wifi_only ? 'translate-x-4.5' : 'translate-x-0'
-                }`}
-              />
-            </div>
+            {/* Dynamic Zero-Truncation Wrapped Status Callout */}
+            {renderSyncCallout()}
           </div>
         </div>
 
@@ -270,7 +371,10 @@ export const ProfileTab: React.FC<ProfileTabProps> = ({
 
         {/* Export JSON */}
         <div
-          onClick={() => exportDataAsJSON({ audioItems, revisions: revisionItems, dailyStats, settings: userSettings })}
+          onClick={() => {
+            exportDataAsJSON({ audioItems, revisions: revisionItems, dailyStats, settings: userSettings });
+            toastService.drive('Data Export Completed', 'Library catalog and revisions saved as JSON.');
+          }}
           className="bg-white border border-slate-200/90 hover:border-slate-300 rounded-2xl p-3.5 flex items-center justify-between gap-3 cursor-pointer transition-all shadow-2xs hover:shadow-xs group"
         >
           <div className="flex items-center gap-3">
@@ -291,7 +395,10 @@ export const ProfileTab: React.FC<ProfileTabProps> = ({
 
         {/* Export CSV */}
         <div
-          onClick={() => exportDataAsCSV(dailyStats)}
+          onClick={() => {
+            exportDataAsCSV(dailyStats);
+            toastService.drive('Study Stats Exported', 'Daily recall records downloaded as CSV.');
+          }}
           className="bg-white border border-slate-200/90 hover:border-slate-300 rounded-2xl p-3.5 flex items-center justify-between gap-3 cursor-pointer transition-all shadow-2xs hover:shadow-xs group"
         >
           <div className="flex items-center gap-3">

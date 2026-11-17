@@ -100,7 +100,7 @@ describe('ProfileTab UI Component', () => {
     expect(html).toContain('Disconnect Google Drive');
   });
 
-  it('renders Wi-Fi Only Sync preference with live network status indicator', () => {
+  it('renders Wi-Fi Only Sync preference with sliding segmented control and status callout', () => {
     const html = renderToString(
       <ProfileTab
         userSettings={mockSettings}
@@ -116,10 +116,11 @@ describe('ProfileTab UI Component', () => {
       />
     );
 
-    // Wi-Fi Only card is present with ENABLED badge
-    expect(html).toContain('Wi-Fi Only Sync');
-    expect(html).toContain('Prevent mobile data consumption for audio sync');
-    expect(html).toContain('ENABLED');
-    expect(html).toContain('Wi-Fi active');
+    // Wi-Fi Only segmented control is present
+    expect(html).toContain('Cloud Sync Network Policy');
+    expect(html).toContain('WI-FI ONLY');
+    expect(html).toContain('Wi-Fi Only');
+    expect(html).toContain('Wi-Fi + Data');
+    expect(html).toContain('Wi-Fi Connected • Auto-Sync Active');
   });
 });

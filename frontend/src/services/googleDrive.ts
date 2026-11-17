@@ -1049,6 +1049,199 @@ class GoogleDriveService {
   }
 
   /**
+   * Renames a file or folder in Google Drive.
+   */
+  public async renameDriveItem(fileId: string, newName: string): Promise<boolean> {
+    if (!this.accessToken || this.isTokenExpired()) {
+      await this.ensureFreshAccessToken();
+    }
+    if (!this.accessToken || !fileId || !newName.trim()) return false;
+    try {
+      const res = await fetch(`https://www.googleapis.com/drive/v3/files/${encodeURIComponent(fileId)}`, {
+        method: 'PATCH',
+        headers: {
+          Authorization: `Bearer ${this.accessToken}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ name: newName.trim() })
+      });
+      return res.ok;
+    } catch (e) {
+      console.error('[GoogleDrive] renameDriveItem error:', e);
+      return false;
+    }
+  }
+
+  /**
+   * Makes a copy of a file in Google Drive, optionally with a new name and destination folder.
+   */
+  public async copyDriveFile(
+    fileId: string,
+    newName?: string,
+    parentFolderId?: string
+  ): Promise<{ id: string; name: string; webViewLink?: string; size?: string } | null> {
+    if (!this.accessToken || this.isTokenExpired()) {
+      await this.ensureFreshAccessToken();
+    }
+    if (!this.accessToken || !fileId) return null;
+    try {
+      const body: any = {};
+      if (newName?.trim()) body.name = newName.trim();
+      if (parentFolderId) body.parents = [parentFolderId];
+
+      const res = await fetch(
+        `https://www.googleapis.com/drive/v3/files/${encodeURIComponent(fileId)}/copy?fields=id,name,webViewLink,size,createdTime`,
+        {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${this.accessToken}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(body)
+        }
+      );
+      if (res.ok) {
+        return await res.json();
+      }
+      return null;
+    } catch (e) {
+      console.error('[GoogleDrive] copyDriveFile error:', e);
+      return null;
+    }
+  }
+
+  /**
+   * Copies a subject folder and all files inside it to a new subject folder in Google Drive.
+   */
+  public async copyDriveFolder(
+    folderId: string,
+    newFolderName: string
+  ): Promise<{ newFolderId: string; copiedCount: number } | null> {
+    if (!this.accessToken || this.isTokenExpired()) {
+      await this.ensureFreshAccessToken();
+    }
+    if (!this.accessToken || !folderId || !newFolderName.trim()) return null;
+    try {
+      const rootId = this.rootFolderId || (await this.getOrCreateFolder('Smriti'));
+      const newFolderId = await this.getOrCreateFolder(newFolderName.trim(), rootId);
+
+      const q = `'${folderId}' in parents and trashed = false and mimeType != 'application/vnd.google-apps.folder'`;
+      const res = await fetch(
+        `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(q)}&fields=files(id,name)&pageSize=1000`,
+        { headers: { Authorization: `Bearer ${this.accessToken}` } }
+      );
+      let copiedCount = 0;
+      if (res.ok) {
+        const data = await res.json();
+        if (data.files && Array.isArray(data.files)) {
+          for (const f of data.files) {
+            const copied = await this.copyDriveFile(f.id, f.name, newFolderId);
+            if (copied) copiedCount++;
+          }
+        }
+      }
+      return { newFolderId, copiedCount };
+    } catch (e) {
+      console.error('[GoogleDrive] copyDriveFolder error:', e);
+      return null;
+    }
+  }
+
+  /**
+   * Moves a file between folders in Google Drive by updating its parent folders.
+   */
+  public async moveDriveFile(
+    fileId: string,
+    oldParentId: string | undefined,
+    newParentId: string
+  ): Promise<boolean> {
+    if (!this.accessToken || this.isTokenExpired()) {
+      await this.ensureFreshAccessToken();
+    }
+    if (!this.accessToken || !fileId || !newParentId) return false;
+    try {
+      let url = `https://www.googleapis.com/drive/v3/files/${encodeURIComponent(fileId)}?addParents=${encodeURIComponent(newParentId)}`;
+      if (oldParentId) {
+        url += `&removeParents=${encodeURIComponent(oldParentId)}`;
+      }
+      const res = await fetch(url, {
+        method: 'PATCH',
+        headers: {
+          Authorization: `Bearer ${this.accessToken}`
+        }
+      });
+      return res.ok;
+    } catch (e) {
+      console.error('[GoogleDrive] moveDriveFile error:', e);
+      return false;
+    }
+  }
+
+  /**
+   * Grants public read permission ("anyone with link") to a file or folder and returns its webViewLink.
+   */
+  public async shareDriveItemPublic(fileId: string): Promise<{ webViewLink: string } | null> {
+    if (!this.accessToken || this.isTokenExpired()) {
+      await this.ensureFreshAccessToken();
+    }
+    if (!this.accessToken || !fileId) return null;
+    try {
+      await fetch(
+        `https://www.googleapis.com/drive/v3/files/${encodeURIComponent(fileId)}/permissions`,
+        {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${this.accessToken}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ role: 'reader', type: 'anyone' })
+        }
+      );
+
+      const res = await fetch(
+        `https://www.googleapis.com/drive/v3/files/${encodeURIComponent(fileId)}?fields=id,name,webViewLink`,
+        {
+          headers: {
+            Authorization: `Bearer ${this.accessToken}`
+          }
+        }
+      );
+      if (res.ok) {
+        const data = await res.json();
+        return {
+          webViewLink: data.webViewLink || `https://drive.google.com/file/d/${fileId}/view`
+        };
+      }
+      return { webViewLink: `https://drive.google.com/file/d/${fileId}/view` };
+    } catch (e) {
+      console.error('[GoogleDrive] shareDriveItemPublic error:', e);
+      return { webViewLink: `https://drive.google.com/file/d/${fileId}/view` };
+    }
+  }
+
+  /**
+   * Permanently deletes a file or folder from Google Drive (skips trash).
+   */
+  public async deleteDriveItemPermanently(fileId: string): Promise<boolean> {
+    if (!this.accessToken || this.isTokenExpired()) {
+      await this.ensureFreshAccessToken();
+    }
+    if (!this.accessToken || !fileId) return false;
+    try {
+      const res = await fetch(`https://www.googleapis.com/drive/v3/files/${encodeURIComponent(fileId)}`, {
+        method: 'DELETE',
+        headers: {
+          Authorization: `Bearer ${this.accessToken}`
+        }
+      });
+      return res.ok || res.status === 404;
+    } catch (e) {
+      console.error('[GoogleDrive] deleteDriveItemPermanently error:', e);
+      return false;
+    }
+  }
+
+  /**
    * Automatically migrates legacy audio files from 'My Recordings' or other legacy folders
    * (or directly under Smriti root) into their proper canonical subject folders in My Drive/Smriti/
    */

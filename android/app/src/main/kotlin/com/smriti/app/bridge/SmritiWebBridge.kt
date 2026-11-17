@@ -1,6 +1,8 @@
 package com.smriti.app.bridge
 
+import android.app.Activity
 import android.content.Context
+import android.content.Intent
 import android.net.ConnectivityManager
 import android.net.Network
 import android.net.NetworkCapabilities
@@ -41,19 +43,28 @@ class SmritiWebBridge(
 
     private val connectivityManager = context.getSystemService(Context.CONNECTIVITY_SERVICE) as? ConnectivityManager
     private var networkCallback: ConnectivityManager.NetworkCallback? = null
+    private var wasEndedReported = false
 
     init {
         // Setup listener on ExoPlayer if active
         mainHandler.postDelayed(object : Runnable {
             override fun run() {
                 val player = SmritiMediaPlaybackService.activePlayerInstance
-                if (player != null && player.isPlaying) {
-                    val pos = (player.currentPosition / 1000.0)
-                    val dur = (player.duration / 1000.0)
-                    sendEventToJs(
-                        "playbackPositionUpdated",
-                        JSONObject().put("positionSeconds", pos).put("durationSeconds", dur).toString()
-                    )
+                if (player != null) {
+                    if (player.isPlaying) {
+                        val pos = (player.currentPosition / 1000.0)
+                        val dur = (player.duration / 1000.0)
+                        sendEventToJs(
+                            "playbackPositionUpdated",
+                            JSONObject().put("positionSeconds", pos).put("durationSeconds", dur).toString()
+                        )
+                    } else if (player.playbackState == Player.STATE_ENDED && !wasEndedReported) {
+                        wasEndedReported = true
+                        sendEventToJs(
+                            "playbackStateChanged",
+                            JSONObject().put("isPlaying", false).put("isEnded", true).toString()
+                        )
+                    }
                 }
                 mainHandler.postDelayed(this, 300)
             }
@@ -88,6 +99,41 @@ class SmritiWebBridge(
     private fun sendNetworkUpdate() {
         val status = checkNetworkStatus()
         sendEventToJs("networkStatusChanged", status.toString())
+        val transport = getNetworkTransportType()
+        mainHandler.post {
+            webView.evaluateJavascript(
+                "if (typeof window.onNativeNetworkChange === 'function') { window.onNativeNetworkChange('$transport'); }",
+                null
+            )
+        }
+    }
+
+    @JavascriptInterface
+    fun getNetworkTransportType(): String {
+        val cm = connectivityManager ?: return "offline"
+        val activeNetwork = cm.activeNetwork ?: return "offline"
+        val caps = cm.getNetworkCapabilities(activeNetwork) ?: return "offline"
+
+        val hasInternet = caps.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
+        if (!hasInternet) return "offline"
+
+        val isWifi = caps.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) ||
+                caps.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET)
+        if (isWifi) return "wifi"
+
+        val isCellular = caps.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR) || cm.isActiveNetworkMetered
+        if (isCellular) return "cellular"
+
+        return if (cm.isActiveNetworkMetered) "cellular" else "wifi"
+    }
+
+    fun destroy() {
+        try {
+            networkCallback?.let { connectivityManager?.unregisterNetworkCallback(it) }
+            networkCallback = null
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
     }
 
     fun checkNetworkStatus(): JSONObject {
@@ -159,6 +205,7 @@ class SmritiWebBridge(
     fun playAudio(audioJson: String) {
         mainHandler.post {
             try {
+                wasEndedReported = false
                 val json = JSONObject(audioJson)
                 val fileUrl = json.optString("file_url", "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3")
                 val title = json.optString("title", "Study Audio")
@@ -381,6 +428,34 @@ class SmritiWebBridge(
     fun removeOfflineDownload(audioId: String) {
         scope.launch {
             db.audioDao().deleteAudio(audioId)
+        }
+    }
+
+    @JavascriptInterface
+    fun exitApp() {
+        mainHandler.post {
+            (context as? Activity)?.finish()
+        }
+    }
+
+    @JavascriptInterface
+    fun shareText(title: String, text: String) {
+        mainHandler.post {
+            try {
+                val sendIntent = Intent().apply {
+                    action = Intent.ACTION_SEND
+                    putExtra(Intent.EXTRA_TEXT, text)
+                    if (title.isNotEmpty()) {
+                        putExtra(Intent.EXTRA_SUBJECT, title)
+                    }
+                    type = "text/plain"
+                }
+                val shareIntent = Intent.createChooser(sendIntent, title.ifEmpty { "Share via" })
+                shareIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                context.startActivity(shareIntent)
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
         }
     }
 

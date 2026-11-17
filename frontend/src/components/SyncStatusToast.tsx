@@ -16,15 +16,17 @@ export interface SyncToastState {
 interface SyncStatusToastProps {
   toast: SyncToastState | null;
   onDismiss: () => void;
+  hasMiniPlayer?: boolean;
 }
 
 export const SyncStatusToast: React.FC<SyncStatusToastProps> = ({
   toast,
   onDismiss,
+  hasMiniPlayer = false
 }) => {
   useEffect(() => {
     if (!toast) return;
-    const duration = toast.durationMs ?? 5500;
+    const duration = toast.durationMs ?? (toast.actionLabel ? 4000 : 2800);
     const timer = setTimeout(() => {
       onDismiss();
     }, duration);
@@ -38,63 +40,69 @@ export const SyncStatusToast: React.FC<SyncStatusToastProps> = ({
   const isOffline = toast.type === 'offline';
   const isSynced = toast.type === 'synced';
 
+  // Section-Dedicated Styling for Obsidian Dark System
+  const badgeClasses = isPaused
+    ? 'bg-amber-500/15 border border-amber-500/20 text-amber-400'
+    : isWifiConnected || isSynced
+    ? 'bg-emerald-500/15 border border-emerald-500/20 text-emerald-400'
+    : isOffline
+    ? 'bg-rose-500/15 border border-rose-500/20 text-rose-400'
+    : 'bg-white/10 border border-white/10 text-slate-300';
+
+  const buttonClasses = isPaused
+    ? 'bg-amber-500 hover:bg-amber-400 text-slate-950'
+    : isWifiConnected || isSynced
+    ? 'bg-emerald-500 hover:bg-emerald-400 text-slate-950'
+    : isOffline
+    ? 'bg-rose-500 hover:bg-rose-400 text-white'
+    : 'bg-white/15 hover:bg-white/25 text-white';
+
+  const positionClasses = hasMiniPlayer
+    ? 'bottom-40 sm:bottom-44'
+    : 'bottom-24 sm:bottom-28';
+
   return (
     <div
-      className="fixed bottom-24 sm:bottom-28 left-4 right-4 z-50 max-w-md mx-auto pointer-events-none animate-in fade-in slide-in-from-bottom-3 duration-300"
+      className={`fixed ${positionClasses} left-1/2 -translate-x-1/2 z-[100] pointer-events-none w-full flex justify-center px-3 safe-bottom animate-in fade-in slide-in-from-bottom-2 duration-200`}
       role="status"
       aria-live="polite"
+      aria-atomic="true"
     >
       <div
-        className={`pointer-events-auto bg-white/95 backdrop-blur-xl border rounded-2xl p-3.5 shadow-xl shadow-slate-900/10 transition-all duration-300 flex items-start justify-between gap-3 ${
-          isPaused
-            ? 'border-amber-200/90 shadow-amber-900/5'
-            : isWifiConnected || isSynced
-            ? 'border-emerald-200/90 shadow-emerald-900/5'
-            : isOffline
-            ? 'border-rose-200/90 shadow-rose-900/5'
-            : 'border-slate-200/90'
-        }`}
+        className="pointer-events-auto bg-slate-900/95 backdrop-blur-md text-white border border-slate-700/80 shadow-[0_14px_34px_-6px_rgba(15,23,42,0.38)] max-w-[calc(100vw-24px)] sm:max-w-sm w-fit min-w-[240px] rounded-2xl px-3.5 py-2.5 transition-all duration-150"
       >
-        <div className="flex items-start gap-3 min-w-0 flex-1">
-          {/* Icon Badge */}
+        <div className="flex items-center gap-3 w-full">
+          {/* Leading Icon Badge */}
           <div
-            className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 border transition-colors ${
-              isPaused
-                ? 'bg-amber-50 border-amber-200 text-amber-600'
-                : isWifiConnected || isSynced
-                ? 'bg-emerald-50 border-emerald-200 text-emerald-600'
-                : isOffline
-                ? 'bg-rose-50 border-rose-200 text-rose-600'
-                : 'bg-slate-100 border-slate-200 text-slate-600'
-            }`}
+            className={`w-7 h-7 sm:w-8 sm:h-8 rounded-xl flex items-center justify-center shrink-0 ${badgeClasses}`}
           >
-            {isPaused && <Radio size={17} className="animate-pulse" />}
-            {isWifiConnected && <Wifi size={17} />}
-            {isOffline && <CloudOff size={17} />}
-            {isSynced && <CheckCircle2 size={17} />}
-            {!isPaused && !isWifiConnected && !isOffline && !isSynced && <WifiOff size={17} />}
+            {isPaused && <Radio size={15} className="animate-pulse text-amber-400" />}
+            {isWifiConnected && <Wifi size={15} className="text-emerald-400" />}
+            {isOffline && <CloudOff size={15} className="text-rose-400" />}
+            {isSynced && <CheckCircle2 size={15} className="text-emerald-400" />}
+            {!isPaused && !isWifiConnected && !isOffline && !isSynced && (
+              <WifiOff size={15} className="text-slate-300" />
+            )}
           </div>
 
-          {/* Text Content */}
+          {/* Text Container: min-w-0 flex-1 guarantees zero text chopping */}
           <div className="min-w-0 flex-1">
-            <div className="flex items-center gap-2">
-              <h4 className="text-xs font-bold text-slate-900 truncate">
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <h4 className="text-[13px] font-semibold leading-snug text-white break-words line-clamp-2">
                 {toast.title || (isPaused ? 'Wi-Fi Only Sync' : isWifiConnected ? 'Wi-Fi Connected' : 'Sync Status')}
               </h4>
               {isPaused && (
-                <span className="text-[10px] font-mono font-bold px-1.5 py-0.2 rounded-full bg-amber-100 text-amber-800 shrink-0">
+                <span className="text-[9.5px] font-mono font-bold px-1.5 py-0.2 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30 shrink-0">
                   Mobile Data
                 </span>
               )}
             </div>
-            <p className="text-[11px] text-slate-600 leading-snug mt-0.5 line-clamp-2">
+            <p className="mt-0.5 text-[11.5px] font-normal leading-normal text-slate-300 break-words line-clamp-2">
               {toast.message}
             </p>
           </div>
-        </div>
 
-        {/* Action Button & Dismiss */}
-        <div className="flex items-center gap-1.5 shrink-0 mt-0.5">
+          {/* Action Button */}
           {toast.actionLabel && toast.onAction && (
             <button
               type="button"
@@ -102,20 +110,21 @@ export const SyncStatusToast: React.FC<SyncStatusToastProps> = ({
                 toast.onAction?.();
                 onDismiss();
               }}
-              className="px-2.5 py-1 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-[11px] font-bold transition-all shadow-2xs hover:shadow-xs cursor-pointer active:scale-95 shrink-0"
+              className={`shrink-0 rounded-xl px-3 py-1.5 text-xs font-semibold transition active:scale-95 cursor-pointer ${buttonClasses}`}
             >
               {toast.actionLabel}
             </button>
           )}
 
+          {/* Dismiss Icon */}
           <button
             type="button"
             onClick={onDismiss}
-            className="w-7 h-7 rounded-xl text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors flex items-center justify-center cursor-pointer"
-            title="Dismiss"
+            className="text-slate-400 hover:text-white p-1 rounded-lg transition-colors cursor-pointer shrink-0 -mr-1"
+            title="Dismiss notification"
             aria-label="Dismiss notification"
           >
-            <X size={15} />
+            <X size={14} />
           </button>
         </div>
       </div>

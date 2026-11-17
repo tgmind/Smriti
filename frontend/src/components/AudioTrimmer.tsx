@@ -10,6 +10,7 @@ import {
   Volume2
 } from 'lucide-react';
 import { formatDuration } from '@/services/learningEngine';
+import { toastService } from '@/services/toastService';
 
 export interface AudioTrimmerProps {
   durationSeconds: number;
@@ -241,6 +242,14 @@ export const AudioTrimmer: React.FC<AudioTrimmerProps> = ({
       const cut = Math.max(startSeconds + 0.3, totalDuration - 1.5);
       setEndSeconds(Number(cut.toFixed(2)));
     }
+
+    const msg =
+      preset === 'full' || preset === 'reset'
+        ? 'Reset to full recording'
+        : preset === 'intro1'
+        ? 'Trimmed 1.5s intro'
+        : 'Trimmed 1.5s outro';
+    toastService.record('Trim Preset Applied', msg);
   };
 
   // Percent calculations for styling

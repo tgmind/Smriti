@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { X, CheckCircle2, HelpCircle, ArrowRight, Sparkles } from 'lucide-react';
 import { RevisionItem, RatingScore } from '../types';
 import { calculateNextReview } from '../services/learningEngine';
+import { toastService } from '../services/toastService';
 import {
   Empty,
   EmptyHeader,
@@ -73,6 +74,10 @@ export const AssessmentModal: React.FC<AssessmentModalProps> = ({
       rating
     });
     onRecordRating(currentItem, rating);
+    toastService.progress(
+      'Recall Recorded',
+      `Next review in ${result.interval_days} day(s) on ${result.next_review_due}.`
+    );
   };
 
   const handleNext = () => {
@@ -82,6 +87,10 @@ export const AssessmentModal: React.FC<AssessmentModalProps> = ({
     if (currentIndex + 1 < items.length) {
       setCurrentIndex(currentIndex + 1);
     } else {
+      toastService.progress(
+        'Recall Session Completed',
+        `Mastered review of ${items.length} spaced repetition cards!`
+      );
       onClose();
     }
   };

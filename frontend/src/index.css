@@ -322,5 +322,49 @@ button, a, input, select {
   animation-play-state: paused;
 }
 
+/* shadcn / Tailwind scroll-fade scroll edge utility */
+@utility scroll-fade-y {
+  mask-image: linear-gradient(
+    to bottom,
+    transparent 0,
+    black var(--scroll-fade-size, 1.5rem),
+    black calc(100% - var(--scroll-fade-size, 1.5rem)),
+    transparent 100%
+  );
+  -webkit-mask-image: linear-gradient(
+    to bottom,
+    transparent 0,
+    black var(--scroll-fade-size, 1.5rem),
+    black calc(100% - var(--scroll-fade-size, 1.5rem)),
+    transparent 100%
+  );
+}
+
+@utility scroll-fade-6 {
+  --scroll-fade-size: 1.5rem;
+}
+
+.scroll-fade-y {
+  mask-image: linear-gradient(
+    to bottom,
+    transparent 0,
+    black var(--scroll-fade-size, 1.5rem),
+    black calc(100% - var(--scroll-fade-size, 1.5rem)),
+    transparent 100%
+  );
+  -webkit-mask-image: linear-gradient(
+    to bottom,
+    transparent 0,
+    black var(--scroll-fade-size, 1.5rem),
+    black calc(100% - var(--scroll-fade-size, 1.5rem)),
+    transparent 100%
+  );
+}
+
+.scroll-fade-6 {
+  --scroll-fade-size: 1.5rem;
+}
+
+
 
 
