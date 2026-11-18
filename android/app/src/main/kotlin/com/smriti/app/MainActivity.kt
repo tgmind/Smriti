@@ -32,6 +32,10 @@ import com.google.common.util.concurrent.ListenableFuture
 import com.google.common.util.concurrent.MoreExecutors
 import com.smriti.app.bridge.SmritiWebBridge
 import com.smriti.app.media.SmritiMediaPlaybackService
+import io.flutter.embedding.engine.FlutterEngine
+import io.flutter.embedding.engine.FlutterEngineCache
+import io.flutter.embedding.engine.dart.DartExecutor
+import io.flutter.plugin.common.MethodChannel
 
 class MainActivity : ComponentActivity() {
 
@@ -53,6 +57,35 @@ class MainActivity : ComponentActivity() {
 
         // Bind MediaController to background MediaSessionService
         initMediaPlaybackService()
+
+        // Setup Flutter Engine for audio player module
+        val flutterEngine = FlutterEngine(this)
+        flutterEngine.dartExecutor.executeDartEntrypoint(DartExecutor.DartEntrypoint.createDefault())
+        FlutterEngineCache.getInstance().put("smriti_player_engine", flutterEngine)
+
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "com.smriti.app/player").setMethodCallHandler { call, result ->
+            val player = SmritiMediaPlaybackService.activePlayerInstance
+            when (call.method) {
+                "playAudio" -> {
+                    val fileUrl = call.argument<String>("file_url")
+                    player?.let { p ->
+                        p.setMediaItem(androidx.media3.common.MediaItem.fromUri(fileUrl!!))
+                        p.prepare()
+                        p.play()
+                        result.success(true)
+                    } ?: result.error("NO_PLAYER", "ExoPlayer not active", null)
+                }
+                "pauseAudio" -> {
+                    player?.pause()
+                    result.success(true)
+                }
+                "resumeAudio" -> {
+                    player?.play()
+                    result.success(true)
+                }
+                else -> result.notImplemented()
+            }
+        }
 
         onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
             override fun handleOnBackPressed() {
