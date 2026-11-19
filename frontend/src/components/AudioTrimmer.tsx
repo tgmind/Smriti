@@ -18,7 +18,7 @@ export interface AudioTrimmerProps {
   waveformPeaks?: number[];
   initialStartSeconds?: number;
   initialEndSeconds?: number;
-  onTrimChange: (start: number, end: number, fadeIn: boolean, fadeOut: boolean) => void;
+  onTrimChange: (start: number, end: number, fadeIn: boolean, fadeOut: boolean, editMode?: 'trim' | 'cut') => void;
   className?: string;
 }
 
@@ -34,6 +34,7 @@ export const AudioTrimmer: React.FC<AudioTrimmerProps> = ({
   const totalDuration = Math.max(0.5, durationSeconds);
   const [startSeconds, setStartSeconds] = useState(initialStartSeconds);
   const [endSeconds, setEndSeconds] = useState(initialEndSeconds ?? totalDuration);
+  const [editMode, setEditMode] = useState<'trim' | 'cut'>('trim');
   const [fadeIn, setFadeIn] = useState(true);
   const [fadeOut, setFadeOut] = useState(true);
   const [showFineTune, setShowFineTune] = useState(false);
@@ -79,8 +80,8 @@ export const AudioTrimmer: React.FC<AudioTrimmerProps> = ({
 
   // Sync state to parent
   useEffect(() => {
-    onTrimChange(startSeconds, endSeconds, fadeIn, fadeOut);
-  }, [startSeconds, endSeconds, fadeIn, fadeOut, onTrimChange]);
+    onTrimChange(startSeconds, endSeconds, fadeIn, fadeOut, editMode);
+  }, [startSeconds, endSeconds, fadeIn, fadeOut, editMode, onTrimChange]);
 
   // Audio preview playback sync: Recreated ONLY when audioUrl changes!
   useEffect(() => {
@@ -331,19 +332,53 @@ export const AudioTrimmer: React.FC<AudioTrimmerProps> = ({
               Visual Audio Trimmer
             </h3>
             <p className="text-[10px] text-slate-400 font-mono">
-              Drag handles to crop recording
+              {editMode === 'cut' ? 'Cut & splice out selected middle region' : 'Drag handles to crop recording'}
             </p>
           </div>
         </div>
 
         <div className="flex items-center gap-1.5">
-          <span className="text-[11px] font-mono font-bold text-emerald-800 bg-emerald-50 border border-emerald-200/80 px-2.5 py-0.5 rounded-full inline-flex items-center gap-1 shadow-2xs">
+          <span
+            className={`text-[11px] font-mono font-bold px-2.5 py-0.5 rounded-full inline-flex items-center gap-1 shadow-2xs border ${
+              editMode === 'cut'
+                ? 'text-orange-800 bg-orange-50 border-orange-200'
+                : 'text-emerald-800 bg-emerald-50 border-emerald-200/80'
+            }`}
+          >
             <span>{formatAccurate(startSeconds)}</span>
-            <span className="text-emerald-400">→</span>
+            <span className={editMode === 'cut' ? 'text-orange-400' : 'text-emerald-400'}>→</span>
             <span>{formatAccurate(endSeconds)}</span>
-            <span className="text-slate-400 font-normal">({formatDuration(Math.round(selectedDuration))})</span>
+            <span className="text-slate-400 font-normal">
+              ({formatDuration(Math.round(editMode === 'cut' ? totalDuration - selectedDuration : selectedDuration))})
+            </span>
           </span>
         </div>
+      </div>
+
+      {/* Editing Mode Selector Pill (Samsung Voice Recorder Style) */}
+      <div className="flex items-center gap-1.5 p-1 bg-slate-100/90 rounded-2xl border border-slate-200/80">
+        <button
+          type="button"
+          onClick={() => setEditMode('trim')}
+          className={`flex-1 py-1.5 px-3 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+            editMode === 'trim'
+              ? 'bg-white text-emerald-800 shadow-2xs'
+              : 'text-slate-500 hover:text-slate-900'
+          }`}
+        >
+          Trim (Keep Region)
+        </button>
+        <button
+          type="button"
+          onClick={() => setEditMode('cut')}
+          className={`flex-1 py-1.5 px-3 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+            editMode === 'cut'
+              ? 'bg-orange-500 text-white shadow-2xs'
+              : 'text-slate-500 hover:text-slate-900'
+          }`}
+        >
+          Cut (Delete Middle)
+        </button>
       </div>
 
       {/* TIMELINE RULER & WAVEFORM CANVAS */}
@@ -384,16 +419,20 @@ export const AudioTrimmer: React.FC<AudioTrimmerProps> = ({
             ))}
           </div>
 
-          {/* ACTIVE TRIM SELECTION REGION (Vibrant Waveform inside selection) */}
+          {/* ACTIVE TRIM / CUT SELECTION REGION */}
           <div
             onPointerDown={(e) => handlePointerDown('window', e)}
-            className="absolute top-0 bottom-0 bg-emerald-500/15 border-y border-emerald-400/40 cursor-grab active:cursor-grabbing z-10 transition-colors hover:bg-emerald-500/20"
+            className={`absolute top-0 bottom-0 cursor-grab active:cursor-grabbing z-10 transition-colors ${
+              editMode === 'cut'
+                ? 'bg-orange-500/20 border-y border-dashed border-orange-400/60 hover:bg-orange-500/25'
+                : 'bg-emerald-500/15 border-y border-emerald-400/40 hover:bg-emerald-500/20'
+            }`}
             style={{
               left: `${startPct}%`,
               width: `${Math.max(0.5, endPct - startPct)}%`
             }}
           >
-            {/* Waveform inside selection: Glowing Emerald Bars */}
+            {/* Waveform inside selection: Glowing Bars */}
             <div className="absolute inset-0 flex items-center justify-between px-1 gap-0.5 pointer-events-none">
               {peaks.map((val, idx) => {
                 const barPct = (idx / peaks.length) * 100;
@@ -402,7 +441,11 @@ export const AudioTrimmer: React.FC<AudioTrimmerProps> = ({
                   <div
                     key={idx}
                     className={`flex-1 rounded-full transition-opacity duration-150 ${
-                      isInside ? 'bg-gradient-to-t from-emerald-500 to-teal-300 opacity-100 shadow-[0_0_8px_rgba(16,185,129,0.4)]' : 'opacity-0'
+                      isInside
+                        ? editMode === 'cut'
+                          ? 'bg-gradient-to-t from-orange-500 to-amber-300 opacity-100 shadow-[0_0_8px_rgba(249,115,22,0.4)]'
+                          : 'bg-gradient-to-t from-emerald-500 to-teal-300 opacity-100 shadow-[0_0_8px_rgba(16,185,129,0.4)]'
+                        : 'opacity-0'
                     }`}
                     style={{ height: `${val}%` }}
                   />
@@ -411,41 +454,61 @@ export const AudioTrimmer: React.FC<AudioTrimmerProps> = ({
             </div>
           </div>
 
-          {/* LEFT HANDLE (START CROP) */}
+          {/* LEFT HANDLE */}
           <div
             onPointerDown={(e) => handlePointerDown('start', e)}
             className="absolute top-0 bottom-0 z-20 w-5 -translate-x-1/2 flex flex-col items-center justify-center cursor-ew-resize select-none touch-none"
             style={{ left: `${startPct}%` }}
           >
             {/* Full-height tactile grip bar */}
-            <div className="w-2 h-full bg-emerald-400 hover:bg-emerald-300 rounded-l-md shadow-lg flex flex-col items-center justify-center gap-1 transition-colors">
+            <div
+              className={`w-2 h-full rounded-l-md shadow-lg flex flex-col items-center justify-center gap-1 transition-colors ${
+                editMode === 'cut' ? 'bg-orange-400 hover:bg-orange-300' : 'bg-emerald-400 hover:bg-emerald-300'
+              }`}
+            >
               <div className="w-0.5 h-3 bg-slate-950/60 rounded-full" />
               <div className="w-0.5 h-3 bg-slate-950/60 rounded-full" />
             </div>
 
             {/* Floating Timecode Pill */}
             {(activeDrag === 'start' || activeDrag === 'window') && (
-              <div className="absolute -top-7 bg-slate-900 text-emerald-300 font-mono text-[9px] font-bold px-1.5 py-0.5 rounded-md border border-slate-700 shadow-md whitespace-nowrap pointer-events-none z-30">
+              <div
+                className={`absolute -top-7 font-mono text-[9px] font-bold px-1.5 py-0.5 rounded-md border shadow-md whitespace-nowrap pointer-events-none z-30 ${
+                  editMode === 'cut'
+                    ? 'bg-slate-900 text-orange-300 border-orange-700'
+                    : 'bg-slate-900 text-emerald-300 border-slate-700'
+                }`}
+              >
                 {formatAccurate(startSeconds)}
               </div>
             )}
           </div>
 
-          {/* RIGHT HANDLE (END CROP) */}
+          {/* RIGHT HANDLE */}
           <div
             onPointerDown={(e) => handlePointerDown('end', e)}
             className="absolute top-0 bottom-0 z-20 w-5 -translate-x-1/2 flex flex-col items-center justify-center cursor-ew-resize select-none touch-none"
             style={{ left: `${endPct}%` }}
           >
             {/* Full-height tactile grip bar */}
-            <div className="w-2 h-full bg-emerald-400 hover:bg-emerald-300 rounded-r-md shadow-lg flex flex-col items-center justify-center gap-1 transition-colors">
+            <div
+              className={`w-2 h-full rounded-r-md shadow-lg flex flex-col items-center justify-center gap-1 transition-colors ${
+                editMode === 'cut' ? 'bg-orange-400 hover:bg-orange-300' : 'bg-emerald-400 hover:bg-emerald-300'
+              }`}
+            >
               <div className="w-0.5 h-3 bg-slate-950/60 rounded-full" />
               <div className="w-0.5 h-3 bg-slate-950/60 rounded-full" />
             </div>
 
             {/* Floating Timecode Pill */}
             {(activeDrag === 'end' || activeDrag === 'window') && (
-              <div className="absolute -top-7 bg-slate-900 text-emerald-300 font-mono text-[9px] font-bold px-1.5 py-0.5 rounded-md border border-slate-700 shadow-md whitespace-nowrap pointer-events-none z-30">
+              <div
+                className={`absolute -top-7 font-mono text-[9px] font-bold px-1.5 py-0.5 rounded-md border shadow-md whitespace-nowrap pointer-events-none z-30 ${
+                  editMode === 'cut'
+                    ? 'bg-slate-900 text-orange-300 border-orange-700'
+                    : 'bg-slate-900 text-emerald-300 border-slate-700'
+                }`}
+              >
                 {formatAccurate(endSeconds)}
               </div>
             )}

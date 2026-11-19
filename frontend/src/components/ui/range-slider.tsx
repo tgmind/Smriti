@@ -165,22 +165,27 @@ export const RangeSlider = React.forwardRef<HTMLDivElement, RangeSliderProps>(
         )}
       >
         {/* Background Track */}
-        <div className="relative w-full h-2 rounded-full bg-zinc-800/90 border border-zinc-700/50 overflow-hidden">
+        <div className="relative w-full h-2.5 rounded-full bg-slate-200/90 border border-slate-300/80 overflow-hidden shadow-inner">
           {/* Active Highlight Range Bar */}
           <div
             onPointerDown={handlePointerDownRange}
-            className="absolute top-0 bottom-0 bg-gradient-to-r from-amber-400 to-amber-500 rounded-full cursor-grab active:cursor-grabbing transition-opacity shadow-xs"
+            className="absolute top-0 bottom-0 bg-gradient-to-r from-amber-400 to-amber-500 rounded-full cursor-grab active:cursor-grabbing transition-opacity shadow-xs flex items-center justify-center overflow-hidden"
             style={{
               left: `${startPercent}%`,
               width: `${Math.max(2, endPercent - startPercent)}%`
             }}
-          />
+            title="Drag interval range"
+          >
+            {endPercent - startPercent > 12 && (
+              <div className="w-4 h-1 rounded-full bg-white/40 pointer-events-none" />
+            )}
+          </div>
         </div>
 
         {/* Live Playback Position Indicator */}
         {playbackPercent !== null && (
           <div
-            className="absolute top-1/2 -translate-y-1/2 size-2 rounded-full bg-emerald-500 shadow-xs z-10 pointer-events-none -translate-x-1/2"
+            className="absolute top-1/2 -translate-y-1/2 w-1.5 h-4 rounded-full bg-emerald-500 border border-white shadow-xs z-10 pointer-events-none -translate-x-1/2"
             style={{ left: `${playbackPercent}%` }}
             title={`Playback: ${formatDuration(currentPlaybackPosition || 0)}`}
           />
@@ -190,28 +195,42 @@ export const RangeSlider = React.forwardRef<HTMLDivElement, RangeSliderProps>(
         <div
           onPointerDown={(e) => handlePointerDownHandle('start', e)}
           className={cn(
-            'absolute top-1/2 -translate-y-1/2 -ml-3.5 size-7 rounded-full bg-white border-2 border-amber-500 shadow-md flex items-center justify-center font-mono font-bold text-[10px] text-amber-900 cursor-ew-resize hover:scale-115 active:scale-120 transition-transform z-20',
-            draggingHandle === 'start' && 'scale-120 ring-4 ring-amber-400/30'
+            'absolute top-1/2 -translate-y-1/2 -ml-3.5 size-7 rounded-full bg-white border-2 border-amber-500 shadow-md flex items-center justify-center font-mono font-extrabold text-[10px] text-amber-900 cursor-ew-resize hover:scale-115 active:scale-120 transition-all select-none',
+            draggingHandle === 'start'
+              ? 'scale-120 ring-4 ring-amber-400/30 z-30'
+              : 'z-20 hover:z-30 hover:border-amber-600'
           )}
           style={{ left: `${startPercent}%` }}
           aria-label="Loop Start Handle (A)"
           title={`Point A: ${formatDuration(safeStart)}`}
         >
           A
+          {draggingHandle === 'start' && (
+            <div className="absolute -top-7 left-1/2 -translate-x-1/2 px-1.5 py-0.5 rounded bg-slate-900 text-white font-mono text-[9px] font-bold shadow-md whitespace-nowrap pointer-events-none after:content-[''] after:absolute after:top-full after:left-1/2 after:-translate-x-1/2 after:border-4 after:border-transparent after:border-t-slate-900">
+              {formatDuration(safeStart)}
+            </div>
+          )}
         </div>
 
         {/* Handle B (End) */}
         <div
           onPointerDown={(e) => handlePointerDownHandle('end', e)}
           className={cn(
-            'absolute top-1/2 -translate-y-1/2 -ml-3.5 size-7 rounded-full bg-white border-2 border-amber-500 shadow-md flex items-center justify-center font-mono font-bold text-[10px] text-amber-900 cursor-ew-resize hover:scale-115 active:scale-120 transition-transform z-20',
-            draggingHandle === 'end' && 'scale-120 ring-4 ring-amber-400/30'
+            'absolute top-1/2 -translate-y-1/2 -ml-3.5 size-7 rounded-full bg-white border-2 border-amber-500 shadow-md flex items-center justify-center font-mono font-extrabold text-[10px] text-amber-900 cursor-ew-resize hover:scale-115 active:scale-120 transition-all select-none',
+            draggingHandle === 'end'
+              ? 'scale-120 ring-4 ring-amber-400/30 z-30'
+              : 'z-20 hover:z-30 hover:border-amber-600'
           )}
           style={{ left: `${endPercent}%` }}
           aria-label="Loop End Handle (B)"
           title={`Point B: ${formatDuration(safeEnd)}`}
         >
           B
+          {draggingHandle === 'end' && (
+            <div className="absolute -top-7 left-1/2 -translate-x-1/2 px-1.5 py-0.5 rounded bg-slate-900 text-white font-mono text-[9px] font-bold shadow-md whitespace-nowrap pointer-events-none after:content-[''] after:absolute after:top-full after:left-1/2 after:-translate-x-1/2 after:border-4 after:border-transparent after:border-t-slate-900">
+              {formatDuration(safeEnd)}
+            </div>
+          )}
         </div>
       </div>
     );

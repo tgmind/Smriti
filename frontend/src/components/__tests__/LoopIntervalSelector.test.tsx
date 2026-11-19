@@ -61,4 +61,23 @@ describe('LoopIntervalSelector & RangeSlider Components', () => {
     expect(html).toContain('Active Repeat Loop');
     expect(html).toContain('Clear');
   });
+
+  it('renders enhanced pro-audio tactile details and accessibility attributes', () => {
+    const html = renderToString(
+      <RangeSlider
+        startValue={5}
+        endValue={15}
+        min={0}
+        max={60}
+        currentPlaybackPosition={10}
+        onChange={vi.fn()}
+      />
+    );
+
+    // Verify handle accessibility labels
+    expect(html).toContain('aria-label="Loop Start Handle (A)"');
+    expect(html).toContain('aria-label="Loop End Handle (B)"');
+    // Verify interval range draggable title
+    expect(html).toContain('title="Drag interval range"');
+  });
 });

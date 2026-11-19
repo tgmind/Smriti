@@ -19,8 +19,8 @@ export const OrganicSoundwave: React.FC<OrganicSoundwaveProps> = ({
   return (
     <div
       className={cn(
-        'w-full h-9 sm:h-10 overflow-hidden relative pointer-events-none select-none my-1 flex items-center justify-center transition-opacity duration-500',
-        isPlaying ? 'opacity-95' : 'opacity-40',
+        'w-full h-32 sm:h-36 overflow-hidden relative pointer-events-none select-none flex items-center justify-center transition-opacity duration-700 [mask-image:radial-gradient(ellipse_at_center,black_35%,transparent_75%)]',
+        isPlaying ? 'opacity-80' : 'opacity-25',
         className
       )}
       aria-hidden="true"

@@ -273,3 +273,137 @@ export class VerifiedPlayTracker {
 }
 
 export const verifiedPlayTracker = new VerifiedPlayTracker();
+
+// ============================================================================
+// VEDIC MEMORY STRENGTH (SMRITI) & REVISION DECAY ENGINE
+// ============================================================================
+
+export type VedicCognitiveCategory = 'mastered' | 'needs_revision' | 'learning' | 'new';
+
+export interface MemoryStrengthMetrics {
+  score: number; // 0 to 100 dynamic strength
+  rawStrength: number; // 0 to 100 before decay
+  status: VedicCognitiveCategory;
+  statusDevanagari: string;
+  statusLabel: string;
+  stageName: string;
+  stageDevanagari: string;
+  daysSinceLastPlay: number;
+}
+
+/**
+ * Calculates continuous Vedic Memory Strength (0-100%) and dynamic forgetting decay.
+ * Inspired by ancient Vedic oral transmission (Śravaṇa, Āvartana, Manana, Nididhyāsana)
+ * and the Ebbinghaus forgetting curve S(t) = S0 * exp(-delta_t / tau).
+ */
+export function calculateMemoryStrength(
+  playCount: number = 0,
+  lastPlayedAt?: string | number | null,
+  options: { targetPlays?: number; now?: Date } = {}
+): MemoryStrengthMetrics {
+  const count = typeof playCount === 'number' && Number.isFinite(playCount) && playCount > 0
+    ? Math.floor(playCount)
+    : 0;
+
+  const targetPlays = Math.max(1, options.targetPlays || 70);
+  const now = options.now || new Date();
+
+  // Fresh / Unheard track
+  if (count === 0) {
+    return {
+      score: 0,
+      rawStrength: 0,
+      status: 'new',
+      statusDevanagari: 'नवीन',
+      statusLabel: 'Unheard',
+      stageName: 'Fresh Note',
+      stageDevanagari: 'नवीन',
+      daysSinceLastPlay: 0
+    };
+  }
+
+  // Base raw strength before time decay (0 to 100)
+  const rawStrength = Math.min(100, Math.round((count / targetPlays) * 100));
+
+  // Compute elapsed days since last verified listening
+  let daysSinceLastPlay = 0;
+  if (lastPlayedAt) {
+    const lastDate = new Date(lastPlayedAt);
+    if (!isNaN(lastDate.getTime())) {
+      const diffMs = Math.max(0, now.getTime() - lastDate.getTime());
+      daysSinceLastPlay = Math.floor(diffMs / (1000 * 3600 * 24));
+    }
+  }
+
+  // Half-life factor (tau) grows with deeper repetition (stronger neural impressions take longer to fade)
+  let tau = 5; // default 5 days
+  if (count < 10) {
+    tau = 5;
+  } else if (count < 25) {
+    tau = 12;
+  } else if (count < 50) {
+    tau = 24;
+  } else {
+    tau = 45; // Mastered concepts have high stability
+  }
+
+  // Grace period before decay kicks in
+  const gracePeriodDays = count >= 20 ? 5 : 2;
+
+  let score = rawStrength;
+  if (daysSinceLastPlay > gracePeriodDays) {
+    const decayDays = daysSinceLastPlay - gracePeriodDays;
+    score = Math.max(5, Math.round(rawStrength * Math.exp(-decayDays / tau)));
+  }
+
+  // Assign Vedic Cognitive Category & Stage
+  if (count >= 50 && score >= 70) {
+    return {
+      score,
+      rawStrength,
+      status: 'mastered',
+      statusDevanagari: 'संस्मृत',
+      statusLabel: 'Learned by Heart',
+      stageName: 'Smṛti-Siddhi (Permanent Mastery)',
+      stageDevanagari: 'स्मृति सिद्धि',
+      daysSinceLastPlay
+    };
+  }
+
+  if (count >= 10 && score < 70) {
+    return {
+      score,
+      rawStrength,
+      status: 'needs_revision',
+      statusDevanagari: 'पुनरावर्तन आवश्यक',
+      statusLabel: 'Needs Revision',
+      stageName: 'Punarāvartana (Review Due)',
+      stageDevanagari: 'पुनरावर्तन',
+      daysSinceLastPlay
+    };
+  }
+
+  // Currently Learning Stages
+  let stageName = 'Śravaṇa (Initial Listening)';
+  let stageDevanagari = 'श्रवण';
+
+  if (count >= 20) {
+    stageName = 'Manana (Cognitive Reflection)';
+    stageDevanagari = 'मनन';
+  } else if (count >= 6) {
+    stageName = 'Āvartana (Rhythmic Repetition)';
+    stageDevanagari = 'आवर्तन';
+  }
+
+  return {
+    score,
+    rawStrength,
+    status: 'learning',
+    statusDevanagari: 'अभ्यासशील',
+    statusLabel: 'Currently Learning',
+    stageName,
+    stageDevanagari,
+    daysSinceLastPlay
+  };
+}
+

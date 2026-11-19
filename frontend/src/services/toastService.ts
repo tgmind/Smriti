@@ -174,6 +174,23 @@ class ToastService {
     return this.show({ title, description, section: 'danger', action, duration });
   }
 
+  // Common UI notification aliases
+  error(title: string, description?: string, action?: ToastAction, duration?: number) {
+    return this.danger(title, description, action, duration);
+  }
+
+  success(title: string, description?: string, action?: ToastAction, duration?: number) {
+    return this.downloads(title, description, action, duration);
+  }
+
+  warning(title: string, description?: string, action?: ToastAction, duration?: number) {
+    return this.record(title, description, action, duration);
+  }
+
+  info(title: string, description?: string, action?: ToastAction, duration?: number) {
+    return this.neutral(title, description, action, duration);
+  }
+
   neutral(title: string, description?: string, action?: ToastAction, duration?: number) {
     return this.show({ title, description, section: 'neutral', action, duration });
   }

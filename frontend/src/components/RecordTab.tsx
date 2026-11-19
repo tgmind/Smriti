@@ -18,9 +18,10 @@ import { bridge } from '../services/bridge';
 import { Subject, AudioItem, UploadProgressState } from '../types';
 import { formatDuration } from '../services/learningEngine';
 import { AudioTrimmer } from './AudioTrimmer';
-import { trimAudioBlob } from '../services/audioTrimmerEngine';
+import { trimAudioBlob, cutMiddleAudioBlob } from '../services/audioTrimmerEngine';
 import { resolveSubjectVisual } from '../utils/subjectVisuals';
 import { toastService } from '../services/toastService';
+import { Bookmark } from 'lucide-react';
 
 interface RecordTabProps {
   subjects: Subject[];
@@ -79,11 +80,14 @@ export const RecordTab: React.FC<RecordTabProps> = ({
     }
   }, [isDriveConnected]);
 
-  // Trim state
+  // Trim & Edit state
   const [trimStartSeconds, setTrimStartSeconds] = useState(0);
   const [trimEndSeconds, setTrimEndSeconds] = useState(0);
   const [trimFadeIn, setTrimFadeIn] = useState(true);
   const [trimFadeOut, setTrimFadeOut] = useState(true);
+  const [editMode, setEditMode] = useState<'trim' | 'cut'>('trim');
+  const [recordingMode, setRecordingMode] = useState<'standard' | 'lecture'>('standard');
+  const [bookmarks, setBookmarks] = useState<Array<{ id: string; timestampSeconds: number; label: string }>>([]);
 
   const [isSaving, setIsSaving] = useState(initialIsSaving);
 
@@ -207,22 +211,48 @@ export const RecordTab: React.FC<RecordTabProps> = ({
 
   // Recording Controls
   const handleStartRecording = async () => {
-    const success = await bridge.startRecording({ enableNoiseSuppression: enhancementEnabled });
+    const success = await bridge.startRecording({
+      enableNoiseSuppression: enhancementEnabled,
+      recordingMode
+    });
     if (success) {
       setRecordedDuration(0);
+      setBookmarks([]);
       setRecordingState('recording');
     }
+  };
+
+  const handleAddBookmark = () => {
+    bridge.triggerHaptic('medium');
+    const newBm = {
+      id: `bm-${Date.now()}`,
+      timestampSeconds: recordedDuration,
+      label: `Marker ${bookmarks.length + 1} (${formatDuration(recordedDuration)})`
+    };
+    setBookmarks(prev => [...prev, newBm]);
+    toastService.show({
+      title: 'Bookmark Added',
+      description: `Marker placed at ${formatDuration(recordedDuration)}`,
+      section: 'record'
+    });
   };
 
   const handleStopRecording = () => {
     bridge.stopRecording();
   };
 
-  const handleTrimChange = (start: number, end: number, fadeIn: boolean, fadeOut: boolean) => {
+  const handleTrimChange = (
+    start: number,
+    end: number,
+    fadeIn: boolean,
+    fadeOut: boolean,
+    mode: 'trim' | 'cut' = 'trim'
+  ) => {
     setTrimStartSeconds(start);
     setTrimEndSeconds(end);
     setTrimFadeIn(fadeIn);
     setTrimFadeOut(fadeOut);
+    setEditMode(mode);
   };
 
   const handleSave = async () => {
@@ -243,24 +273,36 @@ export const RecordTab: React.FC<RecordTabProps> = ({
       let effectiveDuration = Math.max(1, Math.round(effectiveEnd - trimStartSeconds));
       let peaksToSave = liveAmplitudes;
 
-      // CLIENT-SIDE AUDIO TRIMMING
+      // CLIENT-SIDE AUDIO TRIMMING & CUTTING
       if (
         finalBlob &&
         (trimStartSeconds > 0.05 || effectiveEnd < recordedDuration - 0.05 || trimFadeIn || trimFadeOut)
       ) {
         try {
-          const trimmedResult = await trimAudioBlob(
-            finalBlob,
-            trimStartSeconds,
-            effectiveEnd,
-            {
-              fadeIn: trimFadeIn,
-              fadeOut: trimFadeOut
-            }
-          );
-          finalBlob = trimmedResult.blob;
-          effectiveDuration = Math.round(trimmedResult.durationSeconds);
-          peaksToSave = trimmedResult.peaks;
+          if (editMode === 'cut') {
+            const cutResult = await cutMiddleAudioBlob(
+              finalBlob,
+              trimStartSeconds,
+              effectiveEnd,
+              { fadeDurationSeconds: 0.03 }
+            );
+            finalBlob = cutResult.blob;
+            effectiveDuration = Math.round(cutResult.durationSeconds);
+            peaksToSave = cutResult.peaks;
+          } else {
+            const trimmedResult = await trimAudioBlob(
+              finalBlob,
+              trimStartSeconds,
+              effectiveEnd,
+              {
+                fadeIn: trimFadeIn,
+                fadeOut: trimFadeOut
+              }
+            );
+            finalBlob = trimmedResult.blob;
+            effectiveDuration = Math.round(trimmedResult.durationSeconds);
+            peaksToSave = trimmedResult.peaks;
+          }
         } catch (trimErr) {
           console.warn('Audio trimming fallback, keeping original blob:', trimErr);
         }
@@ -274,20 +316,14 @@ export const RecordTab: React.FC<RecordTabProps> = ({
           subject_id: selectedSubjectId,
           subject_name: sub?.name || 'General',
           duration_seconds: effectiveDuration,
-          source_type: 'recorded',
-          file_format: 'wav',
-          file_size_bytes: finalBlob ? finalBlob.size : 2500000,
           audio_enhancement_applied: enhancementEnabled,
           waveform_peaks: peaksToSave,
           key_terms: tags,
-          is_favorite: false,
-          is_downloaded_offline: false
+          bookmarks: bookmarks.length > 0 ? bookmarks : undefined
         },
         finalBlob || undefined,
         { syncToDrive },
-        (progress) => {
-          setUploadProgress(progress);
-        }
+        (progress) => setUploadProgress(progress)
       );
 
       // Reset
@@ -368,6 +404,34 @@ export const RecordTab: React.FC<RecordTabProps> = ({
             </span>
           </div>
 
+          {/* Recording Mode Selector (Samsung Voice Recorder Inspiration) */}
+          {recordingState === 'idle' && (
+            <div className="flex items-center gap-1 p-1 bg-slate-100/90 rounded-2xl border border-slate-200 text-xs font-semibold">
+              <button
+                type="button"
+                onClick={() => setRecordingMode('standard')}
+                className={`py-1 px-3 rounded-xl transition-all cursor-pointer ${
+                  recordingMode === 'standard'
+                    ? 'bg-white text-slate-900 shadow-2xs font-bold'
+                    : 'text-slate-500 hover:text-slate-900'
+                }`}
+              >
+                Standard Voice
+              </button>
+              <button
+                type="button"
+                onClick={() => setRecordingMode('lecture')}
+                className={`py-1 px-3 rounded-xl transition-all cursor-pointer ${
+                  recordingMode === 'lecture'
+                    ? 'bg-white text-amber-800 shadow-2xs font-bold'
+                    : 'text-slate-500 hover:text-slate-900'
+                }`}
+              >
+                Focus / Lecture
+              </button>
+            </div>
+          )}
+
           {/* Large Digital Timer */}
           <div className="text-5xl font-black font-mono text-slate-950 tracking-tight">
             {formatDuration(recordedDuration)}
@@ -380,7 +444,9 @@ export const RecordTab: React.FC<RecordTabProps> = ({
                 key={idx}
                 className={`w-1.5 rounded-full transition-all duration-100 ${
                   recordingState === 'recording'
-                    ? 'bg-blue-600'
+                    ? recordingMode === 'lecture'
+                      ? 'bg-amber-500'
+                      : 'bg-blue-600'
                     : 'bg-slate-200'
                 }`}
                 style={{
@@ -401,20 +467,34 @@ export const RecordTab: React.FC<RecordTabProps> = ({
                 <Mic size={30} strokeWidth={2.4} />
               </button>
             ) : (
-              <button
-                onClick={handleStopRecording}
-                className="w-18 h-18 rounded-full bg-rose-600 hover:bg-rose-700 text-white flex items-center justify-center shadow-lg shadow-rose-600/30 active:scale-95 transition-all cursor-pointer"
-                aria-label="Stop and review recording"
-              >
-                <Square size={24} fill="currentColor" />
-              </button>
+              <div className="flex items-center gap-3">
+                {/* Bookmark Marker Button (Samsung Voice Recorder Style) */}
+                <button
+                  type="button"
+                  onClick={handleAddBookmark}
+                  className="px-3 py-2.5 rounded-2xl bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200/80 text-xs font-bold flex items-center gap-1.5 shadow-2xs active:scale-95 transition-all cursor-pointer"
+                  title="Place timeline marker"
+                  aria-label="Place timeline marker"
+                >
+                  <Bookmark size={15} />
+                  <span>Mark ({bookmarks.length})</span>
+                </button>
+
+                <button
+                  onClick={handleStopRecording}
+                  className="w-18 h-18 rounded-full bg-rose-600 hover:bg-rose-700 text-white flex items-center justify-center shadow-lg shadow-rose-600/30 active:scale-95 transition-all cursor-pointer"
+                  aria-label="Stop and review recording"
+                >
+                  <Square size={24} fill="currentColor" />
+                </button>
+              </div>
             )}
           </div>
 
           <p className="text-[11px] text-slate-500 text-center max-w-xs leading-relaxed">
             {recordingState === 'idle'
               ? 'Tap microphone to start recording. Saved to your sovereign Google Drive.'
-              : 'Speak clearly into the microphone. Tap red square to stop and trim.'}
+              : 'Speak clearly into the microphone. Tap Mark to bookmark key moments, red square to stop and trim.'}
           </p>
         </div>
       ) : (
@@ -442,6 +522,31 @@ export const RecordTab: React.FC<RecordTabProps> = ({
             initialEndSeconds={recordedDuration}
             onTrimChange={handleTrimChange}
           />
+
+          {/* Timeline Bookmarks Bar if any added */}
+          {bookmarks.length > 0 && (
+            <div className="bg-slate-50 border border-slate-200/80 rounded-2xl p-3 space-y-1.5 shadow-2xs">
+              <div className="flex items-center justify-between text-[11px] font-bold text-slate-700">
+                <span className="flex items-center gap-1.5">
+                  <Bookmark size={13} className="text-amber-600" />
+                  <span>Timeline Bookmarks ({bookmarks.length})</span>
+                </span>
+                <span className="text-[10px] text-slate-400 font-mono">Saved with note</span>
+              </div>
+              <div className="flex flex-wrap gap-1.5">
+                {bookmarks.map((bm) => (
+                  <span
+                    key={bm.id}
+                    className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-white border border-slate-200 text-xs font-mono font-medium text-slate-800 shadow-2xs"
+                  >
+                    <span className="text-amber-600 font-bold">{formatDuration(bm.timestampSeconds)}</span>
+                    <span className="text-slate-400">•</span>
+                    <span className="text-slate-600">{bm.label}</span>
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* 2. SUBJECT ASSIGNMENT (4 Clean Modern Cards) */}
           <div className="bg-white border border-slate-200/90 rounded-3xl p-4 shadow-2xs space-y-2.5">

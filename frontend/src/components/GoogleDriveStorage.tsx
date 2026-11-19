@@ -66,15 +66,12 @@ export const GoogleDriveStorage: React.FC<GoogleDriveStorageProps> = ({
   onConnectDrive,
   onDisconnectDrive,
   onSyncDrive,
-  onConnectWithToken,
+  onConnectWithToken: _onConnectWithToken,
   className
 }) => {
   const [quota, setQuota] = useState<GoogleDriveStorageQuota | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [chartView, setChartView] = useState<'donut' | 'bar'>('donut');
-  const [showManualTokenInput, setShowManualTokenInput] = useState(false);
-  const [manualToken, setManualToken] = useState('');
-  const [isSubmittingToken, setIsSubmittingToken] = useState(false);
 
   // Calculate actual Smriti audio notes size from client state
   const smritiAudioBytes = useMemo(() => {
@@ -227,51 +224,7 @@ export const GoogleDriveStorage: React.FC<GoogleDriveStorageProps> = ({
               <HardDrive size={15} className="text-blue-400" />
               <span>{isSyncingDrive ? 'Connecting...' : 'Connect Personal Google Drive'}</span>
             </Button>
-            {onConnectWithToken && (
-              <button
-                type="button"
-                onClick={() => setShowManualTokenInput(!showManualTokenInput)}
-                className="text-[11px] text-slate-400 hover:text-slate-700 font-medium transition-colors cursor-pointer"
-              >
-                {showManualTokenInput ? 'Cancel' : 'Connect with access token'}
-              </button>
-            )}
           </EmptyContent>
-
-          {showManualTokenInput && (
-            <div className="w-full max-w-xs mt-3 p-3 bg-slate-50 border border-slate-200/80 rounded-2xl space-y-2 text-left animate-in fade-in">
-              <label className="text-[10px] font-mono uppercase tracking-wider text-slate-500 font-bold block">
-                Google OAuth Access Token
-              </label>
-              <input
-                type="password"
-                value={manualToken}
-                onChange={(e) => setManualToken(e.target.value)}
-                placeholder="ya29.a0AfH6SM..."
-                className="w-full px-3 py-1.5 text-xs bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 text-slate-900"
-              />
-              <div className="flex justify-end gap-2 pt-1">
-                <Button
-                  size="sm"
-                  disabled={!manualToken.trim() || isSubmittingToken}
-                  onClick={async () => {
-                    if (!manualToken.trim()) return;
-                    setIsSubmittingToken(true);
-                    try {
-                      await onConnectWithToken?.(manualToken.trim());
-                      setManualToken('');
-                      setShowManualTokenInput(false);
-                    } finally {
-                      setIsSubmittingToken(false);
-                    }
-                  }}
-                  className="bg-blue-600 hover:bg-blue-500 text-white rounded-lg text-xs font-semibold"
-                >
-                  {isSubmittingToken ? 'Connecting...' : 'Connect Token'}
-                </Button>
-              </div>
-            </div>
-          )}
         </Empty>
       </div>
     );

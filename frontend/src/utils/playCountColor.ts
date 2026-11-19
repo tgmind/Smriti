@@ -96,3 +96,67 @@ export function formatPlayCountBadge(playCount: number = 0): string {
     : 0;
   return `${count}×`;
 }
+
+export interface VedicCategoryTheme {
+  category: 'mastered' | 'needs_revision' | 'learning' | 'new';
+  label: string;
+  labelDevanagari: string;
+  hex: string;
+  textColor: string;
+  bgColor: string;
+  borderColor: string;
+  badgeClass: string;
+}
+
+export function getVedicCategoryTheme(
+  category: 'mastered' | 'needs_revision' | 'learning' | 'new'
+): VedicCategoryTheme {
+  switch (category) {
+    case 'mastered':
+      return {
+        category: 'mastered',
+        label: 'Learned by Heart',
+        labelDevanagari: 'संस्मृत',
+        hex: '#166534',
+        textColor: 'text-green-800',
+        bgColor: 'bg-green-50',
+        borderColor: 'border-green-300',
+        badgeClass: 'text-green-800 bg-green-50 border-green-300'
+      };
+    case 'needs_revision':
+      return {
+        category: 'needs_revision',
+        label: 'Needs Revision',
+        labelDevanagari: 'पुनरावर्तन',
+        hex: '#EA580C',
+        textColor: 'text-orange-600',
+        bgColor: 'bg-orange-50',
+        borderColor: 'border-orange-300',
+        badgeClass: 'text-orange-600 bg-orange-50 border-orange-300'
+      };
+    case 'new':
+      return {
+        category: 'new',
+        label: 'Unheard',
+        labelDevanagari: 'नवीन',
+        hex: '#64748B',
+        textColor: 'text-slate-600',
+        bgColor: 'bg-slate-50',
+        borderColor: 'border-slate-300',
+        badgeClass: 'text-slate-600 bg-slate-50 border-slate-300'
+      };
+    case 'learning':
+    default:
+      return {
+        category: 'learning',
+        label: 'Currently Learning',
+        labelDevanagari: 'अभ्यासशील',
+        hex: '#CA8A04',
+        textColor: 'text-amber-700',
+        bgColor: 'bg-amber-50',
+        borderColor: 'border-amber-300',
+        badgeClass: 'text-amber-700 bg-amber-50 border-amber-300'
+      };
+  }
+}
+

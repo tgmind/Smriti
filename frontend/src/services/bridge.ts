@@ -232,8 +232,25 @@ class BridgeManager {
         this.emit('playbackLoading', { audioId: audio.id, status: 'downloading_from_drive' });
         const driveBlob = await googleDriveService.downloadAudio(audio.google_drive_file_id);
         if (driveBlob && driveBlob.size > 0) {
+          // Read user cache limit setting (or fallback to 500 MB)
+          let cacheLimitMb = 500;
+          try {
+            const raw = localStorage.getItem('smriti_settings');
+            if (raw) {
+              const parsed = JSON.parse(raw);
+              if (parsed.cache_limit_mb && Number.isFinite(parsed.cache_limit_mb)) {
+                cacheLimitMb = parsed.cache_limit_mb;
+              }
+            }
+          } catch {}
+
+          // Enforce smart LRU eviction before saving new blob
+          await audioStorage.enforceLRUEviction(cacheLimitMb, driveBlob.size);
+
           // Cache in IndexedDB for immediate offline access
-          await audioStorage.saveAudioBlob(audio.id, driveBlob);
+          await audioStorage.saveAudioBlob(audio.id, driveBlob, {
+            isPinned: Boolean(audio.is_downloaded_offline)
+          });
           const blobUrl = URL.createObjectURL(driveBlob);
           this.browserAudio.src = blobUrl;
           this.browserAudio.playbackRate = speed;
@@ -411,7 +428,10 @@ class BridgeManager {
 
   // RECORDING ACTIONS WITH REAL-TIME DSP NOISE SUPPRESSION //
 
-  public async startRecording(options: { enableNoiseSuppression?: boolean } = { enableNoiseSuppression: true }): Promise<boolean> {
+  public async startRecording(options: {
+    enableNoiseSuppression?: boolean;
+    recordingMode?: 'standard' | 'lecture';
+  } = { enableNoiseSuppression: true, recordingMode: 'standard' }): Promise<boolean> {
     if (this.isNativeApp() && window.SmritiBridge) {
       window.SmritiBridge.startRecording();
       return true;
@@ -439,30 +459,52 @@ class BridgeManager {
       if (options.enableNoiseSuppression !== false && this.audioContext.createMediaStreamDestination) {
         const destination = this.audioContext.createMediaStreamDestination();
 
-        // 2a. High-Pass Filter: Eliminates sub-85Hz microphone rumble & mechanical vibrations
+        // 2a. High-Pass Filter: Eliminates sub-85Hz (or 100Hz in lecture mode) rumble & vibrations
         const highPass = this.audioContext.createBiquadFilter();
         highPass.type = 'highpass';
-        highPass.frequency.setValueAtTime(85, this.audioContext.currentTime);
+        highPass.frequency.setValueAtTime(
+          options.recordingMode === 'lecture' ? 100 : 85,
+          this.audioContext.currentTime
+        );
         highPass.Q.setValueAtTime(0.7, this.audioContext.currentTime);
 
-        // 2b. Notch Filter: Eliminates 50Hz/60Hz AC electrical hum
+        // 2b. Twin Notch Filters: Eliminates 50Hz and 60Hz AC electrical hum
         const notch50 = this.audioContext.createBiquadFilter();
         notch50.type = 'notch';
         notch50.frequency.setValueAtTime(50, this.audioContext.currentTime);
         notch50.Q.setValueAtTime(4.0, this.audioContext.currentTime);
 
-        // 2c. Speech Dynamic Compressor: Level out speech and suppress background noise floor
+        const notch60 = this.audioContext.createBiquadFilter();
+        notch60.type = 'notch';
+        notch60.frequency.setValueAtTime(60, this.audioContext.currentTime);
+        notch60.Q.setValueAtTime(4.0, this.audioContext.currentTime);
+
+        // 2c. Gentle De-Esser / High-Shelf: Tames harsh sibilance at 9.5 kHz
+        const deEsser = this.audioContext.createBiquadFilter();
+        deEsser.type = 'highshelf';
+        deEsser.frequency.setValueAtTime(9500, this.audioContext.currentTime);
+        deEsser.gain.setValueAtTime(-3, this.audioContext.currentTime);
+
+        // 2d. Speech Dynamic Compressor: Level out speech and suppress background noise floor
         const compressor = this.audioContext.createDynamicsCompressor();
-        compressor.threshold.setValueAtTime(-24, this.audioContext.currentTime);
+        compressor.threshold.setValueAtTime(
+          options.recordingMode === 'lecture' ? -28 : -24,
+          this.audioContext.currentTime
+        );
         compressor.knee.setValueAtTime(12, this.audioContext.currentTime);
-        compressor.ratio.setValueAtTime(4, this.audioContext.currentTime);
+        compressor.ratio.setValueAtTime(
+          options.recordingMode === 'lecture' ? 4.5 : 3.5,
+          this.audioContext.currentTime
+        );
         compressor.attack.setValueAtTime(0.003, this.audioContext.currentTime);
         compressor.release.setValueAtTime(0.25, this.audioContext.currentTime);
 
-        // Connect chain: source -> highPass -> notch50 -> compressor -> destination
+        // Connect chain: source -> highPass -> notch50 -> notch60 -> deEsser -> compressor -> destination
         source.connect(highPass);
         highPass.connect(notch50);
-        notch50.connect(compressor);
+        notch50.connect(notch60);
+        notch60.connect(deEsser);
+        deEsser.connect(compressor);
         compressor.connect(destination);
 
         recordDestinationStream = destination.stream;

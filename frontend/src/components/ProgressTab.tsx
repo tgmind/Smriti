@@ -1,8 +1,8 @@
 import React, { useState, useMemo } from 'react';
-import { Play, BookOpen } from 'lucide-react';
+import { Play, BookOpen, RotateCcw } from 'lucide-react';
 import { AudioItem, DailyStudyStats, RevisionItem } from '../types';
 import { getPlayCountTheme, formatPlayCountBadge } from '../utils/playCountColor';
-import { formatDuration } from '../services/learningEngine';
+import { formatDuration, calculateMemoryStrength } from '../services/learningEngine';
 
 export interface ProgressTabProps {
   audioItems?: AudioItem[];
@@ -11,7 +11,12 @@ export interface ProgressTabProps {
   onPlayAudio?: (audio: AudioItem) => void;
 }
 
-export type MasteryFilter = 'most_played' | 'yet_to_learn' | 'in_memory' | 'learned';
+export type MasteryFilter =
+  | 'most_played'
+  | 'yet_to_learn'
+  | 'in_memory'
+  | 'learned'
+  | 'needs_revision';
 
 export const ProgressTab: React.FC<ProgressTabProps> = ({
   audioItems = [],
@@ -25,6 +30,7 @@ export const ProgressTab: React.FC<ProgressTabProps> = ({
     let tier2 = 0; // 20..49 (Building Memory)
     let tier3 = 0; // 50..70 (In Memory)
     let tier4 = 0; // > 70 (Learned by Heart)
+    let needsRevisionCount = 0;
 
     for (const item of audioItems) {
       const count = item.play_count || 0;
@@ -32,6 +38,11 @@ export const ProgressTab: React.FC<ProgressTabProps> = ({
       else if (count < 50) tier2++;
       else if (count <= 70) tier3++;
       else tier4++;
+
+      const mem = calculateMemoryStrength(count, item.last_played_at || item.last_listened_at);
+      if (mem.status === 'needs_revision') {
+        needsRevisionCount++;
+      }
     }
 
     return {
@@ -39,6 +50,7 @@ export const ProgressTab: React.FC<ProgressTabProps> = ({
       tier2, // 20..49 (Orange)
       tier3, // 50..70 (Yellow)
       tier4, // > 70 (Dark Green)
+      needsRevisionCount,
       total: audioItems.length
     };
   }, [audioItems]);
@@ -48,6 +60,18 @@ export const ProgressTab: React.FC<ProgressTabProps> = ({
     const list = [...audioItems];
 
     switch (activeFilter) {
+      case 'needs_revision':
+        return list
+          .filter((a) => {
+            const mem = calculateMemoryStrength(a.play_count || 0, a.last_played_at || a.last_listened_at);
+            return mem.status === 'needs_revision';
+          })
+          .sort((a, b) => {
+            const memA = calculateMemoryStrength(a.play_count || 0, a.last_played_at || a.last_listened_at);
+            const memB = calculateMemoryStrength(b.play_count || 0, b.last_played_at || b.last_listened_at);
+            return memA.score - memB.score; // Weakest memory first
+          });
+
       case 'yet_to_learn':
         // playCount < 50, sorted lowest-first so weak tracks surface immediately
         return list
@@ -78,14 +102,33 @@ export const ProgressTab: React.FC<ProgressTabProps> = ({
 
   return (
     <div className="space-y-4 pb-36 pt-3 px-4 max-w-md mx-auto animate-in">
-      {/* 1. Header */}
-      <div className="pt-1">
-        <h1 className="text-2xl font-bold text-slate-900 tracking-tight">
-          Study Progress
-        </h1>
-        <p className="text-xs text-slate-500 mt-0.5">
-          Verified play count analytics &amp; memorization mastery.
-        </p>
+      {/* 1. Header with Vedic Philosophy Accent */}
+      <div className="pt-1 flex items-start justify-between">
+        <div>
+          <div className="flex items-center gap-2">
+            <h1 className="text-2xl font-bold text-slate-900 tracking-tight">
+              Study Progress
+            </h1>
+            <span className="px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-700 font-serif text-[11px] font-semibold border border-amber-500/20">
+              स्मृति
+            </span>
+          </div>
+          <p className="text-xs text-slate-500 mt-0.5">
+            Verified play count analytics &amp; memorization mastery.
+          </p>
+        </div>
+
+        {/* Revision Due Alert Pill if applicable */}
+        {masteryCounts.needsRevisionCount > 0 && (
+          <button
+            onClick={() => setActiveFilter('needs_revision')}
+            className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-orange-50 border border-orange-200 text-orange-700 text-[11px] font-bold hover:bg-orange-100 transition-colors shadow-2xs cursor-pointer animate-pulse"
+            title="View notes that need revision"
+          >
+            <RotateCcw size={12} className="text-orange-600" />
+            <span>{masteryCounts.needsRevisionCount} Needs Review</span>
+          </button>
+        )}
       </div>
 
       {/* 2. Mastery Breakdown Summary Strip (4-Tier Overview) */}
@@ -104,7 +147,7 @@ export const ProgressTab: React.FC<ProgressTabProps> = ({
         >
           <div className="flex items-center justify-between">
             <span className="text-[10px] font-bold uppercase tracking-wider text-green-800">
-              Learned
+              Learned by Heart
             </span>
             <span className="size-2 rounded-full bg-green-700" />
           </div>
@@ -162,7 +205,7 @@ export const ProgressTab: React.FC<ProgressTabProps> = ({
         >
           <div className="flex items-center justify-between">
             <span className="text-[10px] font-bold uppercase tracking-wider text-orange-800">
-              Building
+              Building Memory
             </span>
             <span className="size-2 rounded-full bg-orange-500" />
           </div>
@@ -177,7 +220,7 @@ export const ProgressTab: React.FC<ProgressTabProps> = ({
           </span>
         </div>
 
-        {/* Tier 1: Yet to Learn (< 20) - Red */}
+        {/* Tier 1: Not Still Learned (< 20) - Red */}
         <div
           onClick={() => setActiveFilter('yet_to_learn')}
           className={`p-3 rounded-2xl border transition-all cursor-pointer shadow-2xs ${
@@ -187,11 +230,11 @@ export const ProgressTab: React.FC<ProgressTabProps> = ({
           }`}
           role="button"
           tabIndex={0}
-          aria-label="Filter Yet to Learn tracks"
+          aria-label="Filter Not Still Learned tracks"
         >
           <div className="flex items-center justify-between">
             <span className="text-[10px] font-bold uppercase tracking-wider text-red-800">
-              Yet to Learn
+              Not Still Learned
             </span>
             <span className="size-2 rounded-full bg-red-500" />
           </div>
@@ -212,7 +255,7 @@ export const ProgressTab: React.FC<ProgressTabProps> = ({
         <button
           type="button"
           onClick={() => setActiveFilter('most_played')}
-          className={`flex-1 min-w-[85px] py-1.5 px-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer text-center ${
+          className={`flex-1 min-w-[75px] py-1.5 px-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer text-center ${
             activeFilter === 'most_played'
               ? 'bg-white text-slate-900 shadow-2xs'
               : 'text-slate-500 hover:text-slate-900'
@@ -223,7 +266,7 @@ export const ProgressTab: React.FC<ProgressTabProps> = ({
         <button
           type="button"
           onClick={() => setActiveFilter('yet_to_learn')}
-          className={`flex-1 min-w-[85px] py-1.5 px-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer text-center ${
+          className={`flex-1 min-w-[75px] py-1.5 px-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer text-center ${
             activeFilter === 'yet_to_learn'
               ? 'bg-white text-slate-900 shadow-2xs'
               : 'text-slate-500 hover:text-slate-900'
@@ -234,7 +277,7 @@ export const ProgressTab: React.FC<ProgressTabProps> = ({
         <button
           type="button"
           onClick={() => setActiveFilter('in_memory')}
-          className={`flex-1 min-w-[85px] py-1.5 px-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer text-center ${
+          className={`flex-1 min-w-[75px] py-1.5 px-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer text-center ${
             activeFilter === 'in_memory'
               ? 'bg-white text-slate-900 shadow-2xs'
               : 'text-slate-500 hover:text-slate-900'
@@ -245,7 +288,7 @@ export const ProgressTab: React.FC<ProgressTabProps> = ({
         <button
           type="button"
           onClick={() => setActiveFilter('learned')}
-          className={`flex-1 min-w-[85px] py-1.5 px-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer text-center ${
+          className={`flex-1 min-w-[75px] py-1.5 px-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer text-center ${
             activeFilter === 'learned'
               ? 'bg-white text-slate-900 shadow-2xs'
               : 'text-slate-500 hover:text-slate-900'
@@ -253,6 +296,19 @@ export const ProgressTab: React.FC<ProgressTabProps> = ({
         >
           Learned
         </button>
+        {masteryCounts.needsRevisionCount > 0 && (
+          <button
+            type="button"
+            onClick={() => setActiveFilter('needs_revision')}
+            className={`flex-1 min-w-[80px] py-1.5 px-2 rounded-xl text-xs font-bold transition-all cursor-pointer text-center ${
+              activeFilter === 'needs_revision'
+                ? 'bg-orange-500 text-white shadow-2xs'
+                : 'text-orange-600 hover:text-orange-900'
+            }`}
+          >
+            Revision
+          </button>
+        )}
       </div>
 
       {/* 4. Minimalist Track Analytics Rows (With Direct Practice Tap) */}
@@ -268,6 +324,8 @@ export const ProgressTab: React.FC<ProgressTabProps> = ({
                 ? 'Keep listening to your audio notes! Complete 71+ genuine listens to master tracks by heart.'
                 : activeFilter === 'in_memory'
                 ? 'Tracks reach this stage when played between 50 and 70 times.'
+                : activeFilter === 'needs_revision'
+                ? 'All tracks are currently fresh in memory! Excellent consistency.'
                 : 'Upload or record study notes to begin your memorization journey.'}
             </p>
           </div>
@@ -275,6 +333,10 @@ export const ProgressTab: React.FC<ProgressTabProps> = ({
           displayedTracks.map((track, idx) => {
             const count = track.play_count || 0;
             const theme = getPlayCountTheme(count);
+            const mem = calculateMemoryStrength(
+              count,
+              track.last_played_at || track.last_listened_at
+            );
 
             return (
               <div
@@ -308,6 +370,14 @@ export const ProgressTab: React.FC<ProgressTabProps> = ({
                         <span>{track.subject_name || 'General'}</span>
                         <span className="text-slate-300">•</span>
                         <span className="tabular-nums">{formatDuration(track.duration_seconds)}</span>
+                        {mem.daysSinceLastPlay > 0 && (
+                          <>
+                            <span className="text-slate-300">•</span>
+                            <span className="text-[10px] text-slate-400">
+                              {mem.daysSinceLastPlay}d ago
+                            </span>
+                          </>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -339,15 +409,31 @@ export const ProgressTab: React.FC<ProgressTabProps> = ({
                   </div>
                 </div>
 
-                {/* Bottom: Subtle Horizontal Mastery Progress Bar */}
-                <div className="w-full bg-slate-100 rounded-full h-1.5 overflow-hidden">
-                  <div
-                    className="h-full rounded-full transition-all duration-300"
-                    style={{
-                      width: `${theme.progressPercent}%`,
-                      backgroundColor: theme.hex
-                    }}
-                  />
+                {/* Bottom: Subtle Horizontal Mastery Progress Bar + Vedic Stage Tag */}
+                <div className="space-y-1">
+                  <div className="w-full bg-slate-100 rounded-full h-1.5 overflow-hidden">
+                    <div
+                      className="h-full rounded-full transition-all duration-300"
+                      style={{
+                        width: `${mem.score}%`,
+                        backgroundColor:
+                          mem.status === 'needs_revision'
+                            ? '#ea580c'
+                            : mem.status === 'mastered'
+                            ? '#166534'
+                            : theme.hex
+                      }}
+                    />
+                  </div>
+
+                  <div className="flex items-center justify-between text-[10px] text-slate-400 font-medium pt-0.5">
+                    <span className="font-serif italic text-amber-700/80">
+                      {mem.stageDevanagari} ({mem.stageName.split(' ')[0]})
+                    </span>
+                    <span className="tabular-nums font-mono text-[10px]">
+                      {mem.score}% strength
+                    </span>
+                  </div>
                 </div>
               </div>
             );

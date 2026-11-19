@@ -32,12 +32,19 @@ import { BackgroundSyncBanner, ActiveSyncTask } from './components/BackgroundSyn
 import { SyncToastState } from './components/SyncStatusToast';
 import { ToastContainer } from './components/ui/ToastContainer';
 import { toastService, ToastSection } from './services/toastService';
+import { AuthScreen } from './components/AuthScreen';
 
 export const App: React.FC = () => {
   const [currentTab, setCurrentTab] = useState<TabType>('library');
+  const [isGuestMode, setIsGuestMode] = useState<boolean>(() => {
+    if (typeof window === 'undefined') return false;
+    return localStorage.getItem('smriti_guest_mode') === 'true';
+  });
+
   const [audioItems, setAudioItems] = useState<AudioItem[]>(() => {
-    // If Google Drive is not connected, enforce strict privacy: 0 audio notes displayed
-    if (!googleDriveService.isConnected()) {
+    const isGuest = typeof window !== 'undefined' && localStorage.getItem('smriti_guest_mode') === 'true';
+    // If Google Drive is not connected AND guest mode is not active, enforce strict privacy: 0 audio notes displayed
+    if (!googleDriveService.isConnected() && !isGuest) {
       return [];
     }
     const saved = localStorage.getItem('smriti_audio_items');
@@ -117,6 +124,26 @@ export const App: React.FC = () => {
     const saved = localStorage.getItem('smriti_settings');
     return saved ? JSON.parse(saved) : DEFAULT_USER_SETTINGS;
   });
+
+  // Auto-tune local cache limit on initial app mount by analyzing device hardware capacity
+  useEffect(() => {
+    audioStorage.estimateDeviceCapacity().then(estimate => {
+      if (estimate?.optimalCacheLimitMB) {
+        setUserSettings(prev => {
+          if (!localStorage.getItem('smriti_settings')) {
+            const updated: UserSettings = { ...prev, cache_limit_mb: estimate.optimalCacheLimitMB || 500 };
+            try {
+              localStorage.setItem('smriti_settings', JSON.stringify(updated));
+            } catch {}
+            return updated;
+          }
+          return prev;
+        });
+      }
+    }).catch(err => {
+      console.warn('[App] Device cache capacity estimate note:', err);
+    });
+  }, []);
 
   const [storageInfo, setStorageInfo] = useState<StorageOverview>(() => bridge.getStorageInfo());
   const [isDriveConnected, setIsDriveConnected] = useState<boolean>(() => googleDriveService.isConnected());
@@ -894,7 +921,7 @@ export const App: React.FC = () => {
       });
 
       try {
-        await audioStorage.saveAudioBlob(newId, fileBlob);
+        await audioStorage.saveAudioBlob(newId, fileBlob, { isPinned: true });
         newItem.file_url = URL.createObjectURL(fileBlob);
         onProgress?.({
           stage: 'local_save',
@@ -1021,6 +1048,10 @@ export const App: React.FC = () => {
       setIsSyncingDrive(true);
       await googleDriveService.authorize();
       setIsDriveConnected(true);
+      setIsGuestMode(false);
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem('smriti_guest_mode');
+      }
 
       // Fetch cloud catalog and recordings for this specific connected account
       const driveData = await googleDriveService.fetchDriveData(subjects);
@@ -1269,6 +1300,10 @@ export const App: React.FC = () => {
         { id: 'general', name: 'General', icon_name: 'BookOpen', color_hex: '#38bdf8', description: 'General study & lecture notes', sort_order: 1 }
       ]);
       setIsDriveConnected(false);
+      setIsGuestMode(false);
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem('smriti_guest_mode');
+      }
 
       const info = await bridge.getStorageInfoAsync();
       setStorageInfo(info);
@@ -1359,7 +1394,8 @@ export const App: React.FC = () => {
       if (audio.google_drive_file_id && googleDriveService.isConnected()) {
         const blob = await googleDriveService.downloadAudio(audio.google_drive_file_id, audio.title);
         if (blob) {
-          await audioStorage.saveAudioBlob(audio.id, blob);
+          await audioStorage.enforceLRUEviction(userSettings.cache_limit_mb || 500, blob.size);
+          await audioStorage.saveAudioBlob(audio.id, blob, { isPinned: true });
           setAudioItems(prev =>
             prev.map(item => (item.id === audio.id ? { ...item, is_downloaded_offline: true } : item))
           );
@@ -1972,6 +2008,40 @@ export const App: React.FC = () => {
     };
   }, [handleGlobalBackPress]);
 
+  // Vedic Welcome & Google Drive Onboarding Gateway
+  if (!isDriveConnected && !isGuestMode) {
+    return (
+      <AuthScreen
+        onAuthenticated={() => {
+          setIsDriveConnected(true);
+          setIsGuestMode(false);
+          if (typeof window !== 'undefined') {
+            localStorage.removeItem('smriti_guest_mode');
+          }
+          handleSyncDrive().catch(() => {});
+        }}
+        onExploreGuest={() => {
+          setIsGuestMode(true);
+          if (typeof window !== 'undefined') {
+            localStorage.setItem('smriti_guest_mode', 'true');
+          }
+          try {
+            const saved = localStorage.getItem('smriti_audio_items');
+            if (saved) {
+              const parsed: AudioItem[] = JSON.parse(saved);
+              const demoIds = new Set(['aud-1', 'aud-2', 'aud-3', 'aud-4']);
+              setAudioItems(
+                parsed
+                  .filter(item => !demoIds.has(item.id))
+                  .map(item => playCountService.mergeAudioItem(item))
+              );
+            }
+          } catch {}
+        }}
+      />
+    );
+  }
+
   return (
     <div className="min-h-screen bg-[#F8F9FD] text-slate-900 flex flex-col font-sans select-none">
       {/* Sleek, Non-Blocking Background Sync Banner with animated progress */}
@@ -1980,6 +2050,31 @@ export const App: React.FC = () => {
         onDismissTask={dismissSyncTask}
         onRetryTask={handleRetryTask}
       />
+
+      {/* Sleek Guest Mode Offline Indicator Banner */}
+      {!isDriveConnected && isGuestMode && (
+        <div className="w-full max-w-md mx-auto px-4 pt-2.5 pb-1">
+          <div className="flex items-center justify-between gap-2.5 px-3.5 py-2 rounded-2xl bg-amber-500/10 border border-amber-500/25 text-amber-900 text-xs shadow-xs backdrop-blur-xs">
+            <div className="flex items-center gap-2 min-w-0">
+              <span className="size-2 rounded-full bg-amber-500 animate-pulse shrink-0" />
+              <div className="min-w-0">
+                <p className="font-semibold text-slate-800 text-[11px] leading-tight truncate">
+                  अतिथि • Offline Guest Mode
+                </p>
+                <p className="text-[10px] text-slate-500 leading-tight truncate">
+                  Audio saved on device. Connect Google Drive for cloud backup.
+                </p>
+              </div>
+            </div>
+            <button
+              onClick={handleConnectDrive}
+              className="px-2.5 py-1 rounded-xl bg-gradient-to-r from-amber-600 to-amber-700 hover:from-amber-700 hover:to-amber-800 text-white font-medium text-[11px] shrink-0 transition-all shadow-xs active:scale-95 cursor-pointer"
+            >
+              Sign In
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Unified High-Contrast Obsidian Dark Notification System */}
       <ToastContainer

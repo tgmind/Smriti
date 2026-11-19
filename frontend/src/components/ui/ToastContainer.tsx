@@ -7,13 +7,15 @@ import {
   Cloud,
   AlertCircle,
   Info,
-  X
+  X,
+  Check
 } from 'lucide-react';
 import { toastService, ToastItem, ToastSection } from '../../services/toastService';
 
 export interface ToastContainerProps {
   hasMiniPlayer?: boolean;
   isFullScreenPlayerOpen?: boolean;
+  position?: 'top' | 'bottom';
   className?: string;
 }
 
@@ -21,6 +23,8 @@ interface SectionStyleConfig {
   button: string;
   iconText: string;
   badge: string;
+  circleBg: string;
+  circleGlyph?: React.ReactNode;
   defaultIcon: React.ReactNode;
 }
 
@@ -29,42 +33,54 @@ const SECTION_CONFIGS: Record<ToastSection, SectionStyleConfig> = {
     button: 'bg-indigo-500 hover:bg-indigo-400 text-white',
     iconText: 'text-indigo-400',
     badge: 'bg-indigo-500/15 border border-indigo-500/20 text-indigo-400',
+    circleBg: 'bg-indigo-500 text-white',
     defaultIcon: <Folder size={15} />
   },
   record: {
     button: 'bg-amber-500 hover:bg-amber-400 text-slate-950',
     iconText: 'text-amber-400',
     badge: 'bg-amber-500/15 border border-amber-500/20 text-amber-400',
+    circleBg: 'bg-amber-500 text-slate-950',
+    circleGlyph: <span className="font-black text-slate-950 text-[11px] leading-none select-none">!</span>,
     defaultIcon: <Mic size={15} />
   },
   downloads: {
     button: 'bg-emerald-500 hover:bg-emerald-400 text-slate-950',
     iconText: 'text-emerald-400',
     badge: 'bg-emerald-500/15 border border-emerald-500/20 text-emerald-400',
+    circleBg: 'bg-emerald-500 text-white',
+    circleGlyph: <Check size={12} className="text-white stroke-[3] select-none" />,
     defaultIcon: <Wifi size={15} />
   },
   progress: {
     button: 'bg-violet-500 hover:bg-violet-400 text-white',
     iconText: 'text-violet-400',
     badge: 'bg-violet-500/15 border border-violet-500/20 text-violet-400',
+    circleBg: 'bg-violet-500 text-white',
     defaultIcon: <Sparkles size={15} />
   },
   drive: {
     button: 'bg-sky-500 hover:bg-sky-400 text-slate-950',
     iconText: 'text-sky-400',
     badge: 'bg-sky-500/15 border border-sky-500/20 text-sky-400',
+    circleBg: 'bg-sky-500 text-white',
+    circleGlyph: <span className="font-bold text-white text-[12px] font-serif italic select-none">i</span>,
     defaultIcon: <Cloud size={15} />
   },
   danger: {
     button: 'bg-rose-500 hover:bg-rose-400 text-white',
     iconText: 'text-rose-400',
     badge: 'bg-rose-500/15 border border-rose-500/20 text-rose-400',
+    circleBg: 'bg-rose-500 text-white',
+    circleGlyph: <span className="font-black text-white text-[12px] leading-none select-none">!</span>,
     defaultIcon: <AlertCircle size={15} />
   },
   neutral: {
     button: 'bg-white/15 hover:bg-white/25 text-white',
     iconText: 'text-slate-300',
     badge: 'bg-white/10 border border-white/10 text-slate-300',
+    circleBg: 'bg-sky-500 text-white',
+    circleGlyph: <span className="font-bold text-white text-[12px] font-serif italic select-none">i</span>,
     defaultIcon: <Info size={15} />
   }
 };
@@ -72,6 +88,7 @@ const SECTION_CONFIGS: Record<ToastSection, SectionStyleConfig> = {
 export const ToastContainer: React.FC<ToastContainerProps> = ({
   hasMiniPlayer = false,
   isFullScreenPlayerOpen = false,
+  position,
   className = ''
 }) => {
   const [toast, setToast] = useState<ToastItem | null>(() => toastService.getCurrentToast());
@@ -90,7 +107,9 @@ export const ToastContainer: React.FC<ToastContainerProps> = ({
   const isMicroPill = !toast.description && !toast.action;
 
   // Viewport Positioning & Safe Clearance
-  const positionClasses = isFullScreenPlayerOpen
+  const positionClasses = position === 'top'
+    ? 'top-5 sm:top-6 safe-top animate-in fade-in slide-in-from-top-2'
+    : isFullScreenPlayerOpen
     ? 'top-5 safe-top animate-in fade-in slide-in-from-top-2'
     : hasMiniPlayer
     ? 'bottom-40 sm:bottom-44 safe-bottom animate-in fade-in slide-in-from-bottom-2'
@@ -158,8 +177,8 @@ export const ToastContainer: React.FC<ToastContainerProps> = ({
           {/* Leading Icon / Badge */}
           {showLeadingIcon && (
             isMicroPill ? (
-              <span className={`shrink-0 flex items-center justify-center ${config.iconText}`}>
-                {leadingIcon}
+              <span className={`shrink-0 flex items-center justify-center size-6 rounded-full ${config.circleBg} shadow-xs ${config.iconText}`}>
+                {config.circleGlyph || leadingIcon}
               </span>
             ) : (
               <div

@@ -22,6 +22,8 @@ export interface AudioItem {
   is_downloaded_offline?: boolean;
   play_count?: number;
   last_listened_at?: string;
+  last_played_at?: string;
+  bookmarks?: Array<{ id: string; timestampSeconds: number; label: string }>;
   created_at: string;
 }
 
