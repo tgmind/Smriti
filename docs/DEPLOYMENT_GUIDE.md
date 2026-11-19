@@ -93,3 +93,18 @@ $ANDROID_HOME/build-tools/34.0.0/apksigner sign \
 ```bash
 $ANDROID_HOME/build-tools/34.0.0/apksigner verify app-release-signed.apk
 ```
+
+---
+
+## 4. Two-Repository Closed-Source Architecture (Cross-Repo Releases)
+
+SMRITI utilizes an automated two-repository distribution topology:
+1. **Private Core (`tgmind/Smriti`)**: Contains all source code, tests, and CI/CD pipelines.
+2. **Public Releases Mirror (`tgmind/Smriti-Releases`)**: Contains exclusively binary assets (APKs), release notes, and SHA-256 checksums.
+
+### Automated Cross-Repo Publishing
+The `.github/workflows/release.yml` workflow triggers automatically on version tag pushes (`v*`):
+- Builds production web assets and native Android binaries (`app-debug.apk` and `app-release-unsigned.apk`).
+- Generates `checksums.sha256`.
+- Publishes the release and assets directly to `tgmind/Smriti-Releases` using `softprops/action-gh-release@v2` powered by the `RELEASES_PAT` secret.
+- **Single-Record Workflow**: Developers only ever tag the private repository (`git tag v1.x.x && git push origin v1.x.x`). The public repository is updated automatically with zero manual steps.

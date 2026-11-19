@@ -84,5 +84,15 @@ $$EF' = \max\left(1.3, EF + (0.1 - (3 - q) \times (0.08 + (3 - q) \times 0.02))\
 
 ---
 
-## 5. License
+## 5. Two-Repository Closed-Source Distribution Architecture
+
+SMRITI utilizes an automated dual-repository distribution topology:
+- **Private Source Repository (`tgmind/Smriti`):** Hosts the complete proprietary source code, internal CI/CD orchestration, and developer workflows.
+- **Public Releases Repository (`tgmind/Smriti-Releases`):** Serves as the public-facing distribution mirror hosting compiled binaries (Android APKs), release changelogs, and SHA-256 integrity checksums with zero source exposure.
+
+👉 **[Download Latest APKs & Releases](https://github.com/tgmind/Smriti-Releases/releases/latest)**
+
+---
+
+## 6. License
 Open source under Apache 2.0 / MIT.

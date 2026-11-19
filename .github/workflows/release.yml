@@ -1,0 +1,108 @@
+name: Build & Publish Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      tag_name:
+        description: 'Tag to release (e.g. v1.2.0)'
+        required: false
+        default: ''
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-and-release:
+    name: Build & Publish Cross-Repo Release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'npm'
+          cache-dependency-path: frontend/package.json
+
+      - name: Install Frontend Dependencies
+        run: cd frontend && npm ci
+
+      - name: Run Test Suite
+        run: cd frontend && npm test
+        env:
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL || 'https://wppnfezoqpcgmowdkofp.supabase.co' }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY || 'sb_publishable_Jv7t8irT0s7wTNheRXMUpQ_SrNOB-0n' }}
+          VITE_GOOGLE_CLIENT_ID: ${{ secrets.VITE_GOOGLE_CLIENT_ID || '964954219665-jf8pdaq8n3aejm2hf45p68nmcmc710mb.apps.googleusercontent.com' }}
+
+      - name: Build Web Production Assets
+        run: cd frontend && npm run build
+        env:
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL || 'https://wppnfezoqpcgmowdkofp.supabase.co' }}
+          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY || 'sb_publishable_Jv7t8irT0s7wTNheRXMUpQ_SrNOB-0n' }}
+          VITE_GOOGLE_CLIENT_ID: ${{ secrets.VITE_GOOGLE_CLIENT_ID || '964954219665-jf8pdaq8n3aejm2hf45p68nmcmc710mb.apps.googleusercontent.com' }}
+
+      - name: Setup Java JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '21'
+
+      - name: Setup Gradle Cache
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Make Gradlew Executable
+        run: chmod +x android/gradlew
+
+      - name: Build Android APKs (Debug & Release)
+        run: |
+          cd android
+          ./gradlew assembleDebug assembleRelease --no-daemon
+
+      - name: Package Artifacts & Generate Checksums
+        id: checksums
+        run: |
+          mkdir -p artifacts
+          cp android/app/build/outputs/apk/debug/app-debug.apk artifacts/
+          cp android/app/build/outputs/apk/release/app-release-unsigned.apk artifacts/
+          cd artifacts
+          sha256sum app-debug.apk app-release-unsigned.apk > checksums.sha256
+          echo "Generated SHA-256 Checksums:"
+          cat checksums.sha256
+
+      - name: Determine Release Tag & Version
+        id: vars
+        run: |
+          if [ -n "${{ github.event.inputs.tag_name }}" ]; then
+            TAG="${{ github.event.inputs.tag_name }}"
+          else
+            TAG="${{ github.ref_name }}"
+          fi
+          VERSION="${TAG#v}"
+          echo "TAG=$TAG" >> $GITHUB_ENV
+          echo "VERSION=$VERSION" >> $GITHUB_ENV
+          echo "tag=$TAG" >> $GITHUB_OUTPUT
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+      - name: Publish to Public Releases Repository (Cross-Repo)
+        uses: softprops/action-gh-release@v2
+        with:
+          repository: tgmind/Smriti-Releases
+          token: ${{ secrets.RELEASES_PAT || secrets.GITHUB_TOKEN }}
+          tag_name: ${{ env.TAG }}
+          name: "SMRITI v${{ env.VERSION }}"
+          generate_release_notes: true
+          files: |
+            artifacts/app-debug.apk
+            artifacts/app-release-unsigned.apk
+            artifacts/checksums.sha256
