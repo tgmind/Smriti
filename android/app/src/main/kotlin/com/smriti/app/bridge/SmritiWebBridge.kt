@@ -341,27 +341,39 @@ class SmritiWebBridge(
     @JavascriptInterface
     fun getStorageInformation(): String {
         val cacheSize = getFolderSize(context.cacheDir)
-        val filesSize = getFolderSize(context.filesDir)
-        val dbSize = File(context.getDatabasePath("smriti_operational.db").path).length()
+        var audioFilesSize = 0L
+        context.filesDir.listFiles()?.forEach { file ->
+            val name = file.name.lowercase()
+            if (name.endsWith(".m4a") || name.endsWith(".mp3") || name.endsWith(".wav") || name.startsWith("rec_")) {
+                audioFilesSize += file.length()
+            }
+        }
+        val dbFile = File(context.getDatabasePath("smriti_operational.db").path)
+        val dbSize = if (dbFile.exists()) dbFile.length() else 0L
 
         return JSONObject().apply {
             put("cachedAudioBytes", cacheSize)
-            put("explicitDownloadsBytes", filesSize)
-            put("metadataDbBytes", Math.max(dbSize, 1024 * 1024))
+            put("explicitDownloadsBytes", audioFilesSize)
+            put("metadataDbBytes", dbSize)
             put("pendingSyncCount", 0)
-            put("googleDriveUsedBytes", 2147483648L) // 2 GB
+            put("googleDriveUsedBytes", 0L)
         }.toString()
     }
 
     @JavascriptInterface
     fun clearTemporaryCache() {
-        scope.launch {
+        mainHandler.post {
             try {
-                context.cacheDir.deleteRecursively()
-                context.cacheDir.mkdirs()
+                webView.clearCache(true)
             } catch (e: Exception) {
                 e.printStackTrace()
             }
+        }
+        try {
+            context.cacheDir.deleteRecursively()
+            context.cacheDir.mkdirs()
+        } catch (e: Exception) {
+            e.printStackTrace()
         }
     }
 
@@ -372,32 +384,37 @@ class SmritiWebBridge(
                 val player = SmritiMediaPlaybackService.activePlayerInstance
                 player?.stop()
                 player?.clearMediaItems()
+                webView.clearCache(true)
                 sendEventToJs("playbackStateChanged", JSONObject().put("isPlaying", false).toString())
             } catch (e: Exception) {
                 e.printStackTrace()
             }
         }
-        scope.launch {
-            try {
-                // 1. Wipe Room database tables completely
-                db.audioDao().clearAllAudio()
-                db.playbackEventDao().clearAllEvents()
-                db.revisionDao().clearAllRevisions()
-
-                // 2. Clear cache dir
-                context.cacheDir.deleteRecursively()
-                context.cacheDir.mkdirs()
-
-                // 3. Clear audio files and recordings in filesDir
-                context.filesDir.listFiles()?.forEach { file ->
-                    val name = file.name.lowercase()
-                    if (name.endsWith(".m4a") || name.endsWith(".mp3") || name.endsWith(".wav") || name.startsWith("rec_")) {
-                        file.delete()
-                    }
+        try {
+            // 1. Wipe Room database tables completely
+            scope.launch {
+                try {
+                    db.audioDao().clearAllAudio()
+                    db.playbackEventDao().clearAllEvents()
+                    db.revisionDao().clearAllRevisions()
+                } catch (e: Exception) {
+                    e.printStackTrace()
                 }
-            } catch (e: Exception) {
-                e.printStackTrace()
             }
+
+            // 2. Clear cache dir
+            context.cacheDir.deleteRecursively()
+            context.cacheDir.mkdirs()
+
+            // 3. Clear audio files and recordings in filesDir
+            context.filesDir.listFiles()?.forEach { file ->
+                val name = file.name.lowercase()
+                if (name.endsWith(".m4a") || name.endsWith(".mp3") || name.endsWith(".wav") || name.startsWith("rec_")) {
+                    file.delete()
+                }
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
         }
     }
 

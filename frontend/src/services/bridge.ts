@@ -49,6 +49,13 @@ class BridgeManager {
   private isSpeakingSpeech: boolean = false;
   private speechPositionSeconds: number = 0;
   private speechInterval: any = null;
+  private cachedStorageInfo: StorageOverview = {
+    cachedAudioBytes: 0,
+    explicitDownloadsBytes: 0,
+    metadataDbBytes: 0,
+    pendingSyncCount: 0,
+    googleDriveUsedBytes: 0
+  };
 
   constructor() {
     this.initNativeListener();
@@ -587,55 +594,87 @@ class BridgeManager {
     if (this.isNativeApp() && window.SmritiBridge) {
       try {
         const info = JSON.parse(window.SmritiBridge.getStorageInformation());
+        this.cachedStorageInfo = info;
         return info;
       } catch (e) {
         console.error('Failed reading native storage info', e);
       }
     }
 
-    let indexedDbBytes = 0;
+    let cachedAudioBytes = 0;
+    let explicitDownloadsBytes = 0;
+
     try {
-      indexedDbBytes = await audioStorage.getTotalStorageBytes();
+      const breakdown = await audioStorage.getStorageBreakdown();
+      cachedAudioBytes = breakdown.cachedAudioBytes;
+      explicitDownloadsBytes = breakdown.explicitDownloadsBytes;
     } catch (e) {
       // ignore
     }
 
-    return {
-      cachedAudioBytes: Math.max(12 * 1024 * 1024, indexedDbBytes),
-      explicitDownloadsBytes: indexedDbBytes,
-      metadataDbBytes: 2.1 * 1024 * 1024,
+    let metadataDbBytes = 0;
+    try {
+      if (typeof window !== 'undefined' && window.localStorage) {
+        for (let i = 0; i < localStorage.length; i++) {
+          const k = localStorage.key(i);
+          if (k && k.startsWith('smriti')) {
+            const v = localStorage.getItem(k) || '';
+            metadataDbBytes += (k.length + v.length) * 2;
+          }
+        }
+      }
+    } catch {}
+
+    const info: StorageOverview = {
+      cachedAudioBytes,
+      explicitDownloadsBytes,
+      metadataDbBytes,
       pendingSyncCount: 0,
-      googleDriveUsedBytes: 1024 * 1024 * 1024
+      googleDriveUsedBytes: 0
     };
+
+    this.cachedStorageInfo = info;
+    return info;
   }
 
   public getStorageInfo(): StorageOverview {
     if (this.isNativeApp() && window.SmritiBridge) {
       try {
-        return JSON.parse(window.SmritiBridge.getStorageInformation());
+        const info = JSON.parse(window.SmritiBridge.getStorageInformation());
+        this.cachedStorageInfo = info;
+        return info;
       } catch (e) {
         // fallback
       }
     }
-    return {
-      cachedAudioBytes: 24 * 1024 * 1024,
-      explicitDownloadsBytes: 8 * 1024 * 1024,
-      metadataDbBytes: 2.1 * 1024 * 1024,
-      pendingSyncCount: 0,
-      googleDriveUsedBytes: 1024 * 1024 * 1024
-    };
+    return this.cachedStorageInfo;
   }
 
-  public clearTemporaryCache() {
-    if (this.isNativeApp() && window.SmritiBridge) {
-      window.SmritiBridge.clearTemporaryCache();
+  public async clearTemporaryCache(): Promise<void> {
+    if (this.isNativeApp() && window.SmritiBridge?.clearTemporaryCache) {
+      try {
+        window.SmritiBridge.clearTemporaryCache();
+      } catch (e) {
+        console.warn('Native clearTemporaryCache error', e);
+      }
     }
+
+    try {
+      await audioStorage.clearStreamingCache(true);
+    } catch (e) {
+      console.warn('audioStorage.clearStreamingCache error', e);
+    }
+
+    this.cachedStorageInfo = {
+      ...this.cachedStorageInfo,
+      cachedAudioBytes: 0
+    };
   }
 
   /**
    * Safely and comprehensively purges all local cache, downloaded files,
    * IndexedDB blobs, and Room database records across native Android and Web apps.
-   * Invoked upon Google Drive disconnection to protect user privacy.
+   * Invoked upon Google Drive disconnection or user empty slate reset to protect user privacy.
    */
   public async purgeAllLocalData(): Promise<void> {
     // 1. Native Android purge
@@ -665,6 +704,25 @@ class BridgeManager {
     } catch (e) {
       console.warn('IndexedDB clearAllAudioBlobs error', e);
     }
+
+    // 4. Purge browser CacheStorage API if available
+    if (typeof window !== 'undefined' && 'caches' in window) {
+      try {
+        const cacheKeys = await window.caches.keys();
+        await Promise.all(cacheKeys.map(key => window.caches.delete(key)));
+      } catch (e) {
+        console.warn('Browser Cache API purge error', e);
+      }
+    }
+
+    // 5. Reset cached storage info
+    this.cachedStorageInfo = {
+      cachedAudioBytes: 0,
+      explicitDownloadsBytes: 0,
+      metadataDbBytes: 0,
+      pendingSyncCount: 0,
+      googleDriveUsedBytes: 0
+    };
   }
 
   public async downloadForOffline(audio: AudioItem) {

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   Trash2,
   FileSpreadsheet,
@@ -12,7 +12,10 @@ import {
   Wifi,
   Signal,
   PauseCircle,
-  CloudOff
+  CloudOff,
+  ArrowLeft,
+  HardDrive,
+  RefreshCw
 } from 'lucide-react';
 import { UserSettings, StorageOverview, AudioItem, RevisionItem, DailyStudyStats } from '../types';
 import { exportDataAsJSON, exportDataAsCSV } from '../services/supabase';
@@ -21,6 +24,7 @@ import { toastService } from '../services/toastService';
 import { GoogleDriveStorage } from './GoogleDriveStorage';
 import { googleDriveService } from '../services/googleDrive';
 import { useDriveSyncPolicy } from '../hooks/useDriveSyncPolicy';
+import { ModalPortal } from './ui/modal-portal';
 
 interface ProfileTabProps {
   userSettings: UserSettings;
@@ -29,13 +33,15 @@ interface ProfileTabProps {
   revisionItems: RevisionItem[];
   dailyStats: DailyStudyStats[];
   isDriveConnected: boolean;
+  isGuestMode?: boolean;
   isSyncingDrive?: boolean;
   onUpdateSettings: (settings: Partial<UserSettings>) => void;
   onConnectDrive: () => void;
   onDisconnectDrive: () => void;
+  onExitGuestMode?: () => void;
   onSyncDrive?: () => void;
   onConnectWithToken?: (token: string) => Promise<void>;
-  onClearCache: () => void;
+  onClearCache: (emptySlate?: boolean) => Promise<void> | void;
 }
 
 export const ProfileTab: React.FC<ProfileTabProps> = ({
@@ -45,10 +51,12 @@ export const ProfileTab: React.FC<ProfileTabProps> = ({
   revisionItems,
   dailyStats,
   isDriveConnected,
+  isGuestMode = false,
   isSyncingDrive = false,
   onUpdateSettings,
   onConnectDrive,
   onDisconnectDrive,
+  onExitGuestMode,
   onSyncDrive,
   onConnectWithToken,
   onClearCache
@@ -61,14 +69,14 @@ export const ProfileTab: React.FC<ProfileTabProps> = ({
     enableMobileDataForSession,
   } = useDriveSyncPolicy();
 
+  const [showClearModal, setShowClearModal] = useState<boolean>(false);
+  const [isClearing, setIsClearing] = useState<boolean>(false);
+
   const formatMb = (bytes: number) => (bytes / (1024 * 1024)).toFixed(1);
 
   const handleClear = () => {
-    onClearCache();
-    toastService.downloads(
-      'Cache Cleared',
-      'Streaming cache removed. Pinned offline downloads preserved!'
-    );
+    bridge.triggerHaptic('light');
+    setShowClearModal(true);
   };
 
   const handleSelectSyncPolicy = (targetWifiOnly: boolean) => {
@@ -217,23 +225,50 @@ export const ProfileTab: React.FC<ProfileTabProps> = ({
           <h2 className="text-base font-bold text-slate-900 tracking-tight">
             {isDriveConnected
               ? googleDriveService.getUserProfile()?.name || 'Connected Google Account'
+              : isGuestMode
+              ? 'Guest Scholar'
               : 'Local Account'}
           </h2>
           <p className="text-xs text-slate-500 font-mono mt-0.5">
             {isDriveConnected
               ? googleDriveService.getUserProfile()?.email || 'Google Drive Connected'
+              : isGuestMode
+              ? 'Offline Guest Mode • Local Storage'
               : 'Offline Mode • Local Storage'}
           </p>
         </div>
+
+        {isGuestMode && onExitGuestMode && (
+          <div className="pt-2 border-t border-slate-100 flex flex-col gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                bridge.triggerHaptic('medium');
+                onExitGuestMode();
+              }}
+              className="w-full py-2.5 px-3.5 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 text-amber-900 border border-amber-300/70 text-xs font-semibold flex items-center justify-between active:scale-[0.99] transition-all cursor-pointer shadow-2xs"
+            >
+              <span className="flex items-center gap-2">
+                <ArrowLeft size={14} className="text-amber-700 stroke-[2.5]" />
+                <span>Return to Welcome Screen</span>
+              </span>
+              <span className="text-[10px] text-amber-700 font-bold uppercase tracking-wider">
+                Exit Guest Mode
+              </span>
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Google Drive Storage (Realistic Quota, Recharts Breakdown & Progress) */}
       <GoogleDriveStorage
         audioItems={audioItems}
         isDriveConnected={isDriveConnected}
+        isGuestMode={isGuestMode}
         isSyncingDrive={isSyncingDrive}
         onConnectDrive={onConnectDrive}
         onDisconnectDrive={onDisconnectDrive}
+        onExitGuestMode={onExitGuestMode}
         onSyncDrive={onSyncDrive}
         onConnectWithToken={onConnectWithToken}
       />
@@ -424,6 +459,139 @@ export const ProfileTab: React.FC<ProfileTabProps> = ({
         <p>Runtime: {bridge.isNativeApp() ? 'Native Android Hybrid Client' : 'Cloudflare Edge PWA'}</p>
         <p className="text-[10px] text-slate-400">Zero Third-Party Telemetry • End-to-End Sovereign</p>
       </div>
+
+      {/* Clear Cache & Empty Slate Confirmation Modal */}
+      {showClearModal && (
+        <ModalPortal>
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="clear-cache-dialog-title"
+            className="fixed inset-0 z-[70] flex items-center justify-center p-4 sm:p-6 bg-slate-950/75 backdrop-blur-md overflow-y-auto safe-top safe-bottom animate-in fade-in duration-200"
+            onClick={(e) => {
+              if (e.target === e.currentTarget && !isClearing) {
+                setShowClearModal(false);
+              }
+            }}
+          >
+            <div className="w-full max-w-sm bg-white rounded-3xl p-5 sm:p-6 space-y-4 shadow-2xl border border-slate-200/90 my-auto max-h-[90vh] overflow-y-auto animate-in zoom-in-95 duration-200">
+              <div className="flex items-center gap-3">
+                <div className="size-11 rounded-2xl bg-rose-50 text-rose-600 border border-rose-200/60 flex items-center justify-center shrink-0 shadow-2xs">
+                  <Trash2 size={20} />
+                </div>
+                <div className="min-w-0">
+                  <h3 id="clear-cache-dialog-title" className="text-sm font-bold text-slate-900 leading-snug">
+                    Clear Storage & Cache
+                  </h3>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    Safe device cleanup & reset
+                  </p>
+                </div>
+              </div>
+
+              {/* Live Storage Breakdown Card */}
+              <div className="p-3.5 bg-slate-50 rounded-2xl border border-slate-100 space-y-2">
+                <div className="flex items-center justify-between text-xs text-slate-600">
+                  <span className="flex items-center gap-1.5 font-medium">
+                    <Database size={13} className="text-amber-600" /> Streaming Audio Cache:
+                  </span>
+                  <span className="font-mono font-bold text-slate-900">
+                    {formatMb(storageInfo.cachedAudioBytes)} MB
+                  </span>
+                </div>
+                <div className="flex items-center justify-between text-xs text-slate-600">
+                  <span className="flex items-center gap-1.5 font-medium">
+                    <HardDrive size={13} className="text-indigo-600" /> Offline Downloaded Lessons:
+                  </span>
+                  <span className="font-mono font-bold text-slate-900">
+                    {formatMb(storageInfo.explicitDownloadsBytes)} MB
+                  </span>
+                </div>
+                <div className="pt-2 border-t border-slate-200/70 flex items-center justify-between text-xs font-bold text-slate-800">
+                  <span>Total Cache To Free:</span>
+                  <span className="font-mono text-rose-600">
+                    {formatMb(storageInfo.cachedAudioBytes + storageInfo.explicitDownloadsBytes)} MB
+                  </span>
+                </div>
+              </div>
+
+              {isDriveConnected ? (
+                <div className="text-[11px] text-emerald-800 bg-emerald-50/80 p-2.5 rounded-xl border border-emerald-200/60 leading-relaxed">
+                  ✓ <strong>Google Drive Cloud Safe:</strong> All your audio files and revisions in your personal Google Drive are unaffected and can be re-synced anytime.
+                </div>
+              ) : (
+                <div className="text-[11px] text-amber-800 bg-amber-50/80 p-2.5 rounded-xl border border-amber-200/60 leading-relaxed">
+                  Notice: Resetting to an empty slate purges local offline notes and audio from this device.
+                </div>
+              )}
+
+              {/* Action Buttons */}
+              <div className="space-y-2 pt-1">
+                {/* Action 1: Reset to Empty Slate */}
+                <button
+                  type="button"
+                  disabled={isClearing}
+                  onClick={async () => {
+                    setIsClearing(true);
+                    try {
+                      await onClearCache(true);
+                      setShowClearModal(false);
+                    } catch (err) {
+                      console.error('Failed to clear all cache:', err);
+                    } finally {
+                      setIsClearing(false);
+                    }
+                  }}
+                  className="w-full py-2.5 px-3 rounded-xl bg-rose-600 hover:bg-rose-700 active:scale-[0.98] text-white text-xs font-semibold flex items-center justify-center gap-1.5 shadow-sm transition-all cursor-pointer disabled:opacity-60"
+                >
+                  {isClearing ? (
+                    <>
+                      <RefreshCw size={13} className="animate-spin" />
+                      <span>Clearing All Data...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Trash2 size={13} />
+                      <span>Clear All & Empty Slate</span>
+                    </>
+                  )}
+                </button>
+
+                {/* Action 2: Clear Streaming Cache Only */}
+                <button
+                  type="button"
+                  disabled={isClearing}
+                  onClick={async () => {
+                    setIsClearing(true);
+                    try {
+                      await onClearCache(false);
+                      setShowClearModal(false);
+                    } catch (err) {
+                      console.error('Failed to clear streaming cache:', err);
+                    } finally {
+                      setIsClearing(false);
+                    }
+                  }}
+                  className="w-full py-2 px-3 rounded-xl bg-slate-100 hover:bg-slate-200/80 active:scale-[0.98] text-slate-700 text-xs font-semibold flex items-center justify-center gap-1.5 transition-all cursor-pointer disabled:opacity-60"
+                >
+                  <Database size={13} className="text-slate-500" />
+                  <span>Clear Streaming Cache Only</span>
+                </button>
+
+                {/* Action 3: Cancel */}
+                <button
+                  type="button"
+                  disabled={isClearing}
+                  onClick={() => setShowClearModal(false)}
+                  className="w-full py-1.5 text-center text-xs text-slate-500 hover:text-slate-700 font-medium cursor-pointer transition-colors"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </div>
+        </ModalPortal>
+      )}
     </div>
   );
 };

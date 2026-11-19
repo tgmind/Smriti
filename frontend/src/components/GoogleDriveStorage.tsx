@@ -21,7 +21,8 @@ import {
   BarChart2,
   Sparkles,
   ShieldCheck,
-  ArrowRight
+  ArrowRight,
+  ArrowLeft
 } from 'lucide-react';
 import {
   Empty,
@@ -51,9 +52,11 @@ import { AudioItem } from '../types';
 export interface GoogleDriveStorageProps {
   audioItems: AudioItem[];
   isDriveConnected: boolean;
+  isGuestMode?: boolean;
   isSyncingDrive?: boolean;
   onConnectDrive: () => void;
   onDisconnectDrive: () => void;
+  onExitGuestMode?: () => void;
   onSyncDrive?: () => void;
   onConnectWithToken?: (token: string) => Promise<void>;
   className?: string;
@@ -62,9 +65,11 @@ export interface GoogleDriveStorageProps {
 export const GoogleDriveStorage: React.FC<GoogleDriveStorageProps> = ({
   audioItems,
   isDriveConnected,
+  isGuestMode = false,
   isSyncingDrive = false,
   onConnectDrive,
   onDisconnectDrive,
+  onExitGuestMode,
   onSyncDrive,
   onConnectWithToken: _onConnectWithToken,
   className
@@ -209,10 +214,12 @@ export const GoogleDriveStorage: React.FC<GoogleDriveStorageProps> = ({
               <CloudOff size={22} strokeWidth={2.2} />
             </EmptyMedia>
             <EmptyTitle className="text-base font-bold text-slate-950">
-              Google Drive Disconnected
+              {isGuestMode ? 'Offline Guest Mode' : 'Google Drive Disconnected'}
             </EmptyTitle>
             <EmptyDescription className="text-xs text-slate-500 max-w-xs leading-relaxed">
-              Connect your personal Google Drive to sync audio notes and back up your study library.
+              {isGuestMode
+                ? 'Your audio notes and folders are saved offline on this device. Sign in with Google Drive anytime for cloud backup.'
+                : 'Connect your personal Google Drive to sync audio notes and back up your study library.'}
             </EmptyDescription>
           </EmptyHeader>
           <EmptyContent className="flex flex-col items-center gap-2.5 w-full max-w-xs pt-1">
@@ -224,6 +231,16 @@ export const GoogleDriveStorage: React.FC<GoogleDriveStorageProps> = ({
               <HardDrive size={15} className="text-blue-400" />
               <span>{isSyncingDrive ? 'Connecting...' : 'Connect Personal Google Drive'}</span>
             </Button>
+            {isGuestMode && onExitGuestMode && (
+              <button
+                type="button"
+                onClick={onExitGuestMode}
+                className="w-full h-9 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 text-amber-900 border border-amber-300/60 font-medium text-xs flex items-center justify-center gap-1.5 cursor-pointer active:scale-98 transition-all"
+              >
+                <ArrowLeft size={13} className="stroke-[2.5]" />
+                <span>Return to Welcome Screen</span>
+              </button>
+            )}
           </EmptyContent>
         </Empty>
       </div>

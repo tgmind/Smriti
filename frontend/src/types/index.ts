@@ -145,3 +145,11 @@ export interface UploadProgressState {
   driveFileId?: string;
   error?: string;
 }
+
+export interface UserStatus {
+  isBlocked: boolean;
+  blockedReason?: string;
+  role: 'student' | 'admin' | 'teacher' | 'guest';
+  registered?: boolean;
+}
+

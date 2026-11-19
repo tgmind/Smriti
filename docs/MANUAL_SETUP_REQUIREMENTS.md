@@ -21,6 +21,12 @@ You do **NOT** need to create or configure a Supabase project or write any SQL. 
   - Direct PostgreSQL Pooler: `db.wppnfezoqpcgmowdkofp.supabase.co:6543/postgres`
 - [x] **Full Production Database Migrations Applied:**
   - All 15 relational tables created (`profiles`, `user_settings`, `subjects`, `collections`, `audio_items`, `playlists`, `playlist_items`, `playback_events`, `audio_statistics`, `daily_statistics`, `recall_assessments`, `revision_schedule`, `listening_sessions`, `user_devices`, `sync_state`).
+- [x] **User Tracking & Admin Remote Blocking Applied (Part 2):**
+  - Added `is_blocked`, `blocked_reason`, `role`, and `last_seen_at` columns to `public.profiles`.
+  - Automated `register_or_sync_student` and `check_user_status` RPC functions deployed directly to live PostgreSQL.
+  - Automatically synchronizes registered students into both `auth.users` and `public.profiles`.
+- [x] **Automated Inactivity Keepalive Deployed:**
+  - `.github/workflows/keepalive.yml` pings Supabase PostgREST every 4 days, preventing the 7-day inactivity pause.
 - [x] **PostgreSQL Row-Level Security (RLS) Active:** Every table is secured with tenant isolation policies (`auth.uid() = user_id`).
 - [x] **Automatic Student Provisioning Trigger:** New user registrations automatically initialize student profiles, default preferences, and 4 starter academic subjects (Physics, Chemistry, Biology, Mathematics).
 - [x] **Frontend Production Build Configured:** The web bundle has been recompiled with live Supabase credentials.
@@ -113,3 +119,35 @@ The Android application is completely built and ready in your workspace.
    - `VITE_SUPABASE_ANON_KEY`: `sb_publishable_Jv7t8irT0s7wTNheRXMUpQ_SrNOB-0n`
    - `VITE_GOOGLE_CLIENT_ID`: (Your Google Client ID from Step 1)
 7. Click **Save and Deploy**. Your web platform will be live at `https://smriti.pages.dev`!
+
+---
+
+### Step 4: Supabase Keepalive & User Management Setup (Part 2 Upgrade)
+**Timing:** `[DATABASE MIGRATION ALREADY APPLIED LIVE]`  
+**Status:** **100% DEPLOYED & TESTED**  
+**Cost:** $0.00  
+
+#### 1. SQL Migration Status: COMPLETED
+The database schema migration [`supabase/migrations/20261119000001_add_user_blocking_and_roles.sql`](file:///home/thoughtful/Documents/antigravity/brave-mendeleev/supabase/migrations/20261119000001_add_user_blocking_and_roles.sql) has been **executed directly on your live PostgreSQL server**. You do **NOT** need to run any SQL manually in the Supabase SQL Editor.
+
+#### 2. How to View Registered Users (User Count)
+1. In Supabase Dashboard, click **Table Editor** > **profiles**.
+2. You will see every registered student:
+   - `email`: Student email address
+   - `display_name`: Student full name
+   - `last_seen_at`: Last active timestamp
+   - `is_blocked`: Account access status (`false` = active, `true` = suspended)
+   - `role`: Role (`student`, `admin`, `teacher`)
+
+#### 3. How to Block or Unblock a User
+- **To Block:** In **Table Editor** > **profiles**, find the user row, double-click `is_blocked`, check the box (`true`), and optionally enter a `blocked_reason` (e.g. *"Account suspended for exam policy violation"*). On their next launch or sync, their screen immediately locks with an "Access Suspended" message.
+- **To Unblock:** Set `is_blocked` back to `false`. On their next refresh, normal access is automatically restored.
+
+#### 4. GitHub Actions Keepalive (Automatic Inactivity Ping)
+1. The workflow file is saved at [`.github/workflows/keepalive.yml`](file:///home/thoughtful/Documents/antigravity/brave-mendeleev/.github/workflows/keepalive.yml).
+2. When you push this project to GitHub, go to your repository **Settings** > **Secrets and variables** > **Actions**.
+3. Ensure repository secrets or default environment variables contain:
+   - `VITE_SUPABASE_URL`: `https://wppnfezoqpcgmowdkofp.supabase.co`
+   - `VITE_SUPABASE_ANON_KEY`: `sb_publishable_Jv7t8irT0s7wTNheRXMUpQ_SrNOB-0n`
+4. The workflow runs every 4 days at 06:00 UTC and pings Supabase PostgREST, resetting the 7-day inactivity pause automatically.
+5. You can test it anytime under GitHub repository **Actions** > **Supabase Free Tier Keepalive Ping** > **Run workflow**.

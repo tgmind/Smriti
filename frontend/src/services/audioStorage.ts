@@ -363,30 +363,62 @@ class AudioStorageManager {
   }
 
   public async getTotalStorageBytes(): Promise<number> {
-    const db = await this.getDB();
-    return new Promise((resolve) => {
-      const tx = db.transaction(STORE_NAME, 'readonly');
-      const store = tx.objectStore(STORE_NAME);
-      const req = store.openCursor();
-      let total = 0;
-      req.onsuccess = (e: any) => {
-        const cursor = e.target.result;
-        if (cursor) {
-          const val = cursor.value;
-          if (val instanceof Blob) {
-            total += val.size;
-          } else if (val && typeof val.sizeBytes === 'number') {
-            total += val.sizeBytes;
-          } else if (val && val.blob instanceof Blob) {
-            total += val.blob.size;
+    const breakdown = await this.getStorageBreakdown();
+    return breakdown.totalBytes;
+  }
+
+  /**
+   * Retrieves accurate breakdown of storage bytes separated into
+   * temporary streaming cache and explicit pinned offline downloads.
+   */
+  public async getStorageBreakdown(): Promise<{
+    cachedAudioBytes: number;
+    explicitDownloadsBytes: number;
+    totalBytes: number;
+  }> {
+    try {
+      const db = await this.getDB();
+      return new Promise((resolve) => {
+        const tx = db.transaction(STORE_NAME, 'readonly');
+        const store = tx.objectStore(STORE_NAME);
+        const req = store.openCursor();
+        let cachedAudioBytes = 0;
+        let explicitDownloadsBytes = 0;
+
+        req.onsuccess = (e: any) => {
+          const cursor = e.target.result;
+          if (cursor) {
+            const val = cursor.value;
+            let size = 0;
+            let isPinned = false;
+
+            if (val instanceof Blob) {
+              size = val.size;
+              isPinned = false;
+            } else if (val && typeof val === 'object') {
+              size = val.sizeBytes || (val.blob instanceof Blob ? val.blob.size : 0);
+              isPinned = Boolean(val.isPinned);
+            }
+
+            if (isPinned) {
+              explicitDownloadsBytes += size;
+            } else {
+              cachedAudioBytes += size;
+            }
+            cursor.continue();
+          } else {
+            resolve({
+              cachedAudioBytes,
+              explicitDownloadsBytes,
+              totalBytes: cachedAudioBytes + explicitDownloadsBytes
+            });
           }
-          cursor.continue();
-        } else {
-          resolve(total);
-        }
-      };
-      req.onerror = () => resolve(0);
-    });
+        };
+        req.onerror = () => resolve({ cachedAudioBytes: 0, explicitDownloadsBytes: 0, totalBytes: 0 });
+      });
+    } catch {
+      return { cachedAudioBytes: 0, explicitDownloadsBytes: 0, totalBytes: 0 };
+    }
   }
 }
 

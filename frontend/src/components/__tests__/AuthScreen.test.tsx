@@ -3,8 +3,28 @@ import { renderToString } from 'react-dom/server';
 import { AuthScreen } from '../AuthScreen';
 
 describe('AuthScreen - Vedic Gateway & Google Onboarding', () => {
+  let mockStorage: Record<string, string> = {};
+
   beforeEach(() => {
     vi.clearAllMocks();
+    mockStorage = {};
+    const mockLocalStorage = {
+      getItem: (key: string) => mockStorage[key] || null,
+      setItem: (key: string, value: string) => {
+        mockStorage[key] = value;
+      },
+      removeItem: (key: string) => {
+        delete mockStorage[key];
+      },
+      clear: () => {
+        mockStorage = {};
+      }
+    };
+    Object.defineProperty(globalThis, 'localStorage', {
+      value: mockLocalStorage,
+      writable: true,
+      configurable: true
+    });
   });
 
   it('renders Vedic branding and memory philosophy cards', () => {
@@ -66,5 +86,19 @@ describe('AuthScreen - Vedic Gateway & Google Onboarding', () => {
     expect(html).toContain('overscroll-none');
     expect(html).toContain('[scrollbar-width:none]');
     expect(html).toContain('[&amp;::-webkit-scrollbar]:hidden');
+  });
+
+  it('renders Access Suspended screen if user is locally marked as blocked', () => {
+    localStorage.setItem('smriti_blocked_user', 'true');
+    localStorage.setItem('smriti_blocked_reason', 'Account suspended by institution admin.');
+
+    const html = renderToString(<AuthScreen onAuthenticated={vi.fn()} onExploreGuest={vi.fn()} />);
+
+    expect(html).toContain('Access Suspended');
+    expect(html).toContain('Account suspended by institution admin.');
+    expect(html).toContain('Switch Google Account');
+    expect(html).toContain('Need Help?');
+
+    localStorage.clear();
   });
 });

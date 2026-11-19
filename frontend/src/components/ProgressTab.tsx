@@ -109,8 +109,8 @@ export const ProgressTab: React.FC<ProgressTabProps> = ({
             <h1 className="text-2xl font-bold text-slate-900 tracking-tight">
               Study Progress
             </h1>
-            <span className="px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-700 font-serif text-[11px] font-semibold border border-amber-500/20">
-              स्मृति
+            <span className="px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-700 text-[11px] font-semibold border border-amber-500/20">
+              Smriti
             </span>
           </div>
           <p className="text-xs text-slate-500 mt-0.5">
@@ -427,8 +427,8 @@ export const ProgressTab: React.FC<ProgressTabProps> = ({
                   </div>
 
                   <div className="flex items-center justify-between text-[10px] text-slate-400 font-medium pt-0.5">
-                    <span className="font-serif italic text-amber-700/80">
-                      {mem.stageDevanagari} ({mem.stageName.split(' ')[0]})
+                    <span className="text-amber-700/80 font-medium">
+                      {mem.stageName}
                     </span>
                     <span className="tabular-nums font-mono text-[10px]">
                       {mem.score}% strength

@@ -3,11 +3,12 @@ import {
   HardDrive,
   ArrowRight,
   WifiOff,
-  Lock
+  Lock,
+  ShieldAlert
 } from 'lucide-react';
 import saraswatiImg from '../assets/saraswati.webp';
 import { googleDriveService } from '../services/googleDrive';
-import { supabase } from '../services/supabase';
+import { syncStudentProfileWithSupabase } from '../services/supabase';
 import { toastService } from '../services/toastService';
 import { ToastContainer } from './ui/ToastContainer';
 import { SacredMandala } from './ui/SacredMandala';
@@ -22,6 +23,44 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
   onExploreGuest
 }) => {
   const [loading, setLoading] = useState(false);
+  const [isBlocked, setIsBlocked] = useState<boolean>(() => {
+    try {
+      if (typeof localStorage !== 'undefined') {
+        return localStorage.getItem('smriti_blocked_user') === 'true';
+      }
+    } catch {
+      return false;
+    }
+    return false;
+  });
+  const [blockedReason, setBlockedReason] = useState<string>(() => {
+    try {
+      if (typeof localStorage !== 'undefined') {
+        return (
+          localStorage.getItem('smriti_blocked_reason') ||
+          'Your student account has been suspended by the administrator.'
+        );
+      }
+    } catch {
+      // Ignore
+    }
+    return 'Your student account has been suspended by the administrator.';
+  });
+
+  // Check locally cached block status on mount
+  useEffect(() => {
+    try {
+      if (localStorage.getItem('smriti_blocked_user') === 'true') {
+        setIsBlocked(true);
+        setBlockedReason(
+          localStorage.getItem('smriti_blocked_reason') ||
+          'Your student account has been suspended by the administrator.'
+        );
+      }
+    } catch {
+      // Ignore
+    }
+  }, []);
 
   // Lock body/window scrolling when AuthScreen is displayed so mobile browsers never scroll
   useEffect(() => {
@@ -42,16 +81,22 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
 
       // 1. Authorize Google Identity Services with minimal drive.file + profile scopes
       await googleDriveService.authorize();
+      const profile = googleDriveService.getUserProfile();
 
-      // 2. Link profile with Supabase if configured
-      if (supabase) {
+      // 2. Synchronize student profile with Supabase & enforce admin blocking
+      if (profile?.email) {
         try {
-          const profile = googleDriveService.getUserProfile();
-          if (profile?.email) {
-            // Verify or store session state
+          const status = await syncStudentProfileWithSupabase(profile);
+          if (status.isBlocked) {
+            setIsBlocked(true);
+            setBlockedReason(
+              status.blockedReason ||
+              'Your student account has been suspended by the administrator.'
+            );
+            return;
           }
         } catch (supaErr) {
-          console.warn('[AuthScreen] Supabase verification note:', supaErr);
+          console.warn('[AuthScreen] Supabase verification note (proceeding offline):', supaErr);
         }
       }
 
@@ -80,6 +125,43 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
     }
     onExploreGuest();
   };
+
+  if (isBlocked) {
+    return (
+      <div className="fixed inset-0 w-full h-full h-[100dvh] max-h-[100dvh] bg-[#FAF5EE] text-[#2C2623] flex flex-col justify-center items-center p-6 select-none font-sans z-50">
+        <div className="w-full max-w-sm bg-white rounded-3xl p-6 sm:p-7 border border-rose-200 shadow-2xl flex flex-col items-center text-center space-y-4 animate-in fade-in zoom-in-95 duration-200">
+          <div className="size-16 rounded-2xl bg-rose-50 border border-rose-200 flex items-center justify-center text-rose-600 shadow-xs">
+            <ShieldAlert size={32} />
+          </div>
+          <div className="space-y-1">
+            <h2 className="text-xl font-bold text-slate-900 tracking-tight">Access Suspended</h2>
+            <p className="text-xs text-slate-600 leading-relaxed font-medium">
+              {blockedReason || 'Your student account has been suspended by the administrator.'}
+            </p>
+          </div>
+          <div className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-[11px] text-slate-600 text-left space-y-1">
+            <span className="font-semibold block text-slate-800">Need Help?</span>
+            <p>If you believe this suspension is in error, please reach out to your administrator or teacher with your registered email.</p>
+          </div>
+          <button
+            onClick={() => {
+              try {
+                localStorage.removeItem('smriti_blocked_user');
+                localStorage.removeItem('smriti_blocked_reason');
+                googleDriveService.disconnect();
+              } catch {
+                // Ignore
+              }
+              setIsBlocked(false);
+            }}
+            className="w-full py-2.5 px-4 rounded-full bg-[#241F3B] hover:bg-[#302A4E] text-white text-xs font-semibold transition-all cursor-pointer shadow-md active:scale-95"
+          >
+            Switch Google Account
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="fixed inset-0 w-full h-full h-[100dvh] max-h-[100dvh] bg-[#FAF5EE] text-[#2C2623] flex flex-col justify-between items-center py-[clamp(0.6rem,1.8vh,1.25rem)] px-3 xs:px-4 sm:px-6 select-none overflow-hidden overscroll-none font-sans [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden touch-none">

@@ -1,5 +1,5 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
-import { AudioItem, Subject, RevisionItem, DailyStudyStats, UserSettings } from '../types';
+import { AudioItem, Subject, RevisionItem, DailyStudyStats, UserSettings, UserStatus } from '../types';
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
@@ -114,3 +114,172 @@ export async function incrementAudioPlayCountInSupabase(
     return null;
   }
 }
+
+/**
+ * Registers or synchronizes student profile telemetry in Supabase.
+ * - Records student email, display name, and activity timestamp so the admin
+ *   can see the live registered user count.
+ * - Enforces remote administrator bans: if the user is marked `is_blocked = true`
+ *   in Supabase, immediately returns blocked status.
+ * - Offline-first resilient: fails gracefully to local cache when offline.
+ */
+export async function syncStudentProfileWithSupabase(profile: {
+  email: string;
+  name?: string;
+  picture?: string;
+}): Promise<UserStatus> {
+  const fallbackStatus: UserStatus = {
+    isBlocked: false,
+    role: 'student',
+    registered: false
+  };
+
+  if (!profile?.email) return fallbackStatus;
+
+  const getOfflineBlockedFallback = (): UserStatus => {
+    try {
+      if (localStorage.getItem('smriti_blocked_user') === 'true') {
+        return {
+          isBlocked: true,
+          blockedReason: localStorage.getItem('smriti_blocked_reason') || 'Your account has been suspended by the administrator.',
+          role: 'student'
+        };
+      }
+    } catch {
+      // Ignore
+    }
+    return fallbackStatus;
+  };
+
+  if (!supabase) return getOfflineBlockedFallback();
+
+  try {
+    const { data, error } = await supabase.rpc('register_or_sync_student', {
+      p_email: profile.email,
+      p_display_name: profile.name || null,
+      p_avatar_url: profile.picture || null
+    });
+
+    if (error) {
+      console.warn('[Supabase] register_or_sync_student notice:', error.message);
+      return getOfflineBlockedFallback();
+    }
+
+    if (data && typeof data === 'object') {
+      const isBlocked = Boolean(data.is_blocked);
+      const blockedReason = data.blocked_reason || 'Your account has been suspended by the administrator.';
+      const role = data.role || 'student';
+
+      try {
+        if (isBlocked) {
+          localStorage.setItem('smriti_blocked_user', 'true');
+          localStorage.setItem('smriti_blocked_reason', blockedReason);
+        } else {
+          localStorage.removeItem('smriti_blocked_user');
+          localStorage.removeItem('smriti_blocked_reason');
+          localStorage.setItem('smriti_user_status', JSON.stringify({
+            email: profile.email,
+            role,
+            isBlocked: false,
+            syncedAt: new Date().toISOString()
+          }));
+        }
+      } catch {
+        // localStorage ignore
+      }
+
+      return {
+        isBlocked,
+        blockedReason: isBlocked ? blockedReason : undefined,
+        role,
+        registered: true
+      };
+    }
+
+    return getOfflineBlockedFallback();
+  } catch (err) {
+    console.warn('[Supabase] syncStudentProfileWithSupabase network error (using offline fallback):', err);
+    return getOfflineBlockedFallback();
+  }
+}
+
+/**
+ * Checks whether an account is currently blocked by the administrator.
+ * Fast, non-blocking check suitable for app startup or periodic sync.
+ */
+export async function checkStudentStatus(email?: string): Promise<UserStatus> {
+  let targetEmail = email;
+
+  if (!targetEmail) {
+    try {
+      const cached = localStorage.getItem('smriti_user_status');
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        targetEmail = parsed?.email;
+      }
+    } catch {
+      // Ignore parse errors
+    }
+  }
+
+  const getOfflineBlockedFallback = (): UserStatus => {
+    try {
+      if (localStorage.getItem('smriti_blocked_user') === 'true') {
+        return {
+          isBlocked: true,
+          blockedReason: localStorage.getItem('smriti_blocked_reason') || 'Your account has been suspended by the administrator.',
+          role: 'student'
+        };
+      }
+    } catch {
+      // Ignore storage errors
+    }
+    return { isBlocked: false, role: 'student' };
+  };
+
+  if (!targetEmail || !supabase) {
+    return getOfflineBlockedFallback();
+  }
+
+  try {
+    const { data, error } = await supabase.rpc('check_user_status', {
+      p_email: targetEmail
+    });
+
+    if (error) {
+      console.warn('[Supabase] check_user_status notice:', error.message);
+      return getOfflineBlockedFallback();
+    }
+
+    if (data && typeof data === 'object') {
+      const isBlocked = Boolean(data.is_blocked);
+      const blockedReason = data.blocked_reason || 'Your account has been suspended by the administrator.';
+      const role = data.role || 'student';
+
+      try {
+        if (isBlocked) {
+          localStorage.setItem('smriti_blocked_user', 'true');
+          localStorage.setItem('smriti_blocked_reason', blockedReason);
+        } else {
+          localStorage.removeItem('smriti_blocked_user');
+          localStorage.removeItem('smriti_blocked_reason');
+        }
+      } catch {
+        // Ignore
+      }
+
+      return {
+        isBlocked,
+        blockedReason: isBlocked ? blockedReason : undefined,
+        role,
+        registered: Boolean(data.registered)
+      };
+    }
+
+    return getOfflineBlockedFallback();
+  } catch (err) {
+    console.warn('[Supabase] checkStudentStatus network fallback:', err);
+    return getOfflineBlockedFallback();
+  }
+}
+

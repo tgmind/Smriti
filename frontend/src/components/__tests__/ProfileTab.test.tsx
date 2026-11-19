@@ -123,4 +123,33 @@ describe('ProfileTab UI Component', () => {
     expect(html).toContain('Wi-Fi + Data');
     expect(html).toContain('Wi-Fi Connected • Auto-Sync Active');
   });
+
+  it('renders Audio Streaming Cache row with accurate live values and clear button', () => {
+    const html = renderToString(
+      <ProfileTab
+        userSettings={mockSettings}
+        storageInfo={{
+          cachedAudioBytes: 50 * 1024 * 1024,
+          explicitDownloadsBytes: 20 * 1024 * 1024,
+          metadataDbBytes: 1 * 1024 * 1024,
+          pendingSyncCount: 0
+        }}
+        audioItems={mockAudioItems}
+        revisionItems={[]}
+        dailyStats={[]}
+        isDriveConnected={true}
+        onUpdateSettings={vi.fn()}
+        onConnectDrive={vi.fn()}
+        onDisconnectDrive={vi.fn()}
+        onClearCache={vi.fn()}
+      />
+    );
+
+    expect(html).toContain('Audio Streaming Cache');
+    expect(html).toContain('50.0');
+    expect(html).toContain('MB cached');
+    expect(html).toContain('20.0');
+    expect(html).toContain('MB pinned offline');
+    expect(html).toContain('Clear');
+  });
 });

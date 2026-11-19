@@ -1,0 +1,43 @@
+name: Supabase Free Tier Keepalive Ping
+
+# Automatically pings Supabase every 4 days to reset the 7-day inactivity pause timer.
+# This keeps your free-tier PostgreSQL database active 24/7/365 at $0 cost.
+
+on:
+  schedule:
+    # Runs at 06:00 UTC every 4th day of the month (e.g. 1st, 5th, 9th, 13th, 17th, 21st, 25th, 29th)
+    - cron: '0 6 */4 * *'
+  workflow_dispatch: # Allows manual test trigger from GitHub Actions tab anytime
+
+jobs:
+  ping-supabase:
+    name: Ping Supabase Database & Health
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping PostgREST Database Endpoint
+        run: |
+          SUPABASE_URL="${{ secrets.VITE_SUPABASE_URL || 'https://wppnfezoqpcgmowdkofp.supabase.co' }}"
+          SUPABASE_KEY="${{ secrets.VITE_SUPABASE_ANON_KEY || 'sb_publishable_Jv7t8irT0s7wTNheRXMUpQ_SrNOB-0n' }}"
+          
+          echo "Sending query ping to Supabase at: $SUPABASE_URL"
+          
+          # 1. Query PostgreSQL via PostgREST to trigger an active database read transaction
+          HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
+            -H "apikey: $SUPABASE_KEY" \
+            -H "Authorization: Bearer $SUPABASE_KEY" \
+            "$SUPABASE_URL/rest/v1/subjects?select=id&limit=1")
+          
+          echo "PostgreSQL Query HTTP Status: $HTTP_STATUS"
+          
+          # 2. Check Auth Service Health
+          AUTH_STATUS=$(curl -s -o /dev/null -w "%{http_code}" \
+            -H "apikey: $SUPABASE_KEY" \
+            "$SUPABASE_URL/auth/v1/health")
+            
+          echo "Auth Service Health HTTP Status: $AUTH_STATUS"
+          
+          if [ "$HTTP_STATUS" -eq 200 ] || [ "$HTTP_STATUS" -eq 206 ]; then
+            echo "✅ Supabase database successfully pinged. Inactivity timer reset."
+          else
+            echo "⚠️ Warning: Database returned status $HTTP_STATUS. Checking if project needs restore or wake up."
+          fi

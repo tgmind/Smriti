@@ -18,8 +18,11 @@ import {
   StorageOverview,
   UploadProgressState
 } from './types';
+import { ArrowLeft, ShieldAlert, Cloud, ChevronRight, HardDrive, ChevronDown, ChevronUp } from 'lucide-react';
 import {
-  DEFAULT_USER_SETTINGS
+  DEFAULT_USER_SETTINGS,
+  DEFAULT_SUBJECTS,
+  checkStudentStatus
 } from './services/supabase';
 import { bridge } from './services/bridge';
 import { verifiedPlayTracker } from './services/learningEngine';
@@ -34,6 +37,108 @@ import { ToastContainer } from './components/ui/ToastContainer';
 import { toastService, ToastSection } from './services/toastService';
 import { AuthScreen } from './components/AuthScreen';
 
+// --- Multi-Context Storage Isolation (Guest Mode vs Connected User) ---
+const getStorageKey = (key: 'subjects' | 'audio_items' | 'revisions' | 'daily_stats', isGuest: boolean): string => {
+  return isGuest ? `smriti_guest_${key}` : `smriti_${key}`;
+};
+
+const loadGuestSubjects = (): Subject[] => {
+  if (typeof window === 'undefined') return DEFAULT_SUBJECTS;
+  const saved = localStorage.getItem('smriti_guest_subjects');
+  if (!saved) return DEFAULT_SUBJECTS;
+  try {
+    const parsed: Subject[] = JSON.parse(saved);
+    if (Array.isArray(parsed) && parsed.length > 0) {
+      return parsed;
+    }
+    return DEFAULT_SUBJECTS;
+  } catch {
+    return DEFAULT_SUBJECTS;
+  }
+};
+
+const loadGuestAudioItems = (): AudioItem[] => {
+  if (typeof window === 'undefined') return [];
+  const saved = localStorage.getItem('smriti_guest_audio_items');
+  if (!saved) return [];
+  try {
+    const parsed: AudioItem[] = JSON.parse(saved);
+    const demoIds = new Set(['aud-1', 'aud-2', 'aud-3', 'aud-4']);
+    return parsed
+      .filter(item => !demoIds.has(item.id))
+      .map(item => playCountService.mergeAudioItem(item));
+  } catch {
+    return [];
+  }
+};
+
+const loadUserSubjects = (): Subject[] => {
+  if (typeof window === 'undefined') return DEFAULT_SUBJECTS;
+  const saved = localStorage.getItem('smriti_subjects');
+  if (!saved) return DEFAULT_SUBJECTS;
+  try {
+    const parsed: Subject[] = JSON.parse(saved);
+    if (Array.isArray(parsed) && parsed.length > 0) {
+      const map = new Map<string, Subject>();
+      for (const s of parsed) {
+        if (!s || !s.name) continue;
+        const norm = s.name.trim().toLowerCase();
+        if (!map.has(norm)) {
+          map.set(norm, {
+            ...s,
+            icon_name:
+              s.icon_name === 'Atom' ||
+              s.icon_name === 'FlaskConical' ||
+              s.icon_name === 'Dna' ||
+              s.icon_name === 'Binary' ||
+              s.icon_name === 'Folder'
+                ? 'BookOpen'
+                : (s.icon_name || 'BookOpen'),
+          });
+        }
+      }
+      return Array.from(map.values());
+    }
+    return DEFAULT_SUBJECTS;
+  } catch {
+    return DEFAULT_SUBJECTS;
+  }
+};
+
+const loadUserAudioItems = (): AudioItem[] => {
+  if (typeof window === 'undefined') return [];
+  if (!googleDriveService.isConnected()) return [];
+  const saved = localStorage.getItem('smriti_audio_items');
+  if (!saved) return [];
+  try {
+    const parsed: AudioItem[] = JSON.parse(saved);
+    const demoIds = new Set(['aud-1', 'aud-2', 'aud-3', 'aud-4']);
+    return parsed
+      .filter(item => !demoIds.has(item.id))
+      .map(item => playCountService.mergeAudioItem(item));
+  } catch {
+    return [];
+  }
+};
+
+const persistSubjects = (subs: Subject[], isGuest: boolean) => {
+  if (typeof window === 'undefined') return;
+  try {
+    localStorage.setItem(getStorageKey('subjects', isGuest), JSON.stringify(subs));
+  } catch (e) {
+    console.warn('Failed to save subjects to storage', e);
+  }
+};
+
+const persistAudioItems = (items: AudioItem[], isGuest: boolean) => {
+  if (typeof window === 'undefined') return;
+  try {
+    localStorage.setItem(getStorageKey('audio_items', isGuest), JSON.stringify(items));
+  } catch (e) {
+    console.warn('Failed to save audio items to storage', e);
+  }
+};
+
 export const App: React.FC = () => {
   const [currentTab, setCurrentTab] = useState<TabType>('library');
   const [isGuestMode, setIsGuestMode] = useState<boolean>(() => {
@@ -43,61 +148,29 @@ export const App: React.FC = () => {
 
   const [audioItems, setAudioItems] = useState<AudioItem[]>(() => {
     const isGuest = typeof window !== 'undefined' && localStorage.getItem('smriti_guest_mode') === 'true';
-    // If Google Drive is not connected AND guest mode is not active, enforce strict privacy: 0 audio notes displayed
-    if (!googleDriveService.isConnected() && !isGuest) {
-      return [];
+    if (isGuest) {
+      return loadGuestAudioItems();
     }
-    const saved = localStorage.getItem('smriti_audio_items');
-    if (!saved) return [];
-    try {
-      const parsed: AudioItem[] = JSON.parse(saved);
-      // Remove any previously stored demo/fake audio entries
-      const demoIds = new Set(['aud-1', 'aud-2', 'aud-3', 'aud-4']);
-      return parsed
-        .filter(item => !demoIds.has(item.id))
-        .map(item => playCountService.mergeAudioItem(item));
-    } catch {
-      return [];
+    if (googleDriveService.isConnected()) {
+      return loadUserAudioItems();
     }
+    return [];
   });
 
   const [subjects, setSubjects] = useState<Subject[]>(() => {
-    const saved = localStorage.getItem('smriti_subjects');
-    const fallbackSubjects: Subject[] = [
-      { id: 'general', name: 'General', icon_name: 'BookOpen', color_hex: '#38bdf8', description: 'General study & lecture notes', sort_order: 1 }
-    ];
-    if (saved === null) return fallbackSubjects;
-    try {
-      const parsed: Subject[] = JSON.parse(saved);
-      if (Array.isArray(parsed)) {
-        // Strictly deduplicate by normalized name and normalize deprecated icons
-        const map = new Map<string, Subject>();
-        for (const s of parsed) {
-          if (!s || !s.name) continue;
-          const norm = s.name.trim().toLowerCase();
-          if (!map.has(norm)) {
-            map.set(norm, {
-              ...s,
-              icon_name:
-                s.icon_name === 'Atom' ||
-                s.icon_name === 'FlaskConical' ||
-                s.icon_name === 'Dna' ||
-                s.icon_name === 'Binary' ||
-                s.icon_name === 'Folder'
-                  ? 'BookOpen'
-                  : (s.icon_name || 'BookOpen'),
-            });
-          }
-        }
-        return Array.from(map.values());
-      }
-      return fallbackSubjects;
-    } catch {
-      return fallbackSubjects;
+    const isGuest = typeof window !== 'undefined' && localStorage.getItem('smriti_guest_mode') === 'true';
+    if (isGuest) {
+      return loadGuestSubjects();
     }
+    if (googleDriveService.isConnected()) {
+      return loadUserSubjects();
+    }
+    return DEFAULT_SUBJECTS;
   });
+
   const [revisionItems] = useState<RevisionItem[]>(() => {
-    const saved = localStorage.getItem('smriti_revisions');
+    const isGuest = typeof window !== 'undefined' && localStorage.getItem('smriti_guest_mode') === 'true';
+    const saved = typeof window !== 'undefined' ? localStorage.getItem(getStorageKey('revisions', isGuest)) : null;
     if (!saved) return [];
     try {
       const parsed: RevisionItem[] = JSON.parse(saved);
@@ -109,7 +182,8 @@ export const App: React.FC = () => {
   });
 
   const [dailyStats, setDailyStats] = useState<DailyStudyStats[]>(() => {
-    const saved = localStorage.getItem('smriti_daily_stats');
+    const isGuest = typeof window !== 'undefined' && localStorage.getItem('smriti_guest_mode') === 'true';
+    const saved = typeof window !== 'undefined' ? localStorage.getItem(getStorageKey('daily_stats', isGuest)) : null;
     if (!saved) return [];
     try {
       const parsed: DailyStudyStats[] = JSON.parse(saved);
@@ -146,8 +220,70 @@ export const App: React.FC = () => {
   }, []);
 
   const [storageInfo, setStorageInfo] = useState<StorageOverview>(() => bridge.getStorageInfo());
+
+  // Synchronize dynamic device storage metrics on mount and when navigating tabs
+  useEffect(() => {
+    bridge.getStorageInfoAsync().then(info => {
+      setStorageInfo(info);
+    }).catch(() => {});
+  }, [currentTab]);
   const [isDriveConnected, setIsDriveConnected] = useState<boolean>(() => googleDriveService.isConnected());
   const [isSyncingDrive, setIsSyncingDrive] = useState<boolean>(false);
+  const [isUserBlocked, setIsUserBlocked] = useState<boolean>(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('smriti_blocked_user') === 'true';
+    }
+    return false;
+  });
+  const [blockedReason, setBlockedReason] = useState<string>(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('smriti_blocked_reason') || 'Your student account has been suspended by the administrator.';
+    }
+    return 'Your student account has been suspended by the administrator.';
+  });
+
+  // Check remote account status on startup if connected to Google
+  useEffect(() => {
+    if (isDriveConnected && !isGuestMode) {
+      checkStudentStatus()
+        .then((status) => {
+          if (status.isBlocked) {
+            setIsUserBlocked(true);
+            setBlockedReason(status.blockedReason || 'Your student account has been suspended by the administrator.');
+          }
+        })
+        .catch(() => {});
+    }
+  }, [isDriveConnected, isGuestMode]);
+
+  // Guest Mode auto-collapsing floating banner state (Stitch Vedic Sacred Memory)
+  const [isGuestBannerExpanded, setIsGuestBannerExpanded] = useState<boolean>(true);
+  const guestBannerTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    if (isGuestMode && !isDriveConnected) {
+      setIsGuestBannerExpanded(true);
+      if (guestBannerTimerRef.current) {
+        clearTimeout(guestBannerTimerRef.current);
+      }
+      guestBannerTimerRef.current = setTimeout(() => {
+        setIsGuestBannerExpanded(false);
+      }, 5000);
+
+      return () => {
+        if (guestBannerTimerRef.current) {
+          clearTimeout(guestBannerTimerRef.current);
+        }
+      };
+    }
+  }, [isGuestMode, isDriveConnected]);
+
+  const handleBannerMouseEnter = () => {
+    if (guestBannerTimerRef.current) {
+      clearTimeout(guestBannerTimerRef.current);
+      guestBannerTimerRef.current = null;
+    }
+  };
 
   // Background non-blocking sync tasks (e.g., folder deletion, audio deletion, Drive sync)
   const [activeSyncTasks, setActiveSyncTasks] = useState<ActiveSyncTask[]>([]);
@@ -316,11 +452,7 @@ export const App: React.FC = () => {
           ? { ...item, play_count: newCount, last_listened_at: nowIso }
           : item
       );
-      try {
-        localStorage.setItem('smriti_audio_items', JSON.stringify(updated));
-      } catch (e) {
-        console.warn('Failed to save audio items to localStorage', e);
-      }
+      persistAudioItems(updated, isGuestMode);
       return updated;
     });
 
@@ -347,25 +479,42 @@ export const App: React.FC = () => {
     );
   };
 
-  // Sync to localStorage
+  // Sync to localStorage with strict guest vs user isolation
   useEffect(() => {
-    localStorage.setItem('smriti_audio_items', JSON.stringify(audioItems));
-  }, [audioItems]);
+    if (isGuestMode) {
+      persistAudioItems(audioItems, true);
+    } else if (isDriveConnected) {
+      persistAudioItems(audioItems, false);
+    }
+  }, [audioItems, isGuestMode, isDriveConnected]);
 
   useEffect(() => {
-    localStorage.setItem('smriti_subjects', JSON.stringify(subjects));
-  }, [subjects]);
+    if (isGuestMode) {
+      persistSubjects(subjects, true);
+    } else if (isDriveConnected) {
+      persistSubjects(subjects, false);
+    }
+  }, [subjects, isGuestMode, isDriveConnected]);
 
   useEffect(() => {
-    localStorage.setItem('smriti_revisions', JSON.stringify(revisionItems));
-  }, [revisionItems]);
+    if (typeof window === 'undefined') return;
+    try {
+      localStorage.setItem(getStorageKey('revisions', isGuestMode), JSON.stringify(revisionItems));
+    } catch {}
+  }, [revisionItems, isGuestMode]);
 
   useEffect(() => {
-    localStorage.setItem('smriti_daily_stats', JSON.stringify(dailyStats));
-  }, [dailyStats]);
+    if (typeof window === 'undefined') return;
+    try {
+      localStorage.setItem(getStorageKey('daily_stats', isGuestMode), JSON.stringify(dailyStats));
+    } catch {}
+  }, [dailyStats, isGuestMode]);
 
   useEffect(() => {
-    localStorage.setItem('smriti_settings', JSON.stringify(userSettings));
+    if (typeof window === 'undefined') return;
+    try {
+      localStorage.setItem('smriti_settings', JSON.stringify(userSettings));
+    } catch {}
     networkService.offline_sync_wifi_only = userSettings.offline_sync_wifi_only;
   }, [userSettings]);
 
@@ -790,6 +939,7 @@ export const App: React.FC = () => {
       prev.map(item => (item.id === audio.id ? { ...item, is_downloaded_offline: nextState } : item))
     );
     setStorageInfo(bridge.getStorageInfo());
+    bridge.getStorageInfoAsync().then(info => setStorageInfo(info)).catch(() => {});
   };
 
   const handleDeleteAllDownloads = async () => {
@@ -803,10 +953,88 @@ export const App: React.FC = () => {
       setAudioItems(prev =>
         prev.map(item => ({ ...item, is_downloaded_offline: false }))
       );
-      setStorageInfo(bridge.getStorageInfo());
+      const freshInfo = await bridge.getStorageInfoAsync();
+      setStorageInfo(freshInfo);
       bridge.triggerHaptic('medium');
     } catch (err) {
       console.error('Failed to clear downloaded files:', err);
+    }
+  };
+
+  const handleClearCache = async (emptySlate: boolean = true) => {
+    try {
+      if (emptySlate) {
+        // 1. Immediately halt audio playback and reset player state
+        bridge.stopAudio();
+        setPlaybackQueue([]);
+        setCurrentQueueIndex(0);
+        setRepeatMode('off');
+        setPlaybackState({
+          currentAudio: null,
+          isPlaying: false,
+          positionSeconds: 0,
+          durationSeconds: 0,
+          playbackSpeed: 1.0,
+          isRepeatTrack: false,
+          isRepeatQueue: false,
+          repeatMode: 'off',
+          abLoop: null,
+          sleepTimerRemainingSeconds: null,
+          learningModeActive: false
+        });
+        setIsFullScreenPlayerOpen(false);
+
+        // 2. Comprehensive local cache, IndexedDB blobs, files, and webview purge
+        await bridge.purgeAllLocalData();
+
+        // 3. Clear local storage items for both guest and connected accounts
+        if (typeof window !== 'undefined') {
+          localStorage.removeItem('smriti_audio_items');
+          localStorage.removeItem('smriti_guest_audio_items');
+          localStorage.removeItem('smriti_revisions');
+          localStorage.removeItem('smriti_guest_revisions');
+          localStorage.removeItem('smriti_daily_stats');
+          localStorage.removeItem('smriti_guest_daily_stats');
+          localStorage.removeItem('smriti_drive_transfers');
+          // Clear verified learning and play count keys
+          for (let i = localStorage.length - 1; i >= 0; i--) {
+            const k = localStorage.key(i);
+            if (k && (k.startsWith('smriti_play_count_') || k.startsWith('smriti_verified_'))) {
+              localStorage.removeItem(k);
+            }
+          }
+        }
+
+        // 4. Reset React state to empty slate
+        setAudioItems([]);
+        setDailyStats([]);
+        const cleanSubjects = DEFAULT_SUBJECTS.map(s => ({ ...s, item_count: 0 }));
+        setSubjects(cleanSubjects);
+        persistSubjects(cleanSubjects, isGuestMode);
+
+        // 5. Update storage info to actual 0 values
+        const freshInfo = await bridge.getStorageInfoAsync();
+        setStorageInfo(freshInfo);
+
+        bridge.triggerHaptic('heavy');
+        toastService.success(
+          'App Reset to Empty Slate',
+          'All audio cache, offline downloads, and local data cleared safely.'
+        );
+      } else {
+        // Clear streaming cache only (preserves offline downloads)
+        await bridge.clearTemporaryCache();
+        const freshInfo = await bridge.getStorageInfoAsync();
+        setStorageInfo(freshInfo);
+        bridge.triggerHaptic('medium');
+        toastService.downloads(
+          'Streaming Cache Cleared',
+          'Temporary streaming cache removed. Pinned offline downloads preserved!'
+        );
+      }
+    } catch (err) {
+      console.error('Error during cache clear:', err);
+      toastService.danger('Cache Clear Error', 'Failed to clear local cache.');
     }
   };
 
@@ -867,9 +1095,9 @@ export const App: React.FC = () => {
       googleDriveService.fetchUserProfile().catch(() => {});
       googleDriveService.ensureFreshAccessToken().then(() => {
         setIsSyncingDrive(true);
-        return googleDriveService.fetchDriveData(subjects);
+        return googleDriveService.fetchDriveData();
       }).then(data => {
-        if (data && data.audioItems && data.audioItems.length > 0) {
+        if (data && data.audioItems) {
           setAudioItems(data.audioItems.map(item => playCountService.mergeAudioItem(item)));
         }
         if (data && data.subjects && data.subjects.length > 0) {
@@ -1054,12 +1282,14 @@ export const App: React.FC = () => {
       }
 
       // Fetch cloud catalog and recordings for this specific connected account
-      const driveData = await googleDriveService.fetchDriveData(subjects);
+      const driveData = await googleDriveService.fetchDriveData();
       if (driveData) {
-        setAudioItems((driveData.audioItems || []).map(item => playCountService.mergeAudioItem(item)));
-        if (driveData.subjects && driveData.subjects.length > 0) {
-          setSubjects(driveData.subjects);
-        }
+        const nextAudios = (driveData.audioItems || []).map(item => playCountService.mergeAudioItem(item));
+        const nextSubs = driveData.subjects && driveData.subjects.length > 0 ? driveData.subjects : DEFAULT_SUBJECTS;
+        setAudioItems(nextAudios);
+        setSubjects(nextSubs);
+        persistSubjects(nextSubs, false);
+        persistAudioItems(nextAudios, false);
       }
 
       const info = await bridge.getStorageInfoAsync();
@@ -1078,13 +1308,19 @@ export const App: React.FC = () => {
       setIsSyncingDrive(true);
       await googleDriveService.connectWithToken(token);
       setIsDriveConnected(true);
+      setIsGuestMode(false);
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem('smriti_guest_mode');
+      }
 
-      const driveData = await googleDriveService.fetchDriveData(subjects);
+      const driveData = await googleDriveService.fetchDriveData();
       if (driveData) {
-        setAudioItems((driveData.audioItems || []).map(item => playCountService.mergeAudioItem(item)));
-        if (driveData.subjects && driveData.subjects.length > 0) {
-          setSubjects(driveData.subjects);
-        }
+        const nextAudios = (driveData.audioItems || []).map(item => playCountService.mergeAudioItem(item));
+        const nextSubs = driveData.subjects && driveData.subjects.length > 0 ? driveData.subjects : DEFAULT_SUBJECTS;
+        setAudioItems(nextAudios);
+        setSubjects(nextSubs);
+        persistSubjects(nextSubs, false);
+        persistAudioItems(nextAudios, false);
       }
 
       const info = await bridge.getStorageInfoAsync();
@@ -1146,12 +1382,14 @@ export const App: React.FC = () => {
     try {
       setIsSyncingDrive(true);
       setSyncState('syncing');
-      const driveData = await googleDriveService.fetchDriveData(subjects);
+      const driveData = await googleDriveService.fetchDriveData();
       if (driveData) {
-        setAudioItems((driveData.audioItems || []).map(item => playCountService.mergeAudioItem(item)));
-        if (driveData.subjects && driveData.subjects.length > 0) {
-          setSubjects(driveData.subjects);
-        }
+        const nextAudios = (driveData.audioItems || []).map(item => playCountService.mergeAudioItem(item));
+        const nextSubs = driveData.subjects && driveData.subjects.length > 0 ? driveData.subjects : DEFAULT_SUBJECTS;
+        setAudioItems(nextAudios);
+        setSubjects(nextSubs);
+        persistSubjects(nextSubs, false);
+        persistAudioItems(nextAudios, false);
         setSyncState('idle');
         if (!options?.silent) {
           showSyncToast({
@@ -1468,8 +1706,8 @@ export const App: React.FC = () => {
     });
     setSubjects(nextSubjects);
     setAudioItems(nextAudioItems);
-    localStorage.setItem('smriti_subjects', JSON.stringify(nextSubjects));
-    localStorage.setItem('smriti_audio_items', JSON.stringify(nextAudioItems));
+    persistSubjects(nextSubjects, isGuestMode);
+    persistAudioItems(nextAudioItems, isGuestMode);
 
     if (googleDriveService.isConnected()) {
       try {
@@ -1516,8 +1754,8 @@ export const App: React.FC = () => {
 
     setSubjects(nextSubjects);
     setAudioItems(nextAudioItems);
-    localStorage.setItem('smriti_subjects', JSON.stringify(nextSubjects));
-    localStorage.setItem('smriti_audio_items', JSON.stringify(nextAudioItems));
+    persistSubjects(nextSubjects, isGuestMode);
+    persistAudioItems(nextAudioItems, isGuestMode);
 
     if (googleDriveService.isConnected()) {
       try {
@@ -1547,7 +1785,7 @@ export const App: React.FC = () => {
     });
 
     setAudioItems(nextAudioItems);
-    localStorage.setItem('smriti_audio_items', JSON.stringify(nextAudioItems));
+    persistAudioItems(nextAudioItems, isGuestMode);
 
     if (playbackState.currentAudio?.id === audioId) {
       setPlaybackState(prev => ({
@@ -1584,7 +1822,7 @@ export const App: React.FC = () => {
 
     const nextAudioItems = [newItem, ...audioItems];
     setAudioItems(nextAudioItems);
-    localStorage.setItem('smriti_audio_items', JSON.stringify(nextAudioItems));
+    persistAudioItems(nextAudioItems, isGuestMode);
 
     if (googleDriveService.isConnected()) {
       try {
@@ -1620,7 +1858,7 @@ export const App: React.FC = () => {
     });
 
     setAudioItems(nextAudioItems);
-    localStorage.setItem('smriti_audio_items', JSON.stringify(nextAudioItems));
+    persistAudioItems(nextAudioItems, isGuestMode);
 
     if (playbackState.currentAudio?.id === audioId) {
       setPlaybackState(prev => ({
@@ -1798,8 +2036,8 @@ export const App: React.FC = () => {
       setAudioItems(nextAudioItems);
     }
 
-    localStorage.setItem('smriti_subjects', JSON.stringify(nextSubjects));
-    localStorage.setItem('smriti_audio_items', JSON.stringify(nextAudioItems));
+    persistSubjects(nextSubjects, isGuestMode);
+    persistAudioItems(nextAudioItems, isGuestMode);
 
     // 2. Register non-blocking active sync task with progress bar
     const taskId = `task-del-subj-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
@@ -1916,7 +2154,7 @@ export const App: React.FC = () => {
     // 1. Optimistic UI and local storage update
     const nextAudioItems = audioItems.filter(a => a.id !== audioId);
     setAudioItems(nextAudioItems);
-    localStorage.setItem('smriti_audio_items', JSON.stringify(nextAudioItems));
+    persistAudioItems(nextAudioItems, isGuestMode);
 
     if (playbackState.currentAudio?.id === audioId) {
       handleDismissPlayer();
@@ -1942,6 +2180,27 @@ export const App: React.FC = () => {
   const handleNavigateToAccount = () => {
     setCurrentTab('profile');
   };
+
+  // Exit Guest Mode and return to the Vedic Welcome Screen
+  const handleExitGuestMode = useCallback(() => {
+    bridge.stopAudio();
+    setIsFullScreenPlayerOpen(false);
+    setPlaybackState(prev => ({
+      ...prev,
+      currentAudio: null,
+      isPlaying: false,
+      positionSeconds: 0,
+      durationSeconds: 0,
+      abLoop: null,
+      learningModeActive: false
+    }));
+    setIsGuestMode(false);
+    if (typeof window !== 'undefined') {
+      localStorage.removeItem('smriti_guest_mode');
+    }
+    setCurrentTab('library');
+    setSelectedSubjectForLibrary(null);
+  }, []);
 
   // Double-Back Management
   const lastBackPressTimeRef = useRef<number>(0);
@@ -1969,6 +2228,12 @@ export const App: React.FC = () => {
       return true;
     }
 
+    // Priority 2.5: In Guest Mode on root Homepage, pressing back returns to the Welcome Page!
+    if (isGuestMode) {
+      handleExitGuestMode();
+      return true;
+    }
+
     // Priority 3: On root Homepage, double-back within 2000ms exits app
     const now = Date.now();
     if (now - lastBackPressTimeRef.current < 2000) {
@@ -1985,7 +2250,7 @@ export const App: React.FC = () => {
       duration: 2000
     });
     return true;
-  }, [isFullScreenPlayerOpen, currentTab]);
+  }, [isFullScreenPlayerOpen, currentTab, isGuestMode, handleExitGuestMode]);
 
   useEffect(() => {
     // Register global window bridge hook for Android MainActivity.kt
@@ -2008,6 +2273,46 @@ export const App: React.FC = () => {
     };
   }, [handleGlobalBackPress]);
 
+  // Remote Admin Account Suspension Screen
+  if (isUserBlocked) {
+    return (
+      <div className="fixed inset-0 w-full h-full h-[100dvh] max-h-[100dvh] bg-[#FAF5EE] text-[#2C2623] flex flex-col justify-center items-center p-6 select-none font-sans z-50">
+        <div className="w-full max-w-sm bg-white rounded-3xl p-6 sm:p-7 border border-rose-200 shadow-2xl flex flex-col items-center text-center space-y-4 animate-in fade-in zoom-in-95 duration-200">
+          <div className="size-16 rounded-2xl bg-rose-50 border border-rose-200 flex items-center justify-center text-rose-600 shadow-xs">
+            <ShieldAlert size={32} />
+          </div>
+          <div className="space-y-1">
+            <h2 className="text-xl font-bold text-slate-900 tracking-tight">Access Suspended</h2>
+            <p className="text-xs text-slate-600 leading-relaxed font-medium">
+              {blockedReason}
+            </p>
+          </div>
+          <div className="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-[11px] text-slate-600 text-left space-y-1">
+            <span className="font-semibold block text-slate-800">Need Help?</span>
+            <p>If you believe this suspension is in error, please reach out to your administrator or teacher with your registered email.</p>
+          </div>
+          <button
+            onClick={() => {
+              try {
+                localStorage.removeItem('smriti_blocked_user');
+                localStorage.removeItem('smriti_blocked_reason');
+                googleDriveService.disconnect();
+                setIsDriveConnected(false);
+                setIsGuestMode(false);
+              } catch {
+                // Ignore
+              }
+              setIsUserBlocked(false);
+            }}
+            className="w-full py-2.5 px-4 rounded-full bg-[#241F3B] hover:bg-[#302A4E] text-white text-xs font-semibold transition-all cursor-pointer shadow-md active:scale-95"
+          >
+            Switch Google Account
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   // Vedic Welcome & Google Drive Onboarding Gateway
   if (!isDriveConnected && !isGuestMode) {
     return (
@@ -2022,21 +2327,16 @@ export const App: React.FC = () => {
         }}
         onExploreGuest={() => {
           setIsGuestMode(true);
+          setIsGuestBannerExpanded(true);
           if (typeof window !== 'undefined') {
             localStorage.setItem('smriti_guest_mode', 'true');
           }
-          try {
-            const saved = localStorage.getItem('smriti_audio_items');
-            if (saved) {
-              const parsed: AudioItem[] = JSON.parse(saved);
-              const demoIds = new Set(['aud-1', 'aud-2', 'aud-3', 'aud-4']);
-              setAudioItems(
-                parsed
-                  .filter(item => !demoIds.has(item.id))
-                  .map(item => playCountService.mergeAudioItem(item))
-              );
-            }
-          } catch {}
+          const guestSubs = loadGuestSubjects();
+          const guestAudios = loadGuestAudioItems();
+          setSubjects(guestSubs);
+          setAudioItems(guestAudios);
+          setCurrentTab('library');
+          setSelectedSubjectForLibrary(null);
         }}
       />
     );
@@ -2051,27 +2351,142 @@ export const App: React.FC = () => {
         onRetryTask={handleRetryTask}
       />
 
-      {/* Sleek Guest Mode Offline Indicator Banner */}
+      {/* Sleek Auto-Collapsing Guest Mode Floating Banner (Stitch Vedic Sacred Memory) */}
       {!isDriveConnected && isGuestMode && (
-        <div className="w-full max-w-md mx-auto px-4 pt-2.5 pb-1">
-          <div className="flex items-center justify-between gap-2.5 px-3.5 py-2 rounded-2xl bg-amber-500/10 border border-amber-500/25 text-amber-900 text-xs shadow-xs backdrop-blur-xs">
-            <div className="flex items-center gap-2 min-w-0">
-              <span className="size-2 rounded-full bg-amber-500 animate-pulse shrink-0" />
-              <div className="min-w-0">
-                <p className="font-semibold text-slate-800 text-[11px] leading-tight truncate">
-                  अतिथि • Offline Guest Mode
+        <div className="w-full max-w-md mx-auto px-4 pt-2.5 pb-1 transition-all duration-500 ease-in-out">
+          <div
+            onMouseEnter={handleBannerMouseEnter}
+            className={`relative overflow-hidden bg-[#FFFDF9]/95 backdrop-blur-md border border-[#DFCEB5] shadow-xs hover:border-[#C59B27]/80 transition-all duration-500 ease-in-out ${
+              isGuestBannerExpanded
+                ? 'rounded-2xl p-3.5 shadow-md'
+                : 'rounded-full h-9 px-3 flex items-center justify-between'
+            }`}
+          >
+            {/* Expanded View */}
+            {isGuestBannerExpanded ? (
+              <div className="w-full animate-in fade-in duration-300">
+                {/* Sacred ornamental micro-accents */}
+                <div className="absolute top-2 left-2 text-[#C59B27]/30 text-[8px] select-none pointer-events-none font-serif">✤</div>
+                <div className="absolute top-2 right-2 text-[#C59B27]/30 text-[8px] select-none pointer-events-none font-serif">✤</div>
+
+                {/* Line 1: Dedicated Full Title Line with Glowing Amber Indicator, Local Only Tag & Collapse Trigger */}
+                <div className="flex items-center justify-between gap-2 pb-1.5 border-b border-[#F2E8DC]/80">
+                  <div className="flex items-center gap-2 pl-0.5 min-w-0">
+                    <span className="relative flex size-2 items-center justify-center shrink-0">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75" />
+                      <span className="relative inline-flex rounded-full size-2 bg-amber-500 ring-2 ring-amber-200/80" />
+                    </span>
+                    <h2 className="text-xs font-bold tracking-wide text-[#1E1B4B] uppercase">
+                      Offline Guest Mode
+                    </h2>
+                  </div>
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium bg-[#F8F3EC] text-[#8B6B1F] border border-[#EADCC8]">
+                      <HardDrive size={10} className="stroke-[2.2]" />
+                      <span>Local Only</span>
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setIsGuestBannerExpanded(false)}
+                      className="size-5 rounded-full flex items-center justify-center text-[#7C6A53] hover:text-[#1E1B4B] hover:bg-[#FAF6EE] transition-colors cursor-pointer"
+                      title="Collapse banner into sleek top bar"
+                      aria-label="Collapse banner into sleek top bar"
+                    >
+                      <ChevronUp size={13} className="stroke-[2.5]" />
+                    </button>
+                  </div>
+                </div>
+
+                {/* Line 2: Explanatory Subtitle with comfortable breathing room */}
+                <p className="mt-2 text-[11.5px] leading-relaxed text-[#57534E] pl-0.5 font-normal">
+                  Audio saved locally on device. Connect Google Drive to sync across devices.
                 </p>
-                <p className="text-[10px] text-slate-500 leading-tight truncate">
-                  Audio saved on device. Connect Google Drive for cloud backup.
-                </p>
+
+                {/* Line 3: Dedicated Action Buttons at the Bottom */}
+                <div className="mt-2.5 pt-2.5 border-t border-[#F5EFE7] flex items-center justify-between gap-2.5">
+                  {/* Secondary Pill Button: ← Welcome */}
+                  <button
+                    type="button"
+                    onClick={handleExitGuestMode}
+                    className="group inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-full bg-[#FAF5EE] hover:bg-[#F2EADB] active:scale-95 border border-[#DFCEB5] text-[#44403C] hover:text-[#1E1B4B] text-[11.5px] font-medium transition-all shadow-2xs cursor-pointer"
+                    title="Return to Welcome Screen"
+                    aria-label="Return to Welcome Screen"
+                  >
+                    <ArrowLeft size={11} className="text-[#8B6B1F] group-hover:-translate-x-0.5 transition-transform stroke-[2.5]" />
+                    <span>Welcome</span>
+                  </button>
+
+                  {/* Primary Call-to-Action Button: Sign In */}
+                  <button
+                    type="button"
+                    onClick={handleConnectDrive}
+                    className="relative group overflow-hidden inline-flex items-center justify-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-[#1E1B4B] hover:bg-[#2A2663] active:scale-95 text-[#FFFDF9] text-[11.5px] font-semibold tracking-wide shadow-xs border border-[#C59B27]/40 hover:border-[#C59B27]/70 transition-all cursor-pointer"
+                    title="Sign in with Google Drive to enable cloud sync"
+                    aria-label="Sign in with Google Drive"
+                  >
+                    <Cloud size={12} className="text-[#EADCC8] relative z-10" />
+                    <span className="relative z-10 font-medium">Sign In</span>
+                    <ChevronRight size={12} className="text-[#C59B27] group-hover:translate-x-0.5 transition-transform relative z-10" />
+                  </button>
+                </div>
               </div>
-            </div>
-            <button
-              onClick={handleConnectDrive}
-              className="px-2.5 py-1 rounded-xl bg-gradient-to-r from-amber-600 to-amber-700 hover:from-amber-700 hover:to-amber-800 text-white font-medium text-[11px] shrink-0 transition-all shadow-xs active:scale-95 cursor-pointer"
-            >
-              Sign In
-            </button>
+            ) : (
+              /* Collapsed Sleek Top Bar (Stitch Screen Design deaee47b51944148b91d0ded4f456824) */
+              <div className="w-full h-full flex items-center justify-between gap-2 animate-in fade-in duration-300">
+                {/* Left: Glowing amber bead, title & mini local badge */}
+                <button
+                  type="button"
+                  onClick={() => setIsGuestBannerExpanded(true)}
+                  className="flex items-center gap-2 min-w-0 text-left cursor-pointer hover:opacity-85 transition-opacity"
+                  title="Click to expand details"
+                >
+                  <span className="relative flex size-2 items-center justify-center shrink-0">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75" />
+                    <span className="relative inline-flex rounded-full size-2 bg-amber-500 ring-2 ring-amber-200/80" />
+                  </span>
+                  <span className="text-[11px] font-bold tracking-wider text-[#1E1B4B] uppercase truncate">
+                    Offline Guest Mode
+                  </span>
+                  <span className="hidden xs:inline-flex items-center gap-0.5 px-1.5 py-0.2 rounded-full bg-[#FAF6EE] border border-[#DFCEB5]/80 text-[9px] font-medium text-[#7C6A53] shrink-0">
+                    Local
+                  </span>
+                </button>
+
+                {/* Right: Tactile mini action pills & expand trigger */}
+                <div className="flex items-center gap-1.5 shrink-0">
+                  <button
+                    type="button"
+                    onClick={handleExitGuestMode}
+                    className="h-[22px] px-2 rounded-full bg-[#FAF6EE] hover:bg-[#F2EADB] active:scale-95 border border-[#DFCEB5] text-[10px] font-medium text-[#5A4632] flex items-center gap-1 transition-all cursor-pointer shadow-2xs"
+                    title="Return to Welcome Screen"
+                    aria-label="Return to Welcome Screen"
+                  >
+                    <ArrowLeft size={10} className="text-[#8B6B1F]" />
+                    <span>Welcome</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleConnectDrive}
+                    className="h-[22px] px-2.5 rounded-full bg-[#1E1B4B] hover:bg-[#2A2468] active:scale-95 border border-[#DFCEB5]/70 text-[10px] font-semibold text-[#FFFDF9] flex items-center gap-1 transition-all cursor-pointer shadow-btn-indigo"
+                    title="Sign in with Google Drive"
+                    aria-label="Sign in with Google Drive"
+                  >
+                    <Cloud size={10} className="text-[#DFCEB5]" />
+                    <span>Sign In</span>
+                  </button>
+                  <div className="h-3 w-px bg-[#DFCEB5]/70 mx-0.5" />
+                  <button
+                    type="button"
+                    onClick={() => setIsGuestBannerExpanded(true)}
+                    className="size-5 rounded-full flex items-center justify-center text-[#7C6A53] hover:text-[#1E1B4B] hover:bg-[#FAF6EE] transition-all cursor-pointer active:scale-95"
+                    title="Expand offline guest details"
+                    aria-label="Expand offline guest details"
+                  >
+                    <ChevronDown size={13} className="stroke-[2.5]" />
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -2161,16 +2576,15 @@ export const App: React.FC = () => {
             revisionItems={revisionItems}
             dailyStats={dailyStats}
             isDriveConnected={isDriveConnected}
+            isGuestMode={isGuestMode}
             isSyncingDrive={isSyncingDrive}
             onUpdateSettings={handleUpdateSettings}
             onConnectDrive={handleConnectDrive}
             onDisconnectDrive={handleDisconnectDrive}
+            onExitGuestMode={handleExitGuestMode}
             onSyncDrive={handleSyncDrive}
             onConnectWithToken={handleConnectWithToken}
-            onClearCache={() => {
-              bridge.clearTemporaryCache();
-              setStorageInfo(bridge.getStorageInfo());
-            }}
+            onClearCache={handleClearCache}
           />
         )}
       </main>
