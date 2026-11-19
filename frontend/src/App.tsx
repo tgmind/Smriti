@@ -2444,10 +2444,10 @@ export const App: React.FC = () => {
                     <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75" />
                     <span className="relative inline-flex rounded-full size-2 bg-amber-500 ring-2 ring-amber-200/80" />
                   </span>
-                  <span className="text-[11px] font-bold tracking-wider text-[#1E1B4B] uppercase truncate">
-                    Offline Guest Mode
+                  <span className="text-[11px] font-bold tracking-wider text-[#1E1B4B] uppercase whitespace-nowrap">
+                    <span className="hidden sm:inline">Offline </span>Guest Mode
                   </span>
-                  <span className="hidden xs:inline-flex items-center gap-0.5 px-1.5 py-0.2 rounded-full bg-[#FAF6EE] border border-[#DFCEB5]/80 text-[9px] font-medium text-[#7C6A53] shrink-0">
+                  <span className="inline-flex items-center gap-0.5 px-1.5 py-0.2 rounded-full bg-[#FAF6EE] border border-[#DFCEB5]/80 text-[9px] font-medium text-[#7C6A53] shrink-0">
                     Local
                   </span>
                 </button>

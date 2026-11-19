@@ -213,33 +213,48 @@ export const GoogleDriveStorage: React.FC<GoogleDriveStorageProps> = ({
             >
               <CloudOff size={22} strokeWidth={2.2} />
             </EmptyMedia>
-            <EmptyTitle className="text-base font-bold text-slate-950">
+            {isGuestMode && (
+              <div className="flex items-center justify-center mt-1 mb-1.5">
+                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10.5px] font-semibold bg-amber-500/10 text-amber-900 border border-amber-300/60 shadow-2xs">
+                  <span className="size-1.5 rounded-full bg-amber-500 shrink-0" />
+                  <span className="font-bold uppercase tracking-wider">Guest Scholar</span>
+                  <span className="text-amber-400">•</span>
+                  <span className="text-amber-800 font-medium">Local Storage</span>
+                </span>
+              </div>
+            )}
+            <EmptyTitle className="text-base sm:text-lg font-bold text-slate-900 tracking-tight">
               {isGuestMode ? 'Offline Guest Mode' : 'Google Drive Disconnected'}
             </EmptyTitle>
-            <EmptyDescription className="text-xs text-slate-500 max-w-xs leading-relaxed">
+            <EmptyDescription className="text-xs text-slate-500 max-w-xs leading-relaxed mt-0.5">
               {isGuestMode
                 ? 'Your audio notes and folders are saved offline on this device. Sign in with Google Drive anytime for cloud backup.'
                 : 'Connect your personal Google Drive to sync audio notes and back up your study library.'}
             </EmptyDescription>
           </EmptyHeader>
-          <EmptyContent className="flex flex-col items-center gap-2.5 w-full max-w-xs pt-1">
+          <EmptyContent className="flex flex-col items-center gap-2.5 w-full max-w-xs pt-1.5">
             <Button
               onClick={onConnectDrive}
               disabled={isSyncingDrive}
-              className="w-full h-10 rounded-xl bg-slate-950 hover:bg-slate-800 text-white font-semibold flex items-center justify-center gap-2 cursor-pointer shadow-xs active:scale-98"
+              className="w-full h-11 rounded-xl bg-slate-950 hover:bg-slate-800 text-white font-semibold text-xs flex items-center justify-center gap-2 cursor-pointer shadow-xs active:scale-98 transition-all"
             >
               <HardDrive size={15} className="text-blue-400" />
               <span>{isSyncingDrive ? 'Connecting...' : 'Connect Personal Google Drive'}</span>
             </Button>
             {isGuestMode && onExitGuestMode && (
-              <button
-                type="button"
-                onClick={onExitGuestMode}
-                className="w-full h-9 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 text-amber-900 border border-amber-300/60 font-medium text-xs flex items-center justify-center gap-1.5 cursor-pointer active:scale-98 transition-all"
-              >
-                <ArrowLeft size={13} className="stroke-[2.5]" />
-                <span>Return to Welcome Screen</span>
-              </button>
+              <div className="w-full space-y-1.5">
+                <button
+                  type="button"
+                  onClick={onExitGuestMode}
+                  className="w-full h-10 rounded-xl bg-[#FAF5EE] hover:bg-[#F3ECE0] text-amber-950 border border-[#DFCEB5] font-semibold text-xs flex items-center justify-center gap-2 cursor-pointer active:scale-98 transition-all shadow-2xs"
+                >
+                  <ArrowLeft size={14} className="text-amber-700 stroke-[2.5]" />
+                  <span>Return to Welcome Screen</span>
+                </button>
+                <p className="text-[10px] text-amber-800/80 font-medium text-center">
+                  Exit Guest Mode anytime to sign in or connect cloud storage
+                </p>
+              </div>
             )}
           </EmptyContent>
         </Empty>

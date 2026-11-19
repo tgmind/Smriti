@@ -86,7 +86,7 @@ describe('Guest Mode Privacy Isolation & Welcome Page Navigation Architecture', 
     expect(html).not.toMatch(/Offline Guest Mode[^<]*truncate/);
   });
 
-  it('renders Exit Guest Mode & Return to Welcome Screen in ProfileTab when in Guest Mode', () => {
+  it('renders Exit Guest Mode & Return to Welcome Screen in a single unified card in ProfileTab when in Guest Mode', () => {
     const mockSettings: UserSettings = {
       daily_listening_goal_minutes: 30,
       default_playback_speed: 1.0,
@@ -121,14 +121,19 @@ describe('Guest Mode Privacy Isolation & Welcome Page Navigation Architecture', 
       />
     );
 
-    // Profile card displays Guest Scholar status in pure English
+    // Single unified card displays Guest Scholar status in pure English
     expect(html).toContain('Guest Scholar');
     expect(html).not.toContain('अतिथि');
-    expect(html).toContain('Offline Guest Mode • Local Storage');
+    expect(html).toContain('Offline Guest Mode');
+    expect(html).toContain('Local Storage');
 
-    // Prominent action button to return to Welcome Screen
-    expect(html).toContain('Return to Welcome Screen');
+    // Prominent action button to return to Welcome Screen (exactly ONCE, not duplicated across two cards)
+    const returnMatches = html.match(/Return to Welcome Screen/g);
+    expect(returnMatches).toHaveLength(1);
     expect(html).toContain('Exit Guest Mode');
+
+    // Ensures the duplicate plain avatar card is NOT rendered
+    expect(html).not.toContain('Local Account');
   });
 
   it('renders Offline Guest Mode status and Return to Welcome Screen in GoogleDriveStorage when in Guest Mode', () => {
